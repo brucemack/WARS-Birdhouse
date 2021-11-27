@@ -20,7 +20,9 @@
 
 // ===== TO BE MOVED =======
 
-// A circular queue for byte buffers of arbitray length. 
+/** 
+ *  A circular queue for byte buffers of arbitrary length. 
+ */
 template<unsigned int S> class CircularBuffer {
 public:
 
@@ -75,6 +77,19 @@ public:
     }
     
     _front = ptr;
+  }
+
+  /**
+   * This combines isEmpty() and pop() to provide an easy atomic 
+   * pop operation.
+   */
+  bool popIfNotEmpty(uint8_t* buf, unsigned int* len) {
+    if (isEmpty()) {
+      return false;
+    } else {
+      pop(buf, len);
+      return true;
+    }
   }
   
 private:
@@ -196,13 +211,13 @@ uint8_t spi_write_multi(uint8_t reg, uint8_t* buf, uint8_t len) {
   return stat;
 }
 
+// ===== Low-Level Interface =====
+
 void event_txdone();
 void event_rxdone();
 
 unsigned int isr_count = 0;
 unsigned int last_irq = 0;
-uint8_t rx_buf[256];
-unsigned int rx_buf_len = 0;
 uint8_t tx_buf[256];
 unsigned int tx_buf_len = 0;
 
@@ -211,9 +226,10 @@ enum State { IDLE, LISTENING, TRANSMITTING, LISTENING_FOR_ACK };
 
 static State state = State::IDLE;
 
-CircularBuffer<512> tx_buffer;
-
-void (*rx_callback)(uint8_t*, unsigned int) = 0;
+// The circular buffer used for outgoing data
+static CircularBuffer<4096> tx_buffer;
+// The circular buffer used for incoming data
+static CircularBuffer<4096> rx_buffer;
 
 // ----- Interrupt Service -------
 
@@ -240,7 +256,9 @@ void IRAM_ATTR isr() {
 
 // Call periodically to look for timeouts or other pending activity
 void event_tick() {
-  // If we are in the normal listening state then we can start a transmit
+
+  noInterrupts();
+  
   if (state == State::LISTENING) {
     // Check for pending writes
     if (!tx_buffer.isEmpty()) {
@@ -258,56 +276,43 @@ void event_tick() {
       set_mode_TX();
     }
   }
-  else {
-    //Serial.println("Not listening");
-  }
+
+  interrupts();
 }
 
 void event_TxDone() { 
-  Serial.println("event_TxDone");
   // Waiting for an message transmit to finish successfull
   if (state == State::TRANSMITTING) {
     state = State::LISTENING;
     // Ask for interrupt when receiving
     enable_interrupt_RxDone();
     // Go into RXCONTINUOUS so we can hear the response
-    set_mode_RXCONTINUOUS();
-    
-  } 
+    set_mode_RXCONTINUOUS();  
+  } else {
+    Serial.println("ERR: TxDone received in unexpected state");
+  }
 } 
 
 void event_RxDone() {
-  
-  Serial.println("event_RxDone");
-  
+
   // How much data is available?
   uint8_t len = spi_read(0x13);
   // Reset the FIFO read pointer to the beginning of the packet we just got
   spi_write(0x0d, spi_read(0x10));
+  uint8_t rx_buf[256];
   // Stream in from the FIFO
   spi_read_multi(0x00, rx_buf, len);
-  rx_buf_len = len;
 
   // Look at the message and determine if it belongs to us
-  if (rx_buf_len > 0 && (rx_buf[0] == MY_ADDR || rx_buf[0] == 255)) {
-
-    Serial.println("mine");
-      
+  if (len > 0 && (rx_buf[0] == MY_ADDR || rx_buf[0] == 255)) {     
     // Handle based on state
     if (state == State::LISTENING) {
-      // FIRE CALLBACK
-      if (rx_callback != 0) {
-        rx_callback(rx_buf, rx_buf_len);
-      }
-      else {
-        Serial.println("No callback");
-      }
+      // Put the data into the circular queue
+      rx_buffer.push(rx_buf, len);
     }
     else {
-      Serial.println("Not listening");
+      Serial.println(F("ERR: Message received when not listening"));
     }
-  } else {
-    Serial.println("Ignored message");
   }
 }
 
@@ -451,100 +456,146 @@ int init_radio() {
 // ===== Application 
 
 static auto msg_arg_error = F("Argument error");
+static int counter = 0;
 
-int sendReset(int argc, char **argv) { 
+static const uint8_t nodes = 5;
+// Static routing table
+static uint8_t static_routes[nodes][nodes] = 
+  { 
+    // Node 0 not used
+    { 0, 0, 0, 0, 0 },
+    // Node 1 - Bruce's control node
+    { 0, 0, 0, 3, 3 },
+    // Node 2 not used
+    { 0, 0, 0, 0, 0 },
+    // Node 3 - Bruce's house
+    { 0, 1, 0, 0, 4 },
+    // Node 4 - Hardy School
+    { 0, 3, 0, 3, 0 }
+  };
 
-  if (argc == 2) {
+struct Header {
+  uint8_t destAddr;
+  uint8_t sourceAddr;
+  uint16_t id;
+  uint8_t type;
+  // Used for multi-hop communication.  This is the node that is 
+  // the ultimate destination of a message.
+  uint8_t finalDestAddr;
+  // Used for multi-hop communication.  This is the node that 
+  // originated the message.
+  uint8_t originalSourceAddr;
+  // Used for multi-hop communication.  This is the number of hops
+  // that the packet has traversed.
+  uint8_t hops;
+};
 
-    uint8_t targetNodeAddr = atoi(argv[1]);
-    
-    uint8_t data[32];
-    // VERSION
-    data[0] = SW_VERSION;
-    // COMMAND
-    data[1] = 4;
+struct PingMessage {
+  Header header;  
+};
 
-    shell.print("Resetting node ");
-    shell.println(targetNodeAddr);
+struct PongMessage {
+  Header header;  
+  uint16_t version;
+  uint16_t counter;
+  uint16_t rssi;
+  uint16_t batteryMv;
+  uint16_t panelMv;
+  uint32_t uptimeSeconds;
+  uint16_t bootCount;
+  uint16_t sleepCount;
+};
 
-    
-  } else {
+struct ResetMessage {
+  Header header;  
+};
+
+int sendPing(int argc, char **argv) { 
+ 
+  if (argc != 2) {
     shell.println(msg_arg_error);
+    return -1;
+  }
+
+  counter++;
+  
+  uint8_t target = atoi(argv[1]);
+
+  if (target < nodes) {
+    
+    uint8_t nextHop = static_routes[MY_ADDR][target];
+    if (nextHop != 0) {
+      
+      shell.print(F("Pinging node "));
+      shell.print(target);
+      shell.print(F(" via "));
+      shell.println(nextHop);
+    
+      PingMessage msg;
+      msg.header.destAddr = nextHop;
+      msg.header.sourceAddr = MY_ADDR;
+      msg.header.id = counter;
+      msg.header.type = 1;
+      msg.header.finalDestAddr = target;
+      msg.header.originalSourceAddr = MY_ADDR;
+      msg.header.hops = 0;
+
+      noInterrupts();
+      tx_buffer.push((uint8_t*)&msg, sizeof(PingMessage));
+      interrupts();
+      
+      return 0;
+
+    } else {
+      shell.println(F("No route"));
+    }
   }
 }
 
-int sendPing(int argc, char **argv) { 
+int sendReset(int argc, char **argv) { 
 
-  static int counter = 0;
-  
-  if (argc == 2) {
-
-    uint8_t targetNodeAddr;
-    
-    if (argv[1][0] == '*') 
-      targetNodeAddr = 255;
-    else 
-      targetNodeAddr = atoi(argv[1]);
-
-    shell.print("Pinging node ");
-    shell.println(targetNodeAddr);
-
-    uint8_t msg[5];
-    msg[0] = targetNodeAddr;
-    msg[1] = MY_ADDR;
-    msg[2] = 0;
-    msg[3] = 0;
-    msg[4] = 1;
-    tx_buffer.push(msg, 5);
-    
-  } else {
+  if (argc != 2) {
     shell.println(msg_arg_error);
+    return -1;
+  }
+
+  counter++;
+  uint8_t target = atoi(argv[1]);
+
+  if (target < nodes) {
+
+    uint8_t nextHop = static_routes[MY_ADDR][target];
+    if (nextHop != 0) {
+
+      shell.print(F("Resetting node "));
+      shell.println(target);
+    
+      ResetMessage msg;
+      msg.header.destAddr = nextHop;
+      msg.header.sourceAddr = MY_ADDR;
+      msg.header.id = counter;
+      msg.header.type = 4;
+      msg.header.finalDestAddr = target;
+      msg.header.originalSourceAddr = MY_ADDR;
+      msg.header.hops = 0;
+
+      noInterrupts();
+      tx_buffer.push((uint8_t*)&msg, sizeof(ResetMessage));
+      interrupts();
+      
+      return 0;
+    } else {
+      shell.println(F("No route"));
+    }
+  } else {
+    return -1;
   }
 }
 
 int boot(int argc, char **argv) { 
     shell.println("Asked to reboot ...");
     ESP.restart();
-}
-
-static void show_rx_msg(uint8_t* buf, unsigned int len) {
-
-  if (len >= 5) {
-    
-    uint8_t from_addr = buf[1];
-    unsigned int id = (buf[2] << 8);
-    id |= buf[3];
-    uint8_t type = buf[4];
-
-    Serial.print("Got type: ");
-    Serial.print(type);
-    Serial.print(", id: ");
-    Serial.print(id);
-    Serial.print(", from: ");
-    Serial.println(from_addr);
-    
-    // Ping
-    if (type == 1) {
-      // Create a pong and send back
-      uint8_t msg[5];
-      msg[0] = from_addr;
-      msg[1] = MY_ADDR;
-      msg[2] = (id >> 8) & 0xff;
-      msg[3] = (id & 0xff);
-      msg[4] = 2;
-      tx_buffer.push(msg, 5);
-    }
-    // Pong
-    else if (type == 2) {
-    }
-
-    else {
-      Serial.println("Unknown message");
-    }
-  }
-  else {
-    Serial.println("Invalid message");
-  }
+    return 0;
 }
 
 void setup() {
@@ -606,22 +657,152 @@ void setup() {
   }
 
   // Start listening for messages
-  rx_callback = show_rx_msg;
   state = State::LISTENING;
   enable_interrupt_RxDone();
   set_mode_RXCONTINUOUS();
 }
 
-void loop() {
+void process_rx_msg(uint8_t* buf, unsigned int len);
 
-  event_tick();
+void loop() {
 
   // Service the shell
   shell.executeIfInput();
+  
+  // Check for radio activity
+  event_tick();
 
-  //Serial.print(isr_count);
-  //Serial.print(" ");
-  //Serial.print(last_irq);
-  //Serial.print(" ");
-  //Serial.println(state);
+  // Look for any received data that should be processed by the application
+  uint8_t msg[256];
+  unsigned int msg_len = 256;
+  noInterrupts();
+  boolean notEmpty = rx_buffer.popIfNotEmpty(msg, &msg_len);
+  interrupts();
+  if (notEmpty) {
+    process_rx_msg(msg, msg_len);
+  }
+}
+
+void process_rx_msg(uint8_t* buf, unsigned int len) {
+
+  if (len >= sizeof(Header)) {
+
+    Header header;
+    memcpy(&header, buf, sizeof(Header));
+
+    shell.print("Got type: ");
+    shell.print(header.type);
+    shell.print(", id: ");
+    shell.print(header.id);
+    shell.print(", from: ");
+    shell.print(header.sourceAddr);
+    shell.print(", originalSource: ");
+    shell.print(header.originalSourceAddr);
+    shell.print(", finalDest: ");
+    shell.print(header.finalDestAddr);
+    shell.print(", hops: ");
+    shell.println(header.hops);
+
+    // Look for messages that need to be forwarded on
+    if (header.finalDestAddr != MY_ADDR) {
+      if (header.finalDestAddr < nodes) {
+        // Look up the route
+        uint8_t nextHop = static_routes[MY_ADDR][header.finalDestAddr];
+        if (nextHop == 0) {
+          shell.println(F("No route available"));
+        }
+        else {
+          shell.print(F("Routing via: "));
+          shell.println(nextHop);
+          // Fix the header
+          header.destAddr = nextHop;
+          header.sourceAddr = MY_ADDR;
+          header.hops = header.hops + 1;        
+          memcpy(buf, &header, sizeof(Header));
+          // Send the entire message
+          noInterrupts();
+          tx_buffer.push(buf, len);
+          interrupts();
+        }
+      } else {
+        shell.println(F("Invalid address"));
+      }
+    }
+    // All other messages are being directed to this node
+    else {
+      
+      // Ping
+      if (header.type == 1) {
+        // Create a pong and send back to the originator of the ping
+        PongMessage msg;
+        msg.header.destAddr = header.sourceAddr;
+        msg.header.sourceAddr = MY_ADDR;
+        msg.header.id = header.id;
+        msg.header.type = 2;
+        msg.header.finalDestAddr = header.originalSourceAddr;
+        msg.header.originalSourceAddr = MY_ADDR;
+
+        msg.version = SW_VERSION;
+        msg.counter = counter;
+        msg.rssi = 0;
+        msg.batteryMv = 0;
+        msg.panelMv = 0;
+        msg.uptimeSeconds = 0;
+        msg.bootCount = 0;
+        msg.sleepCount = 0;
+        
+        noInterrupts();
+        tx_buffer.push((uint8_t*)&msg, sizeof(PongMessage));
+        interrupts();
+      }
+      // Pong
+      else if (header.type == 2) {
+        
+        if (len >= sizeof(PongMessage)) {
+        
+          PongMessage pong;
+          memcpy(&pong, buf, sizeof(PongMessage));
+  
+          Serial.print("{ \"counter\": ");
+          Serial.print(pong.counter, DEC);
+          Serial.print(", \"origSourceAddr\": ");
+          Serial.print(pong.header.originalSourceAddr, DEC);
+          Serial.print(", \"local_rssi\": ");
+          Serial.print(0, DEC);
+          Serial.print(", \"hops\": ");
+          Serial.print(pong.header.hops, DEC);
+          Serial.print(", \"version\": ");
+          Serial.print(pong.version, DEC);
+          Serial.print(", \"rssi\": ");
+          Serial.print(pong.rssi, DEC);
+          Serial.print(", \"batteryMv\": ");
+          Serial.print(pong.batteryMv, DEC);
+          Serial.print(", \"panelMv\": ");
+          Serial.print(pong.panelMv, DEC);
+          Serial.print(", \"uptimeSeconds\": ");
+          Serial.print(pong.uptimeSeconds, DEC);
+          Serial.print(", \"bootCount\": ");
+          Serial.print(pong.bootCount, DEC);
+          Serial.print(", \"sleepCount\": ");
+          Serial.print(pong.sleepCount, DEC);
+          Serial.println("\" }");
+        }
+        else {
+          Serial.println("Pong too short");
+        }
+      }
+      // Reset
+      else if (header.type == 4) {
+        shell.println(F("Resetting ..."));
+        ESP.restart();
+      }
+      else {
+        shell.println(F("ERR: Unknown message"));
+      }
+    }
+  }
+  else {
+    shell.println(F("ERR: Invalid message received"));
+    shell.println(len);
+  }
 }
