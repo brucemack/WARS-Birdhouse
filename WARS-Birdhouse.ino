@@ -9,15 +9,52 @@
 // Prerequsisites to Install 
 // * SimpleSerialShell
 
+// Build instructions
+// * Set clock frequency to 10MHz to save power
+
 #include <SPI.h>
 #include "WiFi.h"
 #include <esp_task_wdt.h>
 #include <Preferences.h>
 #include <SimpleSerialShell.h>
 
-#define SW_VERSION 6
+#define SW_VERSION 7
+static const uint8_t nodes = 5;
+
+// NODE SPECIFIC STUFF
 #define MY_ADDR 1
 
+// Static routing table (node 1)
+static uint8_t static_routes[nodes] = 
+{ 
+  // Node 0 not used
+  0,
+  // Node 1 - Bruce's control node
+  0,
+  // Node 2 not used
+  0,
+  // Node 3 - Hardy School
+  4,
+  // Node 4 - Bruce's house
+  4
+};
+
+/*
+// Static routing table (node 4)
+static uint8_t static_routes[nodes] = 
+{ 
+  // Node 0 not used
+  0,
+  // Node 1 - Bruce's control node
+  1,
+  // Node 2 not used
+  0,
+  // Node 3 - Hardy School
+  3,
+  // Node 4 - Bruce's house
+  0
+};
+*/
 // ===== TO BE MOVED =======
 
 /** 
@@ -94,13 +131,14 @@ public:
   
 private:
 
-  // Where we pop (read) from
-  unsigned int _front;
-  // Where we push (write) to
-  unsigned int _back;
-  // The actual space
   const unsigned int _bufSize = S;
-  uint8_t _buf[S];
+
+  // Where we pop (read) from
+  volatile unsigned int _front;
+  // Where we push (write) to
+  volatile unsigned int _back;
+  // The actual space
+  volatile uint8_t _buf[S];
 
   bool _pushRaw(const uint8_t* buf, unsigned int len) {
     for (unsigned int i = 0; i < len; i++) {
@@ -216,20 +254,38 @@ uint8_t spi_write_multi(uint8_t reg, uint8_t* buf, uint8_t len) {
 void event_txdone();
 void event_rxdone();
 
-unsigned int isr_count = 0;
-unsigned int last_irq = 0;
-uint8_t tx_buf[256];
-unsigned int tx_buf_len = 0;
+static volatile unsigned int isr_count = 0;
+static volatile unsigned int last_irq = 0;
 
 // The states of the state machine
 enum State { IDLE, LISTENING, TRANSMITTING, LISTENING_FOR_ACK };
 
-static State state = State::IDLE;
+static volatile State state = State::IDLE;
 
 // The circular buffer used for outgoing data
 static CircularBuffer<4096> tx_buffer;
 // The circular buffer used for incoming data
 static CircularBuffer<4096> rx_buffer;
+
+// Every message starts of with this header
+struct Header {
+  uint8_t destAddr;
+  uint8_t sourceAddr;
+  uint16_t id;
+  uint8_t type;
+  // Used for multi-hop communication.  This is the node that is 
+  // the ultimate destination of a message.
+  uint8_t finalDestAddr;
+  // Used for multi-hop communication.  This is the node that 
+  // originated the message.
+  uint8_t originalSourceAddr;
+  // Used for multi-hop communication.  This is the number of hops
+  // that the packet has traversed.
+  uint8_t hops;
+  // When possible this will be filled in on the *local* side of the 
+  // receive.
+  int16_t receiveRssi;
+};
 
 // ----- Interrupt Service -------
 
@@ -266,7 +322,8 @@ void event_tick() {
       set_mode_STDBY();
       // Pull the data off the queue into the transmit buffer.  We do this so
       // that re-transmits can be supported if necessary.
-      tx_buf_len = 256;
+      unsigned int tx_buf_len = 256;
+      uint8_t tx_buf[tx_buf_len];
       tx_buffer.pop(tx_buf, &tx_buf_len);
       // Move the data into the radio FIFO
       write_message(tx_buf, tx_buf_len);
@@ -299,14 +356,32 @@ void event_RxDone() {
   uint8_t len = spi_read(0x13);
   // Reset the FIFO read pointer to the beginning of the packet we just got
   spi_write(0x0d, spi_read(0x10));
+  // Stream in from the FIFO. 
   uint8_t rx_buf[256];
-  // Stream in from the FIFO
   spi_read_multi(0x00, rx_buf, len);
 
-  // Look at the message and determine if it belongs to us
+  // Grab the RSSI value
+  int8_t lastSnr = (int8_t)spi_read(0x19) / 4;
+  int16_t lastRssi = spi_read(0x1a);
+  if (lastSnr < 0)
+    lastRssi = lastRssi + lastSnr;
+  else
+    lastRssi = (int)lastRssi * 16 / 15;
+  // We are using the high frequency port
+  lastRssi -= 157;
+
+  // Look at the message and determine if it belongs to us.  If not then 
+  // we just ignore it (targeted to someone else)
   if (len > 0 && (rx_buf[0] == MY_ADDR || rx_buf[0] == 255)) {     
     // Handle based on state
     if (state == State::LISTENING) {
+      // Pull in the header 
+      Header header;
+      memcpy(&header, rx_buf, sizeof(Header));
+      // Fix the RSSI attribute in the header 
+      header.receiveRssi = lastRssi;
+      // Write the header back into the receive buffer
+      memcpy(rx_buf, &header, sizeof(Header));
       // Put the data into the circular queue
       rx_buffer.push(rx_buf, len);
     }
@@ -458,38 +533,6 @@ int init_radio() {
 static auto msg_arg_error = F("Argument error");
 static int counter = 0;
 
-static const uint8_t nodes = 5;
-// Static routing table
-static uint8_t static_routes[nodes][nodes] = 
-  { 
-    // Node 0 not used
-    { 0, 0, 0, 0, 0 },
-    // Node 1 - Bruce's control node
-    { 0, 0, 0, 3, 3 },
-    // Node 2 not used
-    { 0, 0, 0, 0, 0 },
-    // Node 3 - Bruce's house
-    { 0, 1, 0, 0, 4 },
-    // Node 4 - Hardy School
-    { 0, 3, 0, 3, 0 }
-  };
-
-struct Header {
-  uint8_t destAddr;
-  uint8_t sourceAddr;
-  uint16_t id;
-  uint8_t type;
-  // Used for multi-hop communication.  This is the node that is 
-  // the ultimate destination of a message.
-  uint8_t finalDestAddr;
-  // Used for multi-hop communication.  This is the node that 
-  // originated the message.
-  uint8_t originalSourceAddr;
-  // Used for multi-hop communication.  This is the number of hops
-  // that the packet has traversed.
-  uint8_t hops;
-};
-
 struct PingMessage {
   Header header;  
 };
@@ -498,7 +541,7 @@ struct PongMessage {
   Header header;  
   uint16_t version;
   uint16_t counter;
-  uint16_t rssi;
+  int16_t rssi;
   uint16_t batteryMv;
   uint16_t panelMv;
   uint32_t uptimeSeconds;
@@ -523,7 +566,7 @@ int sendPing(int argc, char **argv) {
 
   if (target < nodes) {
     
-    uint8_t nextHop = static_routes[MY_ADDR][target];
+    uint8_t nextHop = static_routes[target];
     if (nextHop != 0) {
       
       shell.print(F("Pinging node "));
@@ -539,6 +582,7 @@ int sendPing(int argc, char **argv) {
       msg.header.finalDestAddr = target;
       msg.header.originalSourceAddr = MY_ADDR;
       msg.header.hops = 0;
+      msg.header.receiveRssi = 0;
 
       noInterrupts();
       tx_buffer.push((uint8_t*)&msg, sizeof(PingMessage));
@@ -564,7 +608,7 @@ int sendReset(int argc, char **argv) {
 
   if (target < nodes) {
 
-    uint8_t nextHop = static_routes[MY_ADDR][target];
+    uint8_t nextHop = static_routes[target];
     if (nextHop != 0) {
 
       shell.print(F("Resetting node "));
@@ -578,6 +622,7 @@ int sendReset(int argc, char **argv) {
       msg.header.finalDestAddr = target;
       msg.header.originalSourceAddr = MY_ADDR;
       msg.header.hops = 0;
+      msg.header.receiveRssi = 0;
 
       noInterrupts();
       tx_buffer.push((uint8_t*)&msg, sizeof(ResetMessage));
@@ -607,12 +652,6 @@ void setup() {
   Serial.println(F("KC1FSZ LoRa Mesh System"));
   Serial.print(F("Node "));
   Serial.println(MY_ADDR);
-
-  // Slow down ESP32 to 10 MHz in order to reduce battery consumption
-  setCpuFrequencyMhz(10);
-  // Turn off WIFI and BlueTooth to reduce power 
-  WiFi.mode(WIFI_OFF);
-  btStop();
 
   // SPI slave select
   pinMode(SS_PIN, OUTPUT);
@@ -662,7 +701,7 @@ void setup() {
   set_mode_RXCONTINUOUS();
 }
 
-void process_rx_msg(uint8_t* buf, unsigned int len);
+void process_rx_msg(const uint8_t* buf, const unsigned int len);
 
 void loop() {
 
@@ -673,8 +712,8 @@ void loop() {
   event_tick();
 
   // Look for any received data that should be processed by the application
-  uint8_t msg[256];
   unsigned int msg_len = 256;
+  uint8_t msg[msg_len];
   noInterrupts();
   boolean notEmpty = rx_buffer.popIfNotEmpty(msg, &msg_len);
   interrupts();
@@ -683,10 +722,11 @@ void loop() {
   }
 }
 
-void process_rx_msg(uint8_t* buf, unsigned int len) {
+void process_rx_msg(const uint8_t* buf, const unsigned int len) {
 
   if (len >= sizeof(Header)) {
 
+    // Pull the header out
     Header header;
     memcpy(&header, buf, sizeof(Header));
 
@@ -701,27 +741,34 @@ void process_rx_msg(uint8_t* buf, unsigned int len) {
     shell.print(", finalDest: ");
     shell.print(header.finalDestAddr);
     shell.print(", hops: ");
-    shell.println(header.hops);
+    shell.print(header.hops);
+    shell.print(", RSSI: ");
+    shell.print(header.receiveRssi);
+    shell.println();
 
     // Look for messages that need to be forwarded on
     if (header.finalDestAddr != MY_ADDR) {
       if (header.finalDestAddr < nodes) {
         // Look up the route
-        uint8_t nextHop = static_routes[MY_ADDR][header.finalDestAddr];
+        uint8_t nextHop = static_routes[header.finalDestAddr];
         if (nextHop == 0) {
           shell.println(F("No route available"));
         }
         else {
           shell.print(F("Routing via: "));
           shell.println(nextHop);
+          // Copy the original message (minus the RSSI information)
+          uint8_t tx_buf[256];
+          memcpy(tx_buf, buf, len);
           // Fix the header
           header.destAddr = nextHop;
           header.sourceAddr = MY_ADDR;
           header.hops = header.hops + 1;        
-          memcpy(buf, &header, sizeof(Header));
+          memcpy(tx_buf, &header, sizeof(Header));
           // Send the entire message
           noInterrupts();
-          tx_buffer.push(buf, len);
+          // Notice that we are using the original length
+          tx_buffer.push(tx_buf, len);
           interrupts();
         }
       } else {
@@ -737,6 +784,7 @@ void process_rx_msg(uint8_t* buf, unsigned int len) {
         PongMessage msg;
         msg.header.destAddr = header.sourceAddr;
         msg.header.sourceAddr = MY_ADDR;
+        msg.header.hops = header.hops + 1;        
         msg.header.id = header.id;
         msg.header.type = 2;
         msg.header.finalDestAddr = header.originalSourceAddr;
@@ -744,7 +792,7 @@ void process_rx_msg(uint8_t* buf, unsigned int len) {
 
         msg.version = SW_VERSION;
         msg.counter = counter;
-        msg.rssi = 0;
+        msg.rssi = header.receiveRssi;
         msg.batteryMv = 0;
         msg.panelMv = 0;
         msg.uptimeSeconds = 0;
@@ -759,7 +807,9 @@ void process_rx_msg(uint8_t* buf, unsigned int len) {
       else if (header.type == 2) {
         
         if (len >= sizeof(PongMessage)) {
-        
+
+          // Re-read the message into the PongMessage format.  Notice that we skip the first 
+          // two bytes of the message 
           PongMessage pong;
           memcpy(&pong, buf, sizeof(PongMessage));
   
