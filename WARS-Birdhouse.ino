@@ -23,8 +23,8 @@ static const uint8_t nodes = 5;
 static Preferences preferences;
 
 // NODE SPECIFIC STUFF
-#define MY_ADDR 1
-
+#define MY_ADDR 3
+/*
 // Static routing table (node 1)
 static uint8_t static_routes[nodes] = 
 { 
@@ -39,8 +39,8 @@ static uint8_t static_routes[nodes] =
   // Node 4 - Bruce's house
   4
 };
+*/
 
-/*
 // Static routing table (node 3)
 static uint8_t static_routes[nodes] = 
 { 
@@ -55,7 +55,7 @@ static uint8_t static_routes[nodes] =
   // Node 4 - Bruce's house
   4
 };
-*/
+
 /*
 // Static routing table (node 4)
 static uint8_t static_routes[nodes] = 
@@ -845,7 +845,9 @@ void process_rx_msg(const uint8_t* buf, const unsigned int len) {
         msg.rssi = header.receiveRssi;
         msg.batteryMv = 0;
         msg.panelMv = 0;
-        msg.uptimeSeconds = 0;
+        // Measure uptime
+        int32_t uptime_seconds = esp_timer_get_time() / 1000000L;
+        msg.uptimeSeconds = uptime_seconds;
         msg.bootCount = preferences.getUShort("bootcount", 0);  
         msg.sleepCount = preferences.getUShort("sleepcount", 0);  
         
