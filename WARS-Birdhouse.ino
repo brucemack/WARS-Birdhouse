@@ -56,7 +56,6 @@ static uint8_t static_routes[nodes] =
   4
 };
 */
-
 /*
 // Static routing table (node 4)
 static uint8_t static_routes[nodes] = 
@@ -683,6 +682,8 @@ void setup() {
   Serial.print(F("Node "));
   Serial.println(MY_ADDR);
 
+  preferences.begin("my-app", false); 
+
   // SPI slave select
   pinMode(SS_PIN, OUTPUT);
   digitalWrite(SS_PIN, HIGH);
@@ -700,6 +701,16 @@ void setup() {
   shell.addCommand(F("boot"), boot);
   shell.addCommand(F("sleep"), sleep);
 
+  // Increment the boot count
+  uint16_t bootCount = preferences.getUShort("bootcount", 0);  
+  shell.print(F("Boot count: "));
+  shell.println(bootCount);
+  preferences.putUShort("bootcount", bootCount + 1);
+
+  uint16_t sleepCount = preferences.getUShort("sleepcount", 0);  
+  shell.print(F("Sleep count: "));
+  shell.println(sleepCount);
+  
   // Interrupt setup from radio
   // Allocating an external interrupt will always allocate it on the core that does the allocation.
   attachInterrupt(DIO0_PIN, isr, RISING);
@@ -835,8 +846,8 @@ void process_rx_msg(const uint8_t* buf, const unsigned int len) {
         msg.batteryMv = 0;
         msg.panelMv = 0;
         msg.uptimeSeconds = 0;
-        msg.bootCount = 0;
-        msg.sleepCount = 0;
+        msg.bootCount = preferences.getUShort("bootcount", 0);  
+        msg.sleepCount = preferences.getUShort("sleepcount", 0);  
         
         noInterrupts();
         tx_buffer.push((uint8_t*)&msg, sizeof(PongMessage));
