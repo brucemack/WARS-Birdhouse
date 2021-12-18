@@ -20,6 +20,7 @@
 
 #define SW_VERSION 7
 static const uint8_t nodes = 5;
+static Preferences preferences;
 
 // NODE SPECIFIC STUFF
 #define MY_ADDR 1
@@ -38,6 +39,23 @@ static uint8_t static_routes[nodes] =
   // Node 4 - Bruce's house
   4
 };
+
+/*
+// Static routing table (node 3)
+static uint8_t static_routes[nodes] = 
+{ 
+  // Node 0 not used
+  0,
+  // Node 1 - Bruce's control node
+  4,
+  // Node 2 not used
+  0,
+  // Node 3 - Hardy School
+  0,
+  // Node 4 - Bruce's house
+  4
+};
+*/
 
 /*
 // Static routing table (node 4)
@@ -160,6 +178,10 @@ private:
 #define DIO0_PIN  4
 #define LED_PIN   2
 #define BATTERY_LEVEL_PIN 33
+
+// Watchdog timeout in seconds (NOTE: I think this time might be off because
+// we are changing the CPU clock frequency)
+#define WDT_TIMEOUT 5
 
 // ----- SPI Stuff ---------------------------------------------------
 
@@ -643,6 +665,14 @@ int boot(int argc, char **argv) {
     return 0;
 }
 
+// Used for testing the watch dog 
+static int sleep(int argc, char **argv) { 
+    shell.println("Sleeping ...");
+    delay(120 * 1000);
+    shell.println("Done");
+    return 0;
+}
+
 void setup() {
 
   delay(1000);
@@ -668,6 +698,7 @@ void setup() {
   shell.addCommand(F("ping"), sendPing);
   shell.addCommand(F("reset"), sendReset);
   shell.addCommand(F("boot"), boot);
+  shell.addCommand(F("sleep"), sleep);
 
   // Interrupt setup from radio
   // Allocating an external interrupt will always allocate it on the core that does the allocation.
@@ -699,6 +730,11 @@ void setup() {
   state = State::LISTENING;
   enable_interrupt_RxDone();
   set_mode_RXCONTINUOUS();
+  
+  // Enable the watchdog timer
+  esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
+  esp_task_wdt_add(NULL); //add current thread to WDT watch
+  esp_task_wdt_reset();
 }
 
 void process_rx_msg(const uint8_t* buf, const unsigned int len);
@@ -720,6 +756,9 @@ void loop() {
   if (notEmpty) {
     process_rx_msg(msg, msg_len);
   }
+
+  // Keep the watchdog alive
+  esp_task_wdt_reset();
 }
 
 void process_rx_msg(const uint8_t* buf, const unsigned int len) {
