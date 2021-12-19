@@ -23,8 +23,8 @@ static const uint8_t nodes = 5;
 static Preferences preferences;
 
 // NODE SPECIFIC STUFF
-#define MY_ADDR 3
-/*
+#define MY_ADDR 1
+
 // Static routing table (node 1)
 static uint8_t static_routes[nodes] = 
 { 
@@ -39,8 +39,8 @@ static uint8_t static_routes[nodes] =
   // Node 4 - Bruce's house
   4
 };
-*/
 
+/*
 // Static routing table (node 3)
 static uint8_t static_routes[nodes] = 
 { 
@@ -55,7 +55,7 @@ static uint8_t static_routes[nodes] =
   // Node 4 - Bruce's house
   4
 };
-
+*/
 /*
 // Static routing table (node 4)
 static uint8_t static_routes[nodes] = 
@@ -187,8 +187,6 @@ private:
 SPISettings spi_settings(1000000, MSBFIRST, SPI_MODE0);
 
 uint8_t spi_read(uint8_t reg) {
-  // Make sure we don't interrupt in a transaction
-  noInterrupts();
   SPI.beginTransaction(spi_settings);
   // Slave Select
   digitalWrite(SS_PIN, LOW);
@@ -199,14 +197,10 @@ uint8_t spi_read(uint8_t reg) {
   // Slave deselect
   digitalWrite(SS_PIN, HIGH);
   SPI.endTransaction();
-  // Re-enable interrupts
-  interrupts();
   return val;
 }
 
 void spi_read_multi(uint8_t reg, uint8_t* buf, uint8_t len) {
-  // Make sure we don't interrupt in a transaction
-  noInterrupts();
   SPI.beginTransaction(spi_settings);
   // Slave Select
   digitalWrite(SS_PIN, LOW);
@@ -220,8 +214,6 @@ void spi_read_multi(uint8_t reg, uint8_t* buf, uint8_t len) {
   // Slave deselect
   digitalWrite(SS_PIN, HIGH);
   SPI.endTransaction();
-  // Re-enable interrupts
-  interrupts();
 }
 
 // Writes one byte to SPI.  Returns whatever comes back during the transfer.
@@ -232,8 +224,6 @@ void spi_read_multi(uint8_t reg, uint8_t* buf, uint8_t len) {
 // is the value of the written register before the write operation.
 //
 uint8_t spi_write(uint8_t reg, uint8_t val) {
-  // Make sure we don't interrupt in a transaction
-  noInterrupts();
   SPI.beginTransaction(spi_settings);
   // Slave Select
   digitalWrite(SS_PIN, LOW);
@@ -244,14 +234,10 @@ uint8_t spi_write(uint8_t reg, uint8_t val) {
   // Slave deselect
   digitalWrite(SS_PIN, HIGH);
   SPI.endTransaction();
-  // Re-enable interrupts
-  interrupts();
   return orig_val;
 }
 
 uint8_t spi_write_multi(uint8_t reg, uint8_t* buf, uint8_t len) {
-  // Make sure we don't interrupt in a transaction
-  noInterrupts();
   SPI.beginTransaction(spi_settings);
   // Slave Select
   digitalWrite(SS_PIN, LOW);
@@ -265,8 +251,6 @@ uint8_t spi_write_multi(uint8_t reg, uint8_t* buf, uint8_t len) {
   // Slave deselect
   digitalWrite(SS_PIN, HIGH);
   SPI.endTransaction();
-  // Re-enable interrupts
-  interrupts();
   return stat;
 }
 
@@ -279,7 +263,7 @@ static volatile unsigned int isr_count = 0;
 static volatile unsigned int last_irq = 0;
 
 // The states of the state machine
-enum State { IDLE, LISTENING, TRANSMITTING, LISTENING_FOR_ACK };
+enum State { IDLE, LISTENING, TRANSMITTING, TRANSMITTING_ACK, LISTENING_FOR_ACK };
 
 static volatile State state = State::IDLE;
 
@@ -288,12 +272,31 @@ static CircularBuffer<4096> tx_buffer;
 // The circular buffer used for incoming data
 static CircularBuffer<4096> rx_buffer;
 
+enum MessageType {
+  // This message is used when a delivery acknowlegement is needed
+  TYPE_ACK   = 0b00000001,
+  // The ping message will be acknowledged at every step along the way
+  TYPE_PING  = 0b10000010,
+  // Response is acknowledged as well
+  TYPE_PONG  = 0b10000011,
+  TYPE_RESET = 0b00000100,
+  TYPE_TEXT  = 0b10000101
+};
+
 // Every message starts of with this header
 struct Header {
+
+  Header() 
+  : id(0),
+    hops(0),
+    receiveRssi(0) {
+  }
+  
   uint8_t destAddr;
   uint8_t sourceAddr;
-  uint16_t id;
+  // The high bit controls whether an acknowledgement is required
   uint8_t type;
+  uint16_t id;
   // Used for multi-hop communication.  This is the node that is 
   // the ultimate destination of a message.
   uint8_t finalDestAddr;
@@ -331,36 +334,9 @@ void IRAM_ATTR isr() {
   }
 }
 
-// Call periodically to look for timeouts or other pending activity
-void event_tick() {
-
-  noInterrupts();
-  
-  if (state == State::LISTENING) {
-    // Check for pending writes
-    if (!tx_buffer.isEmpty()) {
-      // Go into stand-by so we know that nothing else is coming in
-      set_mode_STDBY();
-      // Pull the data off the queue into the transmit buffer.  We do this so
-      // that re-transmits can be supported if necessary.
-      unsigned int tx_buf_len = 256;
-      uint8_t tx_buf[tx_buf_len];
-      tx_buffer.pop(tx_buf, &tx_buf_len);
-      // Move the data into the radio FIFO
-      write_message(tx_buf, tx_buf_len);
-      // Go into transmit mode
-      state = State::TRANSMITTING;
-      enable_interrupt_TxDone();
-      set_mode_TX();
-    }
-  }
-
-  interrupts();
-}
-
 void event_TxDone() { 
   // Waiting for an message transmit to finish successfull
-  if (state == State::TRANSMITTING) {
+  if (state == State::TRANSMITTING || state == State::TRANSMITTING_ACK) {
     state = State::LISTENING;
     // Ask for interrupt when receiving
     enable_interrupt_RxDone();
@@ -396,6 +372,7 @@ void event_RxDone() {
   if (len > 0 && (rx_buf[0] == MY_ADDR || rx_buf[0] == 255)) {     
     // Handle based on state
     if (state == State::LISTENING) {
+
       // Pull in the header 
       Header header;
       memcpy(&header, rx_buf, sizeof(Header));
@@ -403,13 +380,70 @@ void event_RxDone() {
       header.receiveRssi = lastRssi;
       // Write the header back into the receive buffer
       memcpy(rx_buf, &header, sizeof(Header));
-      // Put the data into the circular queue
-      rx_buffer.push(rx_buf, len);
+
+      // Check to see if this is an ack that we are waiting for
+      if (header.type == MessageType::TYPE_ACK) {
+        // Ignore it
+      } else {
+        // Put the data into the circular queue
+        rx_buffer.push(rx_buf, len);
+  
+        // Check to see if an ACK was requested by the sender.  If so, create the ACK
+        // and transmit it.
+        if (header.type & 0b10000000) {
+          Header ack_header;
+          // Respond to the node that sent us the message
+          ack_header.destAddr = header.sourceAddr;
+          ack_header.sourceAddr = MY_ADDR;
+          ack_header.type = MessageType::TYPE_ACK;
+          // Maintain the same ID
+          ack_header.id = header.id;
+          ack_header.finalDestAddr = header.sourceAddr;
+          ack_header.originalSourceAddr = MY_ADDR;
+          ack_header.hops = header.hops + 1;
+          // Go into stand-by so we know that nothing else is coming in
+          set_mode_STDBY();
+          // Move the data into the radio FIFO
+          write_message((uint8_t*)&ack_header, sizeof(Header));
+          // Go into transmit mode
+          state = State::TRANSMITTING_ACK;
+          enable_interrupt_TxDone();
+          set_mode_TX();
+        }
+      }
     }
     else {
       Serial.println(F("ERR: Message received when not listening"));
     }
   }
+}
+
+// Call periodically to look for timeouts or other pending activity.  This will happen
+// on the regular application thread, so we disable interrupts to avoid conflicts.
+void event_tick() {
+
+  noInterrupts();
+  
+  if (state == State::LISTENING) {
+    // Check for pending writes
+    if (!tx_buffer.isEmpty()) {
+      // Go into stand-by so we know that nothing else is coming in
+      set_mode_STDBY();
+      // Pull the data off the queue into the transmit buffer.  We do this so
+      // that re-transmits can be supported if necessary.
+      unsigned int tx_buf_len = 256;
+      uint8_t tx_buf[tx_buf_len];
+      tx_buffer.pop(tx_buf, &tx_buf_len);
+      // Move the data into the radio FIFO
+      write_message(tx_buf, tx_buf_len);
+      // Go into transmit mode
+      state = State::TRANSMITTING;
+      enable_interrupt_TxDone();
+      set_mode_TX();
+    }
+  }
+
+  interrupts();
 }
 
 // --------------------------------------------------------------------------
@@ -599,11 +633,9 @@ int sendPing(int argc, char **argv) {
       msg.header.destAddr = nextHop;
       msg.header.sourceAddr = MY_ADDR;
       msg.header.id = counter;
-      msg.header.type = 1;
+      msg.header.type = MessageType::TYPE_PING;
       msg.header.finalDestAddr = target;
       msg.header.originalSourceAddr = MY_ADDR;
-      msg.header.hops = 0;
-      msg.header.receiveRssi = 0;
 
       noInterrupts();
       tx_buffer.push((uint8_t*)&msg, sizeof(PingMessage));
@@ -639,11 +671,9 @@ int sendReset(int argc, char **argv) {
       msg.header.destAddr = nextHop;
       msg.header.sourceAddr = MY_ADDR;
       msg.header.id = counter;
-      msg.header.type = 4;
+      msg.header.type = MessageType::TYPE_RESET;
       msg.header.finalDestAddr = target;
       msg.header.originalSourceAddr = MY_ADDR;
-      msg.header.hops = 0;
-      msg.header.receiveRssi = 0;
 
       noInterrupts();
       tx_buffer.push((uint8_t*)&msg, sizeof(ResetMessage));
@@ -781,7 +811,7 @@ void process_rx_msg(const uint8_t* buf, const unsigned int len) {
     memcpy(&header, buf, sizeof(Header));
 
     shell.print("Got type: ");
-    shell.print(header.type);
+    shell.print(header.type, HEX);
     shell.print(", id: ");
     shell.print(header.id);
     shell.print(", from: ");
@@ -829,14 +859,14 @@ void process_rx_msg(const uint8_t* buf, const unsigned int len) {
     else {
       
       // Ping
-      if (header.type == 1) {
+      if (header.type == MessageType::TYPE_PING) {
         // Create a pong and send back to the originator of the ping
         PongMessage msg;
         msg.header.destAddr = header.sourceAddr;
         msg.header.sourceAddr = MY_ADDR;
         msg.header.hops = header.hops + 1;        
         msg.header.id = header.id;
-        msg.header.type = 2;
+        msg.header.type = MessageType::TYPE_PONG;
         msg.header.finalDestAddr = header.originalSourceAddr;
         msg.header.originalSourceAddr = MY_ADDR;
 
@@ -856,7 +886,7 @@ void process_rx_msg(const uint8_t* buf, const unsigned int len) {
         interrupts();
       }
       // Pong
-      else if (header.type == 2) {
+      else if (header.type == MessageType::TYPE_PONG) {
         
         if (len >= sizeof(PongMessage)) {
 
