@@ -182,6 +182,11 @@ private:
 // we are changing the CPU clock frequency)
 #define WDT_TIMEOUT 5
 
+
+static int32_t get_time_seconds() {
+  return esp_timer_get_time() / 1000000L;
+}
+
 // ----- SPI Stuff ---------------------------------------------------
 
 SPISettings spi_settings(1000000, MSBFIRST, SPI_MODE0);
@@ -266,6 +271,10 @@ static volatile unsigned int last_irq = 0;
 enum State { IDLE, LISTENING, TRANSMITTING, TRANSMITTING_ACK, LISTENING_FOR_ACK };
 
 static volatile State state = State::IDLE;
+// This is the message ID that we are waiting to have acknowledged
+static volatile uint16_t listenId = 0;
+// This is the time we started waiting for the ACK
+static volatile uint32_t listenStart = 0;
 
 // The circular buffer used for outgoing data
 static CircularBuffer<4096> tx_buffer;
@@ -425,7 +434,7 @@ void event_tick() {
   noInterrupts();
   
   if (state == State::LISTENING) {
-    // Check for pending writes
+    // Check for pending transmissions
     if (!tx_buffer.isEmpty()) {
       // Go into stand-by so we know that nothing else is coming in
       set_mode_STDBY();
@@ -434,6 +443,21 @@ void event_tick() {
       unsigned int tx_buf_len = 256;
       uint8_t tx_buf[tx_buf_len];
       tx_buffer.pop(tx_buf, &tx_buf_len);
+
+      // Take a look at the header so we can determine whether an ACK is 
+      // required.
+      // TODO: SEE IF WE CAN SOLVE THIS USING A CAST RATHER THAN A COPY!
+      Header tx_header;
+      ::memcpy((uint8_t*)&tx_header, tx_buf, sizeof(Header));
+      
+      if (tx_header.type & 0b10000000) {
+        listenId = tx_header.id;
+        listenStart = get_time_seconds();
+      } else {
+        listenId = 0;
+        listenStart = 0;
+      }
+          
       // Move the data into the radio FIFO
       write_message(tx_buf, tx_buf_len);
       // Go into transmit mode
@@ -875,9 +899,7 @@ void process_rx_msg(const uint8_t* buf, const unsigned int len) {
         msg.rssi = header.receiveRssi;
         msg.batteryMv = 0;
         msg.panelMv = 0;
-        // Measure uptime
-        int32_t uptime_seconds = esp_timer_get_time() / 1000000L;
-        msg.uptimeSeconds = uptime_seconds;
+        msg.uptimeSeconds = get_time_seconds();
         msg.bootCount = preferences.getUShort("bootcount", 0);  
         msg.sleepCount = preferences.getUShort("sleepcount", 0);  
         
