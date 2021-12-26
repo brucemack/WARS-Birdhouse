@@ -17,8 +17,9 @@
 #include <esp_task_wdt.h>
 #include <Preferences.h>
 #include <SimpleSerialShell.h>
+#include "CircularBuffer.h"
 
-#define SW_VERSION 7
+#define SW_VERSION 8
 static const uint8_t nodes = 5;
 static Preferences preferences;
 
@@ -72,106 +73,6 @@ static uint8_t static_routes[nodes] =
   0
 };
 */
-// ===== TO BE MOVED =======
-
-/** 
- *  A circular queue for byte buffers of arbitrary length. 
- */
-template<unsigned int S> class CircularBuffer {
-public:
-
-  CircularBuffer() 
-  : _front(0),
-    _back(0)
-  {
-  }
-
-  bool isEmpty() {
-    return _front == _back;
-  }
-
-  // Returns true if the push was successful, otherwise false.  For example, if the buffer
-  // is completely full.
-  // NOTE: A two-byte length header is put into the buffer to manage size.
-  bool push(const uint8_t* buf, unsigned int len) {
-    // Keep the original pointer in case a failure/rollback is necessary.
-    unsigned int original_back = _back;
-    // Write a two-byte length
-    uint8_t temp[2];
-    temp[0] = (len >> 8) & 0xff;
-    temp[1] = len & 0xff;
-    if (_pushRaw(temp, 2) && _pushRaw(buf, len)) {
-      return true;
-    }
-    // Reset like nothing happened
-    _back = original_back;
-    return false;
-  }
-
-  // The *len argument starts off with the maximum space available in buf and ends
-  // with the actual number of bytes taken from the queue.
-  void pop(uint8_t* buf, unsigned int* len) {
-    unsigned int available_space = *len;
-    unsigned int ptr = _front;
-    // Get out the length
-    unsigned int entry_size = 0;
-    entry_size = _buf[ptr] << 8;
-    ptr = (ptr + 1) % _bufSize;
-    entry_size |= _buf[ptr];
-    ptr = (ptr + 1) % _bufSize;
-    
-    *len = 0;
-    
-    for (int i = 0; i < entry_size; i++) {
-      if (i < available_space) {
-        buf[i] = _buf[ptr];
-        (*len)++;
-      }
-      ptr = (ptr + 1) % _bufSize;
-    }
-    
-    _front = ptr;
-  }
-
-  /**
-   * This combines isEmpty() and pop() to provide an easy atomic 
-   * pop operation.
-   */
-  bool popIfNotEmpty(uint8_t* buf, unsigned int* len) {
-    if (isEmpty()) {
-      return false;
-    } else {
-      pop(buf, len);
-      return true;
-    }
-  }
-  
-private:
-
-  const unsigned int _bufSize = S;
-
-  // Where we pop (read) from
-  volatile unsigned int _front;
-  // Where we push (write) to
-  volatile unsigned int _back;
-  // The actual space
-  volatile uint8_t _buf[S];
-
-  bool _pushRaw(const uint8_t* buf, unsigned int len) {
-    for (unsigned int i = 0; i < len; i++) {
-      // Store into the buffer
-      _buf[_back] = buf[i];
-      // Advance and wrap
-      _back = (_back + 1) % _bufSize;
-      // Check for overflow
-      if (_back == _front) {
-        return false;
-      }
-    }
-    return true;
-  }
-};
-  
 #define SS_PIN    5
 #define RST_PIN   14
 #define DIO0_PIN  4
@@ -181,7 +82,6 @@ private:
 // Watchdog timeout in seconds (NOTE: I think this time might be off because
 // we are changing the CPU clock frequency)
 #define WDT_TIMEOUT 5
-
 
 static int32_t get_time_seconds() {
   return esp_timer_get_time() / 1000000L;
@@ -261,20 +161,23 @@ uint8_t spi_write_multi(uint8_t reg, uint8_t* buf, uint8_t len) {
 
 // ===== Low-Level Interface =====
 
-void event_txdone();
-void event_rxdone();
-
-static volatile unsigned int isr_count = 0;
-static volatile unsigned int last_irq = 0;
+static volatile bool isr_hit = false;
 
 // The states of the state machine
 enum State { IDLE, LISTENING, TRANSMITTING, TRANSMITTING_ACK, LISTENING_FOR_ACK };
 
-static volatile State state = State::IDLE;
-// This is the message ID that we are waiting to have acknowledged
-static volatile uint16_t listenId = 0;
-// This is the time we started waiting for the ACK
-static volatile uint32_t listenStart = 0;
+static State state = State::IDLE;
+
+// The state we need to go into after a transmit is successful
+static State stateAfterTransmit = State::LISTENING;
+// This is the message ID that we are waiting to have acknowledged.
+static uint16_t listenAckId = 0;
+// This is the time we started waiting for the ACK. Used for timeout tracking.
+static uint32_t listenAckStart = 0;
+// The number of times we've retried the transmit
+static uint16_t transmitRetry = 0;
+// The number of ACKs to skip (used for testing)
+static uint16_t skipAckCount = 0;
 
 // The circular buffer used for outgoing data
 static CircularBuffer<4096> tx_buffer;
@@ -318,42 +221,35 @@ struct Header {
   // When possible this will be filled in on the *local* side of the 
   // receive.
   int16_t receiveRssi;
+
+  bool isAckRequired() {
+    return (type & 0b10000000) != 0;
+  }
 };
 
 // ----- Interrupt Service -------
 
 void IRAM_ATTR isr() {
-
-  // Read and reset the IRQ register at the same time:
-  uint8_t irq_flags = spi_write(0x12, 0xff);
-    
-  isr_count += 1;
-  last_irq = irq_flags;
-  
-  // RX timeout - ignored
-  if (irq_flags & 0x80) {
-  } 
-  // RxDone without a CRC error
-  if ((irq_flags & 0x40) && !(irq_flags & 0x20)) {
-    event_RxDone();
-  }
-  // TxDone
-  if (irq_flags & 0x08) {
-    event_TxDone();
-  }
+  // NOTE: We've had so many problems with interrupt enable/disable on the ESP32
+  // so now we're just going to set a flag and let everything happen in the loop()
+  // context.
+  isr_hit = true;
 }
 
 void event_TxDone() { 
+
   // Waiting for an message transmit to finish successfull
-  if (state == State::TRANSMITTING || state == State::TRANSMITTING_ACK) {
-    state = State::LISTENING;
-    // Ask for interrupt when receiving
-    enable_interrupt_RxDone();
-    // Go into RXCONTINUOUS so we can hear the response
-    set_mode_RXCONTINUOUS();  
-  } else {
-    Serial.println("ERR: TxDone received in unexpected state");
+  if (state != State::TRANSMITTING && state != State::TRANSMITTING_ACK) {
+    Serial.println(F("ERR: TxDone received in unexpected state"));
+    return;
   }
+
+  // Revert back to whatever we were listening for. 
+  state = stateAfterTransmit;
+  // Ask for interrupt when receiving
+  enable_interrupt_RxDone();
+  // Go into RXCONTINUOUS so we can hear the response
+  set_mode_RXCONTINUOUS();  
 } 
 
 void event_RxDone() {
@@ -366,7 +262,7 @@ void event_RxDone() {
   uint8_t rx_buf[256];
   spi_read_multi(0x00, rx_buf, len);
 
-  // Grab the RSSI value
+  // Grab the RSSI value from the radio
   int8_t lastSnr = (int8_t)spi_read(0x19) / 4;
   int16_t lastRssi = spi_read(0x1a);
   if (lastSnr < 0)
@@ -376,98 +272,189 @@ void event_RxDone() {
   // We are using the high frequency port
   lastRssi -= 157;
 
-  // Look at the message and determine if it belongs to us.  If not then 
-  // we just ignore it (targeted to someone else)
-  if (len > 0 && (rx_buf[0] == MY_ADDR || rx_buf[0] == 255)) {     
-    // Handle based on state
-    if (state == State::LISTENING) {
+  // Handle based on state.  If we're not listening for anything then 
+  // ignore what was just read.
+  if (state != State::LISTENING && state != State::LISTENING_FOR_ACK) {
+    Serial.println(F("ERR: Message received when not listening"));
+    return;
+  }
 
-      // Pull in the header 
-      Header header;
-      memcpy(&header, rx_buf, sizeof(Header));
-      // Fix the RSSI attribute in the header 
-      header.receiveRssi = lastRssi;
-      // Write the header back into the receive buffer
-      memcpy(rx_buf, &header, sizeof(Header));
+  // Make sure the message is valid (right length, version, etc.)
+  if (len < sizeof(Header)) {
+    Serial.print(F("ERR: Message invalid length "));
+    Serial.println(len);
+    return;
+  }
 
-      // Check to see if this is an ack that we are waiting for
-      if (header.type == MessageType::TYPE_ACK) {
-        // Ignore it
-      } else {
-        // Put the data into the circular queue
-        rx_buffer.push(rx_buf, len);
-  
-        // Check to see if an ACK was requested by the sender.  If so, create the ACK
-        // and transmit it.
-        if (header.type & 0b10000000) {
-          Header ack_header;
-          // Respond to the node that sent us the message
-          ack_header.destAddr = header.sourceAddr;
-          ack_header.sourceAddr = MY_ADDR;
-          ack_header.type = MessageType::TYPE_ACK;
-          // Maintain the same ID
-          ack_header.id = header.id;
-          ack_header.finalDestAddr = header.sourceAddr;
-          ack_header.originalSourceAddr = MY_ADDR;
-          ack_header.hops = header.hops + 1;
-          // Go into stand-by so we know that nothing else is coming in
-          set_mode_STDBY();
-          // Move the data into the radio FIFO
-          write_message((uint8_t*)&ack_header, sizeof(Header));
-          // Go into transmit mode
-          state = State::TRANSMITTING_ACK;
-          enable_interrupt_TxDone();
-          set_mode_TX();
-        }
+  // Ignore messsages targeted for other stations
+  if (rx_buf[0] != MY_ADDR && rx_buf[0] != 255) {
+    Serial.print(F("INF: Ignored message for another node"));
+    return;
+  }
+
+  // Pull in the header 
+  Header rx_header;
+  memcpy(&rx_header, rx_buf, sizeof(Header));
+  // Tweak the RSSI attribute in the header 
+  rx_header.receiveRssi = lastRssi;
+  // Write the fixed header back into the receive buffer
+  memcpy(rx_buf, &rx_header, sizeof(Header));
+
+  // Check to see if this is an ack that we are waiting for
+  if (rx_header.type == MessageType::TYPE_ACK) {
+    // When we get an ACK, figure out if it is the one we are waiting for
+    if (state == State::LISTENING_FOR_ACK && rx_header.id == listenAckId) {
+      // Flush the message that we sent previously (it's been confirmed now)
+      tx_buffer.popAndDiscard();
+      // Get back into normal listening mode
+      state = State::LISTENING;
+      listenAckId = 0;
+      listenAckStart = 0;
+      transmitRetry = 0;
+    } else {
+      Serial.print(F("INF: Ignorning ACK for "));
+      Serial.println(rx_header.id);
+    }
+  } 
+  // Any other message will be forwarded to the application
+  else {
+    // Put the data into the circular queue
+    rx_buffer.push(rx_buf, len);
+
+    // Check to see if an ACK was requested by the sender.  If so, create the ACK
+    // and transmit it.
+    if (rx_header.isAckRequired()) {
+
+      if (skipAckCount != 0) {
+        skipAckCount--;
+        Serial.println(F("INF: Skipping an ACK (test)"));
+      }
+      else {
+        Header ack_header;
+        // Respond to the node that sent us the message
+        ack_header.destAddr = rx_header.sourceAddr;
+        ack_header.sourceAddr = MY_ADDR;
+        ack_header.type = MessageType::TYPE_ACK;
+        // Maintain the same ID
+        ack_header.id = rx_header.id;
+        ack_header.finalDestAddr = rx_header.sourceAddr;
+        ack_header.originalSourceAddr = MY_ADDR;
+        ack_header.hops = rx_header.hops + 1;
+        // Go into stand-by so we know that nothing else is coming in
+        set_mode_STDBY();
+        // Move the data into the radio FIFO
+        write_message((uint8_t*)&ack_header, sizeof(Header));
+        // Keep track of what we were listening for before starting this transmission
+        stateAfterTransmit = state;
+        // Go into transmit mode
+        state = State::TRANSMITTING_ACK;
+        enable_interrupt_TxDone();
+        set_mode_TX();
       }
     }
-    else {
-      Serial.println(F("ERR: Message received when not listening"));
-    }
   }
+}
+
+static void event_tick_LISTENING_FOR_ACK() {
+
+  // If we are listening for an ACK then don't send/resend until the timeout 
+  // has passed.
+  if (get_time_seconds() - listenAckStart < 5) {
+    return;
+  }
+
+  // If we have retried a few times then give up and discard the message.
+  if (transmitRetry > 3) {
+    Serial.println(F("WRN: Giving up on "));
+    Serial.println(listenAckId);
+    // Flush the message
+    tx_buffer.popAndDiscard();
+    // Give up and get back into the normal listen state
+    state = State::LISTENING;
+    stateAfterTransmit = State::LISTENING;
+    listenAckId = 0;
+    listenAckStart = 0;
+    transmitRetry = 0;
+    return;
+  }
+
+  // If a retry is still possible then generate it.
+  // Go into stand-by so we know that nothing else is coming in
+  set_mode_STDBY();
+
+  // Peek the data off the TX queue into the transmit buffer.  We use peek so
+  // that re-transmits can be supported if necessary.
+  unsigned int tx_buf_len = 256;
+  uint8_t tx_buf[tx_buf_len];
+  tx_buffer.peek(tx_buf, &tx_buf_len);
+
+  // Move the data into the radio FIFO
+  write_message(tx_buf, tx_buf_len);
+  // Go into transmit mode
+  state = State::TRANSMITTING;
+  enable_interrupt_TxDone();
+  set_mode_TX();
+
+  stateAfterTransmit = State::LISTENING_FOR_ACK;
+  listenAckStart = get_time_seconds();
+  transmitRetry++;
+}
+
+static void event_tick_LISTENING() {
+
+  // Check for pending transmissions.  If nothing is pending then 
+  // return without any state change.
+  if (tx_buffer.isEmpty()) {
+    return;
+  }
+    
+  // At this point we have something pending.
+  // Go into stand-by so we know that nothing else is coming in
+  set_mode_STDBY();
+
+  // Peek the data off the TX queue into the transmit buffer.  We use peek so
+  // that re-transmits can be supported if necessary.
+  unsigned int tx_buf_len = 256;
+  uint8_t tx_buf[tx_buf_len];
+  tx_buffer.peek(tx_buf, &tx_buf_len);
+
+  // Move the data into the radio FIFO
+  write_message(tx_buf, tx_buf_len);
+  // Go into transmit mode
+  state = State::TRANSMITTING;
+  enable_interrupt_TxDone();
+  set_mode_TX();
+
+  // Take a look at the header so we can determine whether an ACK is 
+  // going to be required for this message.
+  // TODO: SEE IF WE CAN SOLVE THIS USING A CAST RATHER THAN A COPY!
+  Header tx_header;
+  ::memcpy((uint8_t*)&tx_header, tx_buf, sizeof(Header));
+
+  if (tx_header.isAckRequired()) {
+    // After transmission we will need to wait for the ACK
+    stateAfterTransmit = State::LISTENING_FOR_ACK;
+    listenAckId = tx_header.id;
+    listenAckStart = get_time_seconds();
+  } else {
+    // Pop the message off now - no ACK involved
+    tx_buffer.popAndDiscard();
+    // Transition directly into the listen mode
+    stateAfterTransmit = State::LISTENING;
+    listenAckId = 0;
+    listenAckStart = 0;
+  }    
+  transmitRetry = 0;
 }
 
 // Call periodically to look for timeouts or other pending activity.  This will happen
 // on the regular application thread, so we disable interrupts to avoid conflicts.
 void event_tick() {
-
-  noInterrupts();
-  
   if (state == State::LISTENING) {
-    // Check for pending transmissions
-    if (!tx_buffer.isEmpty()) {
-      // Go into stand-by so we know that nothing else is coming in
-      set_mode_STDBY();
-      // Pull the data off the queue into the transmit buffer.  We do this so
-      // that re-transmits can be supported if necessary.
-      unsigned int tx_buf_len = 256;
-      uint8_t tx_buf[tx_buf_len];
-      tx_buffer.pop(tx_buf, &tx_buf_len);
-
-      // Take a look at the header so we can determine whether an ACK is 
-      // required.
-      // TODO: SEE IF WE CAN SOLVE THIS USING A CAST RATHER THAN A COPY!
-      Header tx_header;
-      ::memcpy((uint8_t*)&tx_header, tx_buf, sizeof(Header));
-      
-      if (tx_header.type & 0b10000000) {
-        listenId = tx_header.id;
-        listenStart = get_time_seconds();
-      } else {
-        listenId = 0;
-        listenStart = 0;
-      }
-          
-      // Move the data into the radio FIFO
-      write_message(tx_buf, tx_buf_len);
-      // Go into transmit mode
-      state = State::TRANSMITTING;
-      enable_interrupt_TxDone();
-      set_mode_TX();
-    }
+    event_tick_LISTENING();
+  } else if (state == State::LISTENING_FOR_ACK) {
+    event_tick_LISTENING_FOR_ACK();
   }
-
-  interrupts();
 }
 
 // --------------------------------------------------------------------------
@@ -661,9 +648,7 @@ int sendPing(int argc, char **argv) {
       msg.header.finalDestAddr = target;
       msg.header.originalSourceAddr = MY_ADDR;
 
-      noInterrupts();
       tx_buffer.push((uint8_t*)&msg, sizeof(PingMessage));
-      interrupts();
       
       return 0;
 
@@ -699,10 +684,8 @@ int sendReset(int argc, char **argv) {
       msg.header.finalDestAddr = target;
       msg.header.originalSourceAddr = MY_ADDR;
 
-      noInterrupts();
       tx_buffer.push((uint8_t*)&msg, sizeof(ResetMessage));
-      interrupts();
-      
+    
       return 0;
     } else {
       shell.println(F("No route"));
@@ -724,6 +707,16 @@ static int sleep(int argc, char **argv) {
     delay(120 * 1000);
     shell.println("Done");
     return 0;
+}
+
+int skipAcks(int argc, char **argv) { 
+
+  if (argc != 2) {
+    shell.println(msg_arg_error);
+    return -1;
+  }
+
+  skipAckCount = atoi(argv[1]);
 }
 
 void setup() {
@@ -754,6 +747,7 @@ void setup() {
   shell.addCommand(F("reset"), sendReset);
   shell.addCommand(F("boot"), boot);
   shell.addCommand(F("sleep"), sleep);
+  shell.addCommand(F("skipacks"), skipAcks);
 
   // Increment the boot count
   uint16_t bootCount = preferences.getUShort("bootcount", 0);  
@@ -806,6 +800,27 @@ void process_rx_msg(const uint8_t* buf, const unsigned int len);
 
 void loop() {
 
+  // Interrupt stuff
+  if (isr_hit) {
+
+    isr_hit = false;
+
+    // Read and reset the IRQ register at the same time:
+    uint8_t irq_flags = spi_write(0x12, 0xff);    
+    
+    // RX timeout - ignored
+    if (irq_flags & 0x80) {
+    } 
+    // RxDone without a CRC error
+    if ((irq_flags & 0x40) && !(irq_flags & 0x20)) {
+      event_RxDone();
+    }
+    // TxDone
+    if (irq_flags & 0x08) {
+      event_TxDone();
+    }
+  }
+
   // Service the shell
   shell.executeIfInput();
   
@@ -815,9 +830,7 @@ void loop() {
   // Look for any received data that should be processed by the application
   unsigned int msg_len = 256;
   uint8_t msg[msg_len];
-  noInterrupts();
   boolean notEmpty = rx_buffer.popIfNotEmpty(msg, &msg_len);
-  interrupts();
   if (notEmpty) {
     process_rx_msg(msg, msg_len);
   }
@@ -870,10 +883,8 @@ void process_rx_msg(const uint8_t* buf, const unsigned int len) {
           header.hops = header.hops + 1;        
           memcpy(tx_buf, &header, sizeof(Header));
           // Send the entire message
-          noInterrupts();
           // Notice that we are using the original length
           tx_buffer.push(tx_buf, len);
-          interrupts();
         }
       } else {
         shell.println(F("Invalid address"));
@@ -903,9 +914,7 @@ void process_rx_msg(const uint8_t* buf, const unsigned int len) {
         msg.bootCount = preferences.getUShort("bootcount", 0);  
         msg.sleepCount = preferences.getUShort("sleepcount", 0);  
         
-        noInterrupts();
         tx_buffer.push((uint8_t*)&msg, sizeof(PongMessage));
-        interrupts();
       }
       // Pong
       else if (header.type == MessageType::TYPE_PONG) {
