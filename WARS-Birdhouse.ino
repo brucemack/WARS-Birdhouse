@@ -19,7 +19,7 @@
 #include <SimpleSerialShell.h>
 #include "CircularBuffer.h"
 
-#define SW_VERSION 8
+#define SW_VERSION 9
 static const uint8_t nodes = 5;
 static Preferences preferences;
 
@@ -288,7 +288,7 @@ void event_RxDone() {
 
   // Ignore messsages targeted for other stations
   if (rx_buf[0] != MY_ADDR && rx_buf[0] != 255) {
-    Serial.print(F("INF: Ignored message for another node"));
+    //Serial.println(F("INF: Ignored message for another node"));
     return;
   }
 
@@ -701,6 +701,14 @@ int boot(int argc, char **argv) {
     return 0;
 }
 
+int info(int argc, char **argv) { 
+    shell.print(F("Node "));
+    shell.println(MY_ADDR);
+    shell.print(F("Version "));
+    shell.println(SW_VERSION);
+    return 0;
+}
+
 // Used for testing the watch dog 
 static int sleep(int argc, char **argv) { 
     shell.println("Sleeping ...");
@@ -746,6 +754,7 @@ void setup() {
   shell.addCommand(F("ping"), sendPing);
   shell.addCommand(F("reset"), sendReset);
   shell.addCommand(F("boot"), boot);
+  shell.addCommand(F("info"), info);
   shell.addCommand(F("sleep"), sleep);
   shell.addCommand(F("skipacks"), skipAcks);
 
