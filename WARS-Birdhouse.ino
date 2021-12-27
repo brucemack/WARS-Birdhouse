@@ -19,7 +19,7 @@
 #include <SimpleSerialShell.h>
 #include "CircularBuffer.h"
 
-#define SW_VERSION 9
+#define SW_VERSION 10
 
 #define SS_PIN    5
 #define RST_PIN   14
@@ -145,7 +145,8 @@ enum MessageType {
   // Response is acknowledged as well
   TYPE_PONG  = 0b10000011,
   TYPE_RESET = 0b00000100,
-  TYPE_TEXT  = 0b10000101
+  TYPE_TEXT  = 0b10000101,
+  TYPE_BLINK = 0b00000110
 };
 
 // Every message starts of with this header
@@ -551,7 +552,7 @@ int init_radio() {
 
 // ===== Application 
 
-static auto msg_arg_error = F("Argument error");
+static auto msg_arg_error = F("ERR: Argument error");
 static int counter = 0;
 
 struct PingMessage {
@@ -571,6 +572,10 @@ struct PongMessage {
 };
 
 struct ResetMessage {
+  Header header;  
+};
+
+struct BlinkMessage {
   Header header;  
 };
 
@@ -643,6 +648,40 @@ int sendReset(int argc, char **argv) {
       return 0;
     } else {
       shell.println(F("No route"));
+    }
+  } else {
+    return -1;
+  }
+}
+
+int sendBlink(int argc, char **argv) { 
+
+  if (argc != 2) {
+    shell.println(msg_arg_error);
+    return -1;
+  }
+
+  counter++;
+  uint8_t target = atoi(argv[1]);
+
+  if (target > 0 && target < 255) {
+
+    uint8_t nextHop = Routes[target];
+    if (nextHop != 0) {
+
+      BlinkMessage msg;
+      msg.header.destAddr = nextHop;
+      msg.header.sourceAddr = MY_ADDR;
+      msg.header.id = counter;
+      msg.header.type = MessageType::TYPE_BLINK;
+      msg.header.finalDestAddr = target;
+      msg.header.originalSourceAddr = MY_ADDR;
+
+      tx_buffer.push((uint8_t*)&msg, sizeof(BlinkMessage));
+    
+      return 0;
+    } else {
+      shell.println(F("ERR: No route"));
     }
   } else {
     return -1;
@@ -757,6 +796,7 @@ void setup() {
   shell.attach(Serial); 
   shell.addCommand(F("ping"), sendPing);
   shell.addCommand(F("reset"), sendReset);
+  shell.addCommand(F("blink"), sendBlink);
   shell.addCommand(F("boot"), boot);
   shell.addCommand(F("info"), info);
   shell.addCommand(F("sleep"), sleep);
@@ -895,10 +935,10 @@ void process_rx_msg(const uint8_t* buf, const unsigned int len) {
         // Look up the route
         uint8_t nextHop = Routes[header.finalDestAddr];
         if (nextHop == 0) {
-          shell.println(F("No route available"));
+          shell.println(F("ERR: No route available"));
         }
         else {
-          shell.print(F("Routing via: "));
+          shell.print(F("INF: Routing via "));
           shell.println(nextHop);
           // Copy the original message (minus the RSSI information)
           uint8_t tx_buf[256];
@@ -913,7 +953,7 @@ void process_rx_msg(const uint8_t* buf, const unsigned int len) {
           tx_buffer.push(tx_buf, len);
         }
       } else {
-        shell.println(F("Invalid address"));
+        shell.println(F("ERR: Invalid address"));
       }
     }
     // All other messages are being directed to this node
@@ -921,6 +961,7 @@ void process_rx_msg(const uint8_t* buf, const unsigned int len) {
       
       // Ping
       if (header.type == MessageType::TYPE_PING) {
+
         // Create a pong and send back to the originator of the ping
         PongMessage msg;
         msg.header.destAddr = header.sourceAddr;
@@ -980,8 +1021,14 @@ void process_rx_msg(const uint8_t* buf, const unsigned int len) {
           Serial.println("Pong too short");
         }
       }
+      // Blink the on-board LED
+      else if (header.type == MessageType::TYPE_BLINK) {
+        digitalWrite(LED_PIN, HIGH);
+        delay(250);
+        digitalWrite(LED_PIN, LOW);
+      }
       // Reset
-      else if (header.type == 4) {
+      else if (header.type == MessageType::TYPE_RESET) {
         shell.println(F("Resetting ..."));
         ESP.restart();
       }
