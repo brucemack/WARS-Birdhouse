@@ -19,7 +19,7 @@
 #include <SimpleSerialShell.h>
 #include "CircularBuffer.h"
 
-#define SW_VERSION 10
+#define SW_VERSION 12
 
 #define SS_PIN    5
 #define RST_PIN   14
@@ -31,6 +31,11 @@
 // we are changing the CPU clock frequency)
 #define WDT_TIMEOUT 5
 
+#define US_TO_S_FACTOR 1000000
+
+// Deep sleep duration when low battery is detected
+#define DEEP_SLEEP_SECONDS 60 * 30
+
 static Preferences preferences;
 
 // NODE SPECIFIC STUFF
@@ -40,6 +45,13 @@ static uint8_t Routes[256];
 
 static int32_t get_time_seconds() {
   return esp_timer_get_time() / 1000000L;
+}
+
+// Returns the battery level in mV
+uint16_t checkBattery() {
+  const float batteryScale = (3.3 / 4096.0) * 2.0;
+  float batteryLevel = (float)analogRead(BATTERY_LEVEL_PIN) * batteryScale;
+  return batteryLevel * 1000.0;
 }
 
 // ----- SPI Stuff ---------------------------------------------------
@@ -113,8 +125,6 @@ uint8_t spi_write_multi(uint8_t reg, uint8_t* buf, uint8_t len) {
   SPI.endTransaction();
   return stat;
 }
-
-// ===== Low-Level Interface =====
 
 // The states of the state machine
 enum State { IDLE, LISTENING, TRANSMITTING, TRANSMITTING_ACK, LISTENING_FOR_ACK };
@@ -554,6 +564,7 @@ int init_radio() {
 
 static auto msg_arg_error = F("ERR: Argument error");
 static int counter = 0;
+static uint32_t lastLowBatteryCheckSeconds = 0;
 
 struct PingMessage {
   Header header;  
@@ -699,6 +710,10 @@ int info(int argc, char **argv) {
     shell.print(MY_ADDR);
     shell.print(F(", \"version\": "));
     shell.print(SW_VERSION);
+    shell.print(F(", \"blimit\": "));
+    shell.print(preferences.getUShort("blimit", 0));
+    shell.print(F(", \"batteryMv\": "));
+    shell.print(checkBattery());
     shell.print(F(", \"routes\": ["));
     bool first = true;
     for (int i = 0; i < 256; i++) {
@@ -772,6 +787,17 @@ int clearRoutes(int argc, char **argv) {
   preferences.putBytes("routes", Routes, 256);
 }
 
+int setBlimit(int argc, char **argv) { 
+
+  if (argc != 2) {
+    shell.println(msg_arg_error);
+    return -1;
+  }
+
+  // Save the address in the NVRAM
+  preferences.putUShort("blimit", atoi(argv[1]));
+}
+
 void setup() {
 
   delay(1000);
@@ -804,6 +830,7 @@ void setup() {
   shell.addCommand(F("setaddr"), setAddr);
   shell.addCommand(F("setroute"), setRoute);
   shell.addCommand(F("clearroutes"), clearRoutes);
+  shell.addCommand(F("setblimit"), setBlimit);
 
   // Increment the boot count
   uint16_t bootCount = preferences.getUShort("bootcount", 0);  
@@ -860,9 +887,14 @@ void setup() {
   esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
   esp_task_wdt_add(NULL); //add current thread to WDT watch
   esp_task_wdt_reset();
+
+  // Make sure we don't check the battery immediately
+  lastLowBatteryCheckSeconds = get_time_seconds();
 }
 
-void process_rx_msg(const uint8_t* buf, const unsigned int len);
+static void process_rx_msg(const uint8_t* buf, const unsigned int len);
+static void check_for_rx_msg();
+static void check_low_battery();
 
 void loop() {
 
@@ -894,18 +926,31 @@ void loop() {
   event_tick();
 
   // Look for any received data that should be processed by the application
-  unsigned int msg_len = 256;
-  uint8_t msg[msg_len];
-  boolean notEmpty = rx_buffer.popIfNotEmpty(msg, &msg_len);
-  if (notEmpty) {
-    process_rx_msg(msg, msg_len);
+  check_for_rx_msg();
+
+  // Check for low battery condition.  But we don't check this on every loop.
+  if (get_time_seconds() - lastLowBatteryCheckSeconds > 30) {
+    check_low_battery();
+    lastLowBatteryCheckSeconds = get_time_seconds();
   }
 
   // Keep the watchdog alive
   esp_task_wdt_reset();
 }
 
-void process_rx_msg(const uint8_t* buf, const unsigned int len) {
+/**
+ * @brief Look to see if any data is available on the RX queue.
+ */
+static void check_for_rx_msg() {
+  unsigned int msg_len = 256;
+  uint8_t msg[msg_len];
+  boolean notEmpty = rx_buffer.popIfNotEmpty(msg, &msg_len);
+  if (notEmpty) {
+    process_rx_msg(msg, msg_len);
+  }
+}
+
+static void process_rx_msg(const uint8_t* buf, const unsigned int len) {
 
   if (len >= sizeof(Header)) {
 
@@ -975,7 +1020,7 @@ void process_rx_msg(const uint8_t* buf, const unsigned int len) {
         msg.version = SW_VERSION;
         msg.counter = counter;
         msg.rssi = header.receiveRssi;
-        msg.batteryMv = 0;
+        msg.batteryMv = checkBattery();
         msg.panelMv = 0;
         msg.uptimeSeconds = get_time_seconds();
         msg.bootCount = preferences.getUShort("bootcount", 0);  
@@ -1040,5 +1085,21 @@ void process_rx_msg(const uint8_t* buf, const unsigned int len) {
   else {
     shell.println(F("ERR: Invalid message received"));
     shell.println(len);
+  }
+}
+
+static void check_low_battery() {
+  uint16_t lowBatteryLimitMv = preferences.getUShort("blimit", 0);
+  // Check the battery
+  uint16_t battery = checkBattery();
+  // If the battery is low then deep sleep
+  if (lowBatteryLimitMv != 0 && battery < lowBatteryLimitMv) {
+    shell.println(F("INF: Low battery detected"));
+    // Keep track of how many times this has happened
+    uint16_t sleepCount = preferences.getUShort("sleepcount", 0);  
+    preferences.putUShort("sleepcount", sleepCount+1);   
+    // Put the system into a deep sleep that will be awakened using the timer
+    esp_sleep_enable_timer_wakeup(DEEP_SLEEP_SECONDS * US_TO_S_FACTOR);
+    esp_deep_sleep_start();
   }
 }
