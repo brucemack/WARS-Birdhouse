@@ -20,59 +20,7 @@
 #include "CircularBuffer.h"
 
 #define SW_VERSION 9
-static const uint8_t nodes = 5;
-static Preferences preferences;
 
-// NODE SPECIFIC STUFF
-#define MY_ADDR 1
-
-// Static routing table (node 1)
-static uint8_t static_routes[nodes] = 
-{ 
-  // Node 0 not used
-  0,
-  // Node 1 - Bruce's control node
-  0,
-  // Node 2 not used
-  0,
-  // Node 3 - Hardy School
-  4,
-  // Node 4 - Bruce's house
-  4
-};
-
-/*
-// Static routing table (node 3)
-static uint8_t static_routes[nodes] = 
-{ 
-  // Node 0 not used
-  0,
-  // Node 1 - Bruce's control node
-  4,
-  // Node 2 not used
-  0,
-  // Node 3 - Hardy School
-  0,
-  // Node 4 - Bruce's house
-  4
-};
-*/
-/*
-// Static routing table (node 4)
-static uint8_t static_routes[nodes] = 
-{ 
-  // Node 0 not used
-  0,
-  // Node 1 - Bruce's control node
-  1,
-  // Node 2 not used
-  0,
-  // Node 3 - Hardy School
-  3,
-  // Node 4 - Bruce's house
-  0
-};
-*/
 #define SS_PIN    5
 #define RST_PIN   14
 #define DIO0_PIN  4
@@ -82,6 +30,13 @@ static uint8_t static_routes[nodes] =
 // Watchdog timeout in seconds (NOTE: I think this time might be off because
 // we are changing the CPU clock frequency)
 #define WDT_TIMEOUT 5
+
+static Preferences preferences;
+
+// NODE SPECIFIC STUFF
+static uint8_t MY_ADDR = 1;
+// Routing table (node 1)
+static uint8_t Routes[256];
 
 static int32_t get_time_seconds() {
   return esp_timer_get_time() / 1000000L;
@@ -161,8 +116,6 @@ uint8_t spi_write_multi(uint8_t reg, uint8_t* buf, uint8_t len) {
 
 // ===== Low-Level Interface =====
 
-static volatile bool isr_hit = false;
-
 // The states of the state machine
 enum State { IDLE, LISTENING, TRANSMITTING, TRANSMITTING_ACK, LISTENING_FOR_ACK };
 
@@ -228,6 +181,8 @@ struct Header {
 };
 
 // ----- Interrupt Service -------
+
+static volatile bool isr_hit = false;
 
 void IRAM_ATTR isr() {
   // NOTE: We've had so many problems with interrupt enable/disable on the ESP32
@@ -629,10 +584,9 @@ int sendPing(int argc, char **argv) {
   counter++;
   
   uint8_t target = atoi(argv[1]);
-
-  if (target < nodes) {
+  if (target > 0 && target < 255) {
     
-    uint8_t nextHop = static_routes[target];
+    uint8_t nextHop = Routes[target];
     if (nextHop != 0) {
       
       shell.print(F("Pinging node "));
@@ -668,9 +622,9 @@ int sendReset(int argc, char **argv) {
   counter++;
   uint8_t target = atoi(argv[1]);
 
-  if (target < nodes) {
+  if (target > 0 && target < 255) {
 
-    uint8_t nextHop = static_routes[target];
+    uint8_t nextHop = Routes[target];
     if (nextHop != 0) {
 
       shell.print(F("Resetting node "));
@@ -702,10 +656,26 @@ int boot(int argc, char **argv) {
 }
 
 int info(int argc, char **argv) { 
-    shell.print(F("Node "));
-    shell.println(MY_ADDR);
-    shell.print(F("Version "));
-    shell.println(SW_VERSION);
+    shell.print(F("{ \"node\": "));
+    shell.print(MY_ADDR);
+    shell.print(F(", \"version\": "));
+    shell.print(SW_VERSION);
+    shell.print(F(", \"routes\": ["));
+    bool first = true;
+    for (int i = 0; i < 256; i++) {
+      if (Routes[i] != 0) {
+        if (!first) 
+          shell.print(", ");
+        first = false;
+        shell.print("[");
+        shell.print(i);
+        shell.print(", ");
+        shell.print(Routes[i]);
+        shell.print("]");
+      }
+    }
+    shell.print("]");
+    shell.println(F("}"));
     return 0;
 }
 
@@ -727,6 +697,42 @@ int skipAcks(int argc, char **argv) {
   skipAckCount = atoi(argv[1]);
 }
 
+int setAddr(int argc, char **argv) { 
+
+  if (argc != 2) {
+    shell.println(msg_arg_error);
+    return -1;
+  }
+
+  // Save the address in the NVRAM
+  preferences.putUChar("addr", atoi(argv[1]));
+
+  // Get the address
+  MY_ADDR = preferences.getUChar("addr", 1);  
+}
+
+int setRoute(int argc, char **argv) { 
+
+  if (argc != 3) {
+    shell.println(msg_arg_error);
+    return -1;
+  }
+
+  uint8_t t = atoi(argv[1]);
+  uint8_t r = atoi(argv[2]);
+  Routes[t] = r;
+
+  // Save the address in the NVRAM
+  preferences.putBytes("routes", Routes, 256);
+}
+
+int clearRoutes(int argc, char **argv) { 
+  for (int i = 0; i < 256; i++)
+    Routes[i] = 0;
+  // Save the address in the NVRAM
+  preferences.putBytes("routes", Routes, 256);
+}
+
 void setup() {
 
   delay(1000);
@@ -734,8 +740,6 @@ void setup() {
   delay(1000);
   
   Serial.println(F("KC1FSZ LoRa Mesh System"));
-  Serial.print(F("Node "));
-  Serial.println(MY_ADDR);
 
   preferences.begin("my-app", false); 
 
@@ -757,6 +761,9 @@ void setup() {
   shell.addCommand(F("info"), info);
   shell.addCommand(F("sleep"), sleep);
   shell.addCommand(F("skipacks"), skipAcks);
+  shell.addCommand(F("setaddr"), setAddr);
+  shell.addCommand(F("setroute"), setRoute);
+  shell.addCommand(F("clearroutes"), clearRoutes);
 
   // Increment the boot count
   uint16_t bootCount = preferences.getUShort("bootcount", 0);  
@@ -767,7 +774,17 @@ void setup() {
   uint16_t sleepCount = preferences.getUShort("sleepcount", 0);  
   shell.print(F("Sleep count: "));
   shell.println(sleepCount);
-  
+
+  // Get the address loaded from NVRAM
+  MY_ADDR = preferences.getUChar("addr", 1);  
+  Serial.print(F("Node "));
+  Serial.println(MY_ADDR);
+
+  // Get the initial routing table loaded from NVRAM
+  for (int i = 0; i < 256; i++)
+    Routes[i] = 0;
+  preferences.getBytes("routes", Routes, 256);
+
   // Interrupt setup from radio
   // Allocating an external interrupt will always allocate it on the core that does the allocation.
   attachInterrupt(DIO0_PIN, isr, RISING);
@@ -874,9 +891,9 @@ void process_rx_msg(const uint8_t* buf, const unsigned int len) {
 
     // Look for messages that need to be forwarded on
     if (header.finalDestAddr != MY_ADDR) {
-      if (header.finalDestAddr < nodes) {
+      if (header.finalDestAddr > 0 && header.finalDestAddr < 255) {
         // Look up the route
-        uint8_t nextHop = static_routes[header.finalDestAddr];
+        uint8_t nextHop = Routes[header.finalDestAddr];
         if (nextHop == 0) {
           shell.println(F("No route available"));
         }
