@@ -19,7 +19,7 @@
 #include "CircularBuffer.h"
 #include "spi_utils.h"
 
-#define SW_VERSION 12
+#define SW_VERSION 14
 
 #define RST_PIN   14
 #define DIO0_PIN  4
@@ -550,7 +550,7 @@ int sendPing(int argc, char **argv) {
       return 0;
 
     } else {
-      shell.println(F("No route"));
+      shell.println(F("ERR: No route"));
     }
   }
 }
@@ -725,6 +725,90 @@ int setBlimit(int argc, char **argv) {
   preferences.putUShort("blimit", atoi(argv[1]));
 }
 
+int doPrint(int argc, char **argv) { 
+
+  if (argc != 2) {
+    shell.println(msg_arg_error);
+    return -1;
+  }
+
+  shell.print("[");
+  shell.print(argv[1]);
+  shell.println("]");
+}
+
+static bool isDelim(char d, const char* delims) {
+  const char* ptr = delims;
+  while (*ptr != 0) {
+    if (d == *ptr) {
+      return true;
+    }
+    ptr++;
+  }
+  return false;
+}
+
+char* tokenizer(char* str, const char* delims, char** saveptr) {
+
+  // Figure out where to start scanning
+  char* ptr = 0;
+  if (str == 0) {
+    ptr = *saveptr;
+  } else {
+    ptr = str;
+  }
+  
+  // Consume/ignore any leading delimiters
+  while (*ptr != 0 && isDelim(*ptr, delims)) {
+    ptr++;
+  }
+
+  // At this point we either have a null or a non-delimiter
+  // character to deal with. If there is nothing left in the 
+  // string then return 0
+  if (*ptr == 0) {
+    return 0;
+  }
+
+  char* result;
+
+  // Check to see if this is a quoted token 
+  if (*ptr == '\"') {
+    // Skip the opening quote
+    ptr++;
+    // Result is the first eligible character
+    result = ptr;
+    while (*ptr != 0) {
+      if (*ptr == '\"') {
+        // Turn the trailing delimiter into a null-termination
+        *ptr = 0;
+        // Skip forward for next start
+        ptr++;
+        break;
+      } 
+      ptr++;
+    }
+  } 
+  else {
+    // Result is the first eligible character
+    result = ptr;
+    while (*ptr != 0) {
+      if (isDelim(*ptr, delims)) {
+        // Turn the trailing delimiter into a null-termination
+        *ptr = 0;
+        // Skip forward for next start
+        ptr++;
+        break;
+      } 
+      ptr++;
+    }
+  }
+
+  // We will start on the next character when we return
+  *saveptr = ptr;
+  return result;
+}
+
 void setup() {
 
   delay(1000);
@@ -744,6 +828,7 @@ void setup() {
 
   // Shell setup
   shell.attach(Serial); 
+  shell.setTokenizer(tokenizer);
   shell.addCommand(F("ping"), sendPing);
   shell.addCommand(F("reset"), sendReset);
   shell.addCommand(F("blink"), sendBlink);
@@ -755,6 +840,7 @@ void setup() {
   shell.addCommand(F("setroute"), setRoute);
   shell.addCommand(F("clearroutes"), clearRoutes);
   shell.addCommand(F("setblimit"), setBlimit);
+  shell.addCommand(F("print"), doPrint);
 
   // Increment the boot count
   uint16_t bootCount = preferences.getUShort("bootcount", 0);  
