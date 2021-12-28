@@ -19,7 +19,7 @@
 #include "CircularBuffer.h"
 #include "spi_utils.h"
 
-#define SW_VERSION 15
+#define SW_VERSION 16
 
 #define RST_PIN   14
 #define DIO0_PIN  4
@@ -737,6 +737,51 @@ int doPrint(int argc, char **argv) {
   shell.println("]");
 }
 
+int sendText(int argc, char **argv) { 
+ 
+  if (argc != 3) {
+    shell.println(msg_arg_error);
+    return -1;
+  }
+  
+  uint8_t target = atoi(argv[1]);
+  if (target == 0 || target == 255) {
+      shell.println(F("ERR: Bad address"));
+      return -1;
+  }
+
+  uint8_t nextHop = Routes[target];
+  if (nextHop == 0) {
+    shell.println(F("ERR: No route"));
+    return -1;
+  }
+
+  uint16_t textLen = strlen(argv[2]);
+
+  if (textLen > 80) {
+    shell.println(F("ERR: Length error"));
+    return -1;
+  }
+
+  counter++;
+  uint8_t tx_buf[256];
+
+  Header header;
+  header.destAddr = nextHop;
+  header.sourceAddr = MY_ADDR;
+  header.id = counter;
+  header.type = MessageType::TYPE_TEXT;
+  header.finalDestAddr = target;
+  header.originalSourceAddr = MY_ADDR;
+
+  memcpy(tx_buf, &header, sizeof(Header));
+  memcpy(tx_buf + sizeof(Header), argv[2], textLen);
+
+  tx_buffer.push(tx_buf, sizeof(Header) + textLen);
+      
+  return 0;
+}
+
 static bool isDelim(char d, const char* delims) {
   const char* ptr = delims;
   while (*ptr != 0) {
@@ -832,6 +877,7 @@ void setup() {
   shell.addCommand(F("ping"), sendPing);
   shell.addCommand(F("reset"), sendReset);
   shell.addCommand(F("blink"), sendBlink);
+  shell.addCommand(F("text"), sendText);
   shell.addCommand(F("boot"), boot);
   shell.addCommand(F("info"), info);
   shell.addCommand(F("sleep"), sleep);
@@ -1084,6 +1130,15 @@ static void process_rx_msg(const uint8_t* buf, const unsigned int len) {
       else if (header.type == MessageType::TYPE_RESET) {
         shell.println(F("Resetting ..."));
         ESP.restart();
+      }
+      // Text
+      else if (header.type == MessageType::TYPE_TEXT) {
+        shell.print("MSG: ");
+        // There is no null-termination, so we must use the message length here
+        for (int i = 0; i < len - sizeof(Header); i++) {
+          shell.write(buf[i + sizeof(Header)]);
+        }
+        shell.println();
       }
       else {
         shell.println(F("ERR: Unknown message"));
