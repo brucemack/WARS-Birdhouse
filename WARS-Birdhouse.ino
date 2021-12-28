@@ -19,7 +19,7 @@
 #include "CircularBuffer.h"
 #include "spi_utils.h"
 
-#define SW_VERSION 14
+#define SW_VERSION 15
 
 #define RST_PIN   14
 #define DIO0_PIN  4
@@ -478,9 +478,9 @@ int init_radio() {
   
   // Turn on PA and set power to +20dB
   // PaSelect=1
-  // OutputPower=18
+  // OutputPower=17 (20 - 3dB from DAC)
   //   NOTE: Actual Power=(17-(15-OutputPower)) = 2 + OutputPower = 20
-  spi_write(0x09, 0x80 | 18);
+  spi_write(0x09, 0x80 | (20 - 3 - 2));
 
   set_frequency(916.0);
   
@@ -1052,8 +1052,6 @@ static void process_rx_msg(const uint8_t* buf, const unsigned int len) {
           Serial.print(pong.counter, DEC);
           Serial.print(", \"origSourceAddr\": ");
           Serial.print(pong.header.originalSourceAddr, DEC);
-          Serial.print(", \"local_rssi\": ");
-          Serial.print(0, DEC);
           Serial.print(", \"hops\": ");
           Serial.print(pong.header.hops, DEC);
           Serial.print(", \"version\": ");
