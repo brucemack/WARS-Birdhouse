@@ -19,7 +19,7 @@
 #include "CircularBuffer.h"
 #include "spi_utils.h"
 
-#define SW_VERSION 16
+#define SW_VERSION 18
 
 #define RST_PIN   14
 #define DIO0_PIN  4
@@ -419,6 +419,38 @@ int reset_radio() {
   return 0;  
 }
 
+static void setLowDatarate() {
+
+    // called after changing bandwidth and/or spreading factor
+    //  Semtech modem design guide AN1200.13 says 
+    // "To avoid issues surrounding  drift  of  the  crystal  reference  oscillator  due  to  either  temperature  change  
+    // or  motion,the  low  data  rate optimization  bit  is  used. Specifically for 125  kHz  bandwidth  and  SF  =  11  and  12,  
+    // this  adds  a  small  overhead  to increase robustness to reference frequency variations over the timescale of the LoRa packet."
+ 
+    // read current value for BW and SF
+    uint8_t bw = spi_read(0x1d) >> 4;	// bw is in bits 7..4
+    uint8_t sf = spi_read(0x1e) >> 4;	// sf is in bits 7..4
+   
+    // calculate symbol time (see Semtech AN1200.22 section 4)
+    float bw_tab[] = { 7800, 10400, 15600, 20800, 31250, 41700, 62500, 
+      125000, 250000, 500000};
+    float bandwidth = bw_tab[bw];
+    float symbolTime = 1000.0 * pow(2, sf) / bandwidth;	// ms
+   
+    // the symbolTime for SF 11 BW 125 is 16.384ms. 
+    // and, according to this :- 
+    // https://www.thethingsnetwork.org/forum/t/a-point-to-note-lora-low-data-rate-optimisation-flag/12007
+    // the LDR bit should be set if the Symbol Time is > 16ms
+    // So the threshold used here is 16.0ms
+ 
+    // the LDR is bit 3 of register 0x26
+    uint8_t current = spi_read(0x26) & ~0x08; // mask off the LDR bit
+    if (symbolTime > 16.0)
+      spi_write(0x26, current | 0x08);
+    else
+      spi_write(0x26, current);   
+}
+
 /** 
  *  All of the one-time initializaiton of the radio
  */
@@ -445,16 +477,15 @@ int init_radio() {
   spi_write(0x0e, 0);
   // RX base:
   spi_write(0x0f, 0);
+
   // Go into stand-by
   set_mode_STDBY();
 
   // Configure the radio
   uint8_t reg = 0;
 
-  // Preable Length=8 (default)
-
   // Bw=31.25kHz, CodingRate=4/5, ImplicitHeaderModeOn=Explicit header)
-  //reg = 0b01000010;
+  // reg = 0b01000010;
   // Bw=125, CodingRate=4/5, ImplicitHeaderModeOn=Explicit header)
   reg = 0x72;
   spi_write(0x1d, reg);
@@ -466,24 +497,28 @@ int init_radio() {
   // AgcAutoOn=LNA gain set by AGC
   reg = 0b00000100;
   spi_write(0x26, reg);
- 
-  // Set freq
-  set_frequency(916);
-  
-  // Adjust over-current protection
-  spi_write(0x0b, 0x31);
+
+  // Preable Length=8 (default)
+  // Preamble MSB and LSB
+  spi_write(0x20, 8 >> 8);
+  spi_write(0x21, 8 & 0xff);
+
+  setLowDatarate();
 
   // DAC enable (adds 3dB)
-  spi_write(0x4d, 0x87);
+  spi_write(0x4d, 0x07);
   
   // Turn on PA and set power to +20dB
   // PaSelect=1
   // OutputPower=17 (20 - 3dB from DAC)
   //   NOTE: Actual Power=(17-(15-OutputPower)) = 2 + OutputPower = 20
-  spi_write(0x09, 0x80 | (20 - 3 - 2));
+  spi_write(0x09, 0x80 | ((20 - 3) - 2));
 
   set_frequency(916.0);
-  
+
+  // Adjust over-current protection
+  spi_write(0x0b, 0x31);
+
   return 0;
 }
 
@@ -918,6 +953,7 @@ void setup() {
   
   // Reset the radio 
   reset_radio();
+  delay(250);
 
   // Initialize the radio
   if (init_radio() != 0) {
@@ -1014,7 +1050,7 @@ static void process_rx_msg(const uint8_t* buf, const unsigned int len) {
     Header header;
     memcpy(&header, buf, sizeof(Header));
 
-    shell.print("Got type: ");
+    shell.print(F("INF: Got type: "));
     shell.print(header.type, HEX);
     shell.print(", id: ");
     shell.print(header.id);
