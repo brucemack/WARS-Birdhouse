@@ -1147,6 +1147,7 @@ static void process_rx_msg(const uint8_t* buf, const unsigned int len) {
 
         // Create a pong and send back to the originator of the ping
         PongMessage msg;
+        // Notice that the first hop is always the node that sent the PING.
         msg.header.destAddr = header.sourceAddr;
         msg.header.sourceAddr = MY_ADDR;
         msg.header.hops = header.hops + 1;        
