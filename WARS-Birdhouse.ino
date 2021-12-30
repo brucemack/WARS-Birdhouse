@@ -19,9 +19,11 @@
 #include "CircularBuffer.h"
 #include "spi_utils.h"
 
-#define SW_VERSION 18
+#define SW_VERSION 20
 
-#define RST_PIN   14
+//#define RST_PIN   14
+// This is the pin that is available on the D1 Mini module:
+#define RST_PIN   26
 #define DIO0_PIN  4
 #define LED_PIN   2
 #define BATTERY_LEVEL_PIN 33
@@ -358,6 +360,10 @@ void event_tick() {
 // 
 // The LoRa register map starts on page 103.
 
+void set_mode_SLEEP() {
+  spi_write(0x01, 0x00);  
+}
+
 void set_mode_STDBY() {
   spi_write(0x01, 0x01);  
 }
@@ -527,6 +533,7 @@ int init_radio() {
 static auto msg_arg_error = F("ERR: Argument error");
 static int counter = 0;
 static uint32_t lastLowBatteryCheckSeconds = 0;
+static uint32_t chipId = 0;
 
 struct PingMessage {
   Header header;  
@@ -542,6 +549,7 @@ struct PongMessage {
   uint32_t uptimeSeconds;
   uint16_t bootCount;
   uint16_t sleepCount;
+  //uint32_t macAddress;
 };
 
 struct ResetMessage {
@@ -566,12 +574,7 @@ int sendPing(int argc, char **argv) {
     
     uint8_t nextHop = Routes[target];
     if (nextHop != 0) {
-      
-      shell.print(F("Pinging node "));
-      shell.print(target);
-      shell.print(F(" via "));
-      shell.println(nextHop);
-    
+
       PingMessage msg;
       msg.header.destAddr = nextHop;
       msg.header.sourceAddr = MY_ADDR;
@@ -667,12 +670,37 @@ int boot(int argc, char **argv) {
     return 0;
 }
 
+int bootRadio(int argc, char **argv) { 
+
+  // Reset the radio 
+  reset_radio();
+  delay(250);
+
+  // Initialize the radio
+  if (init_radio() != 0) {
+    shell.println("Problem with initialization");
+    return -1;
+  }
+  else {
+    shell.println("Radio initialized");
+
+    // Start listening for messages
+    state = State::LISTENING;
+    enable_interrupt_RxDone();
+    set_mode_RXCONTINUOUS();
+
+    return 0;
+  }
+}
+
 int info(int argc, char **argv) { 
     shell.print(F("{ \"node\": "));
     shell.print(MY_ADDR);
     shell.print(F(", \"version\": "));
     shell.print(SW_VERSION);
-    shell.print(F(", \"blimit\": "));
+    shell.print(F(", \"MAC\": \""));
+    shell.print(chipId, HEX);
+    shell.print(F("\", \"blimit\": "));
     shell.print(preferences.getUShort("blimit", 0));
     shell.print(F(", \"batteryMv\": "));
     shell.print(checkBattery());
@@ -895,7 +923,25 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   
-  Serial.println(F("KC1FSZ LoRa Mesh System"));
+  Serial.println();
+  Serial.println(F("====================="));
+  Serial.println(F("KC1FSZ LoRa Mesh Node"));
+  Serial.println(F("====================="));
+  Serial.println();
+
+  Serial.print("Version: ");
+  Serial.println(SW_VERSION);
+
+  Serial.print("Build: ");
+  Serial.println(__DATE__);
+
+  // Extract the MAC address of the chip
+  for (int i = 0; i < 17; i = i + 8) {
+    chipId |= ((ESP.getEfuseMac() >> (40 - i)) & 0xff) << i;
+  }
+
+  Serial.print("MAC: ");
+  Serial.println(chipId, HEX);
 
   preferences.begin("my-app", false); 
 
@@ -914,6 +960,7 @@ void setup() {
   shell.addCommand(F("blink"), sendBlink);
   shell.addCommand(F("text"), sendText);
   shell.addCommand(F("boot"), boot);
+  shell.addCommand(F("bootradio"), bootRadio);
   shell.addCommand(F("info"), info);
   shell.addCommand(F("sleep"), sleep);
   shell.addCommand(F("skipacks"), skipAcks);
@@ -925,17 +972,17 @@ void setup() {
 
   // Increment the boot count
   uint16_t bootCount = preferences.getUShort("bootcount", 0);  
-  shell.print(F("Boot count: "));
+  shell.print(F("Boot Count: "));
   shell.println(bootCount);
   preferences.putUShort("bootcount", bootCount + 1);
 
   uint16_t sleepCount = preferences.getUShort("sleepcount", 0);  
-  shell.print(F("Sleep count: "));
+  shell.print(F("Sleep Count: "));
   shell.println(sleepCount);
 
   // Get the address loaded from NVRAM
   MY_ADDR = preferences.getUChar("addr", 1);  
-  Serial.print(F("Node "));
+  Serial.print(F("Node Address: "));
   Serial.println(MY_ADDR);
 
   // Get the initial routing table loaded from NVRAM
@@ -957,10 +1004,9 @@ void setup() {
 
   // Initialize the radio
   if (init_radio() != 0) {
-    Serial.println("Problem with initialization");
+    Serial.println("ERR: Problem with radio initialization");
   }
   else {
-    Serial.println("Radio initialized");
     digitalWrite(LED_PIN, HIGH);
     delay(200);
     digitalWrite(LED_PIN, LOW);
@@ -968,13 +1014,13 @@ void setup() {
     digitalWrite(LED_PIN, HIGH);
     delay(200);
     digitalWrite(LED_PIN, LOW);
+
+    // Start listening for messages
+    state = State::LISTENING;
+    enable_interrupt_RxDone();
+    set_mode_RXCONTINUOUS();  
   }
 
-  // Start listening for messages
-  state = State::LISTENING;
-  enable_interrupt_RxDone();
-  set_mode_RXCONTINUOUS();
-  
   // Enable the watchdog timer
   esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
   esp_task_wdt_add(NULL); //add current thread to WDT watch
@@ -1117,6 +1163,7 @@ static void process_rx_msg(const uint8_t* buf, const unsigned int len) {
         msg.uptimeSeconds = get_time_seconds();
         msg.bootCount = preferences.getUShort("bootcount", 0);  
         msg.sleepCount = preferences.getUShort("sleepcount", 0);  
+        //msg.macAddress = chipId;
         
         tx_buffer.push((uint8_t*)&msg, sizeof(PongMessage));
       }
@@ -1125,8 +1172,7 @@ static void process_rx_msg(const uint8_t* buf, const unsigned int len) {
         
         if (len >= sizeof(PongMessage)) {
 
-          // Re-read the message into the PongMessage format.  Notice that we skip the first 
-          // two bytes of the message 
+          // Re-read the message into the PongMessage format.  
           PongMessage pong;
           memcpy(&pong, buf, sizeof(PongMessage));
   
@@ -1150,10 +1196,13 @@ static void process_rx_msg(const uint8_t* buf, const unsigned int len) {
           Serial.print(pong.bootCount, DEC);
           Serial.print(", \"sleepCount\": ");
           Serial.print(pong.sleepCount, DEC);
-          Serial.println("\" }");
+          Serial.println("}");
+          //Serial.print(", \"mac\": \"");
+          //Serial.print(pong.macAddress, HEX);
+          //Serial.println("\" }");
         }
         else {
-          Serial.println("Pong too short");
+          Serial.println(F("ERR: Pong too short"));
         }
       }
       // Blink the on-board LED
@@ -1187,6 +1236,11 @@ static void process_rx_msg(const uint8_t* buf, const unsigned int len) {
   }
 }
 
+/**
+ * @brief Checks to see if the battery voltage is below the 
+ * configured limited.  If so, put the radio in SLEEP mode
+ * and tell the ESP32 to go into deep sleep.
+ */
 static void check_low_battery() {
   uint16_t lowBatteryLimitMv = preferences.getUShort("blimit", 0);
   // Check the battery
@@ -1196,8 +1250,11 @@ static void check_low_battery() {
     shell.println(F("INF: Low battery detected"));
     // Keep track of how many times this has happened
     uint16_t sleepCount = preferences.getUShort("sleepcount", 0);  
-    preferences.putUShort("sleepcount", sleepCount+1);   
-    // Put the system into a deep sleep that will be awakened using the timer
+    preferences.putUShort("sleepcount", sleepCount + 1);   
+    // Put the radio into SLEEP mode
+    set_mode_SLEEP();
+    // Put the ESP32 into a deep sleep that will be awakened using the timer.
+    // Wakeup will look like reboot.
     esp_sleep_enable_timer_wakeup(DEEP_SLEEP_SECONDS * US_TO_S_FACTOR);
     esp_deep_sleep_start();
   }
