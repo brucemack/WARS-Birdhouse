@@ -19,7 +19,7 @@
 #include "CircularBuffer.h"
 #include "spi_utils.h"
 
-#define SW_VERSION 20
+#define SW_VERSION 21
 
 //#define RST_PIN   14
 // This is the pin that is available on the D1 Mini module:
@@ -725,10 +725,17 @@ int info(int argc, char **argv) {
 
 // Used for testing the watch dog 
 static int sleep(int argc, char **argv) { 
-    shell.println("Sleeping ...");
-    delay(120 * 1000);
-    shell.println("Done");
-    return 0;
+
+  if (argc != 2) {
+    shell.println(msg_arg_error);
+    return -1;
+  }
+
+  uint16_t seconds = atoi(argv[1]);
+  shell.println("INF: Sleeping ...");
+  delay(seconds * 1000);
+  shell.println("INF: Done");
+  return 0;
 }
 
 int skipAcks(int argc, char **argv) { 
@@ -955,17 +962,18 @@ void setup() {
   // Shell setup
   shell.attach(Serial); 
   shell.setTokenizer(tokenizer);
-  shell.addCommand(F("ping"), sendPing);
+  //shell.setPrompt("-> ");
+  shell.addCommand(F("ping"), F("<addr>"), sendPing);
   shell.addCommand(F("reset"), sendReset);
   shell.addCommand(F("blink"), sendBlink);
   shell.addCommand(F("text"), sendText);
   shell.addCommand(F("boot"), boot);
   shell.addCommand(F("bootradio"), bootRadio);
   shell.addCommand(F("info"), info);
-  shell.addCommand(F("sleep"), sleep);
+  shell.addCommand(F("sleep"), F("<seconds>"), sleep);
   shell.addCommand(F("skipacks"), skipAcks);
-  shell.addCommand(F("setaddr"), setAddr);
-  shell.addCommand(F("setroute"), setRoute);
+  shell.addCommand(F("setaddr"), F("<addr>"), setAddr);
+  shell.addCommand(F("setroute"), F("<target addr> <next hop addr>"), setRoute);
   shell.addCommand(F("clearroutes"), clearRoutes);
   shell.addCommand(F("setblimit"), setBlimit);
   shell.addCommand(F("print"), doPrint);
@@ -982,8 +990,8 @@ void setup() {
 
   // Get the address loaded from NVRAM
   MY_ADDR = preferences.getUChar("addr", 1);  
-  Serial.print(F("Node Address: "));
-  Serial.println(MY_ADDR);
+  shell.print(F("Node Address: "));
+  shell.println(MY_ADDR);
 
   // Get the initial routing table loaded from NVRAM
   for (int i = 0; i < 256; i++)
