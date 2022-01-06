@@ -7,7 +7,8 @@
 // 30mA at 10 MHz clock rate
 
 // Prerequsisites to Install 
-// * SimpleSerialShell
+// * philj404:SimpleSerialShell
+// * contrem:arduino-timer
 
 // Build instructions
 // * Set clock frequency to 10MHz to save power
@@ -18,6 +19,7 @@
 #include <SimpleSerialShell.h>
 #include "CircularBuffer.h"
 #include "spi_utils.h"
+#include <arduino-timer.h>
 
 #define SW_VERSION 21
 
@@ -36,6 +38,9 @@
 
 // Deep sleep duration when low battery is detected
 #define DEEP_SLEEP_SECONDS 60 * 30
+
+// How frequently to check the batter condition
+#define BATTERY_CHECK_INTERVAL_SECONDS 30
 
 static Preferences preferences;
 
@@ -532,8 +537,10 @@ int init_radio() {
 
 static auto msg_arg_error = F("ERR: Argument error");
 static int counter = 0;
-static uint32_t lastLowBatteryCheckSeconds = 0;
+//static uint32_t lastLowBatteryCheckSeconds = 0;
 static uint32_t chipId = 0;
+
+auto timer = timer_create_default();
 
 struct PingMessage {
   Header header;  
@@ -924,6 +931,32 @@ char* tokenizer(char* str, const char* delims, char** saveptr) {
   return result;
 }
 
+/**
+ * @brief Checks to see if the battery voltage is below the 
+ * configured limited.  If so, put the radio in SLEEP mode
+ * and tell the ESP32 to go into deep sleep.
+ */
+static bool check_low_battery(void*) {
+  uint16_t lowBatteryLimitMv = preferences.getUShort("blimit", 0);
+  // Check the battery
+  uint16_t battery = checkBattery();
+  // If the battery is low then deep sleep
+  if (lowBatteryLimitMv != 0 && battery < lowBatteryLimitMv) {
+    shell.println(F("INF: Low battery detected"));
+    // Keep track of how many times this has happened
+    uint16_t sleepCount = preferences.getUShort("sleepcount", 0);  
+    preferences.putUShort("sleepcount", sleepCount + 1);   
+    // Put the radio into SLEEP mode
+    set_mode_SLEEP();
+    // Put the ESP32 into a deep sleep that will be awakened using the timer.
+    // Wakeup will look like reboot.
+    esp_sleep_enable_timer_wakeup(DEEP_SLEEP_SECONDS * US_TO_S_FACTOR);
+    esp_deep_sleep_start();
+  }
+  // Keep repeating
+  return true;
+}
+
 void setup() {
 
   delay(1000);
@@ -962,18 +995,17 @@ void setup() {
   // Shell setup
   shell.attach(Serial); 
   shell.setTokenizer(tokenizer);
-  //shell.setPrompt("-> ");
-  shell.addCommand(F("ping"), F("<addr>"), sendPing);
+  shell.addCommand(F("ping:<addr>"), sendPing);
   shell.addCommand(F("reset"), sendReset);
   shell.addCommand(F("blink"), sendBlink);
   shell.addCommand(F("text"), sendText);
   shell.addCommand(F("boot"), boot);
   shell.addCommand(F("bootradio"), bootRadio);
   shell.addCommand(F("info"), info);
-  shell.addCommand(F("sleep"), F("<seconds>"), sleep);
+  shell.addCommand(F("sleep:<seconds>"), sleep);
   shell.addCommand(F("skipacks"), skipAcks);
-  shell.addCommand(F("setaddr"), F("<addr>"), setAddr);
-  shell.addCommand(F("setroute"), F("<target addr> <next hop addr>"), setRoute);
+  shell.addCommand(F("setaddr:<addr>"), setAddr);
+  shell.addCommand(F("setroute:<target addr> <next hop addr>"), setRoute);
   shell.addCommand(F("clearroutes"), clearRoutes);
   shell.addCommand(F("setblimit"), setBlimit);
   shell.addCommand(F("print"), doPrint);
@@ -1029,18 +1061,17 @@ void setup() {
     set_mode_RXCONTINUOUS();  
   }
 
+  // Enable the battery check timer
+  timer.every(BATTERY_CHECK_INTERVAL_SECONDS * 1000, check_low_battery);
+
   // Enable the watchdog timer
   esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
   esp_task_wdt_add(NULL); //add current thread to WDT watch
   esp_task_wdt_reset();
-
-  // Make sure we don't check the battery immediately
-  lastLowBatteryCheckSeconds = get_time_seconds();
 }
 
 static void process_rx_msg(const uint8_t* buf, const unsigned int len);
 static void check_for_rx_msg();
-static void check_low_battery();
 
 void loop() {
 
@@ -1068,17 +1099,14 @@ void loop() {
   // Service the shell
   shell.executeIfInput();
   
+  // Service the timer
+  timer.tick();
+
   // Check for radio activity
   event_tick();
 
   // Look for any received data that should be processed by the application
   check_for_rx_msg();
-
-  // Check for low battery condition.  But we don't check this on every loop.
-  if (get_time_seconds() - lastLowBatteryCheckSeconds > 30) {
-    check_low_battery();
-    lastLowBatteryCheckSeconds = get_time_seconds();
-  }
 
   // Keep the watchdog alive
   esp_task_wdt_reset();
@@ -1245,26 +1273,3 @@ static void process_rx_msg(const uint8_t* buf, const unsigned int len) {
   }
 }
 
-/**
- * @brief Checks to see if the battery voltage is below the 
- * configured limited.  If so, put the radio in SLEEP mode
- * and tell the ESP32 to go into deep sleep.
- */
-static void check_low_battery() {
-  uint16_t lowBatteryLimitMv = preferences.getUShort("blimit", 0);
-  // Check the battery
-  uint16_t battery = checkBattery();
-  // If the battery is low then deep sleep
-  if (lowBatteryLimitMv != 0 && battery < lowBatteryLimitMv) {
-    shell.println(F("INF: Low battery detected"));
-    // Keep track of how many times this has happened
-    uint16_t sleepCount = preferences.getUShort("sleepcount", 0);  
-    preferences.putUShort("sleepcount", sleepCount + 1);   
-    // Put the radio into SLEEP mode
-    set_mode_SLEEP();
-    // Put the ESP32 into a deep sleep that will be awakened using the timer.
-    // Wakeup will look like reboot.
-    esp_sleep_enable_timer_wakeup(DEEP_SLEEP_SECONDS * US_TO_S_FACTOR);
-    esp_deep_sleep_start();
-  }
-}
