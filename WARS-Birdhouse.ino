@@ -21,7 +21,7 @@
 #include "spi_utils.h"
 #include <arduino-timer.h>
 
-#define SW_VERSION 21
+#define SW_VERSION 22
 
 //#define RST_PIN   14
 // This is the pin that is available on the D1 Mini module:
@@ -995,17 +995,17 @@ void setup() {
   // Shell setup
   shell.attach(Serial); 
   shell.setTokenizer(tokenizer);
-  shell.addCommand(F("ping:<addr>"), sendPing);
+  shell.addCommand(F("ping <addr>"), sendPing);
   shell.addCommand(F("reset"), sendReset);
   shell.addCommand(F("blink"), sendBlink);
   shell.addCommand(F("text"), sendText);
   shell.addCommand(F("boot"), boot);
   shell.addCommand(F("bootradio"), bootRadio);
   shell.addCommand(F("info"), info);
-  shell.addCommand(F("sleep:<seconds>"), sleep);
+  shell.addCommand(F("sleep <seconds>"), sleep);
   shell.addCommand(F("skipacks"), skipAcks);
-  shell.addCommand(F("setaddr:<addr>"), setAddr);
-  shell.addCommand(F("setroute:<target addr> <next hop addr>"), setRoute);
+  shell.addCommand(F("setaddr <addr>"), setAddr);
+  shell.addCommand(F("setroute <target addr> <next hop addr>"), setRoute);
   shell.addCommand(F("clearroutes"), clearRoutes);
   shell.addCommand(F("setblimit"), setBlimit);
   shell.addCommand(F("print"), doPrint);
@@ -1024,6 +1024,10 @@ void setup() {
   MY_ADDR = preferences.getUChar("addr", 1);  
   shell.print(F("Node Address: "));
   shell.println(MY_ADDR);
+
+  uint16_t lowBatteryLimitMv = preferences.getUShort("blimit", 0);
+  shell.print(F("Battery Limit: "));
+  shell.println(lowBatteryLimitMv);
 
   // Get the initial routing table loaded from NVRAM
   for (int i = 0; i < 256; i++)
@@ -1272,4 +1276,3 @@ static void process_rx_msg(const uint8_t* buf, const unsigned int len) {
     shell.println(len);
   }
 }
-
