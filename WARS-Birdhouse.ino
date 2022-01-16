@@ -21,7 +21,7 @@
 #include "spi_utils.h"
 #include <arduino-timer.h>
 
-#define SW_VERSION 22
+#define SW_VERSION 23
 
 //#define RST_PIN   14
 // This is the pin that is available on the D1 Mini module:
@@ -430,6 +430,24 @@ int reset_radio() {
   return 0;  
 }
 
+/**
+ * @brief Sets the Over Current Protection register.
+ * 
+ * @param current_ma 
+ */
+static void set_ocp(uint8_t current_ma) {
+
+  uint8_t trim = 27;
+
+  if (current_ma <= 120) {
+    trim = (current_ma - 45) / 5;
+  } else if (current_ma <= 240) {
+    trim = (current_ma + 30) / 10;
+  }
+
+  spi_write(0x0b, 0x20 | (0x1F & trim));
+}
+
 static void setLowDatarate() {
 
     // called after changing bandwidth and/or spreading factor
@@ -489,6 +507,25 @@ int init_radio() {
   // RX base:
   spi_write(0x0f, 0);
 
+  set_frequency(916.0);
+
+  // Set LNA boost
+  spi_write(0x0c, spi_read(0x0c) | 0x03);
+
+  // AgcAutoOn=LNA gain set by AGC
+  spi_write(0x26, 0x04);
+
+  // DAC enable (adds 3dB)
+  spi_write(0x4d, 0x87);
+  
+  // Turn on PA and set power to +20dB
+  // PaSelect=1
+  // OutputPower=17 (20 - 3dB from DAC)
+  spi_write(0x09, 0x80 | ((20 - 3) - 2));
+
+  // Set OCP to 140 (as per the Sandeep Mistry library)
+  set_ocp(140);
+
   // Go into stand-by
   set_mode_STDBY();
 
@@ -505,30 +542,12 @@ int init_radio() {
   reg = 0b10010100;
   spi_write(0x1e, reg);
 
-  // AgcAutoOn=LNA gain set by AGC
-  reg = 0b00000100;
-  spi_write(0x26, reg);
-
   // Preable Length=8 (default)
   // Preamble MSB and LSB
   spi_write(0x20, 8 >> 8);
   spi_write(0x21, 8 & 0xff);
 
   setLowDatarate();
-
-  // DAC enable (adds 3dB)
-  spi_write(0x4d, 0x07);
-  
-  // Turn on PA and set power to +20dB
-  // PaSelect=1
-  // OutputPower=17 (20 - 3dB from DAC)
-  //   NOTE: Actual Power=(17-(15-OutputPower)) = 2 + OutputPower = 20
-  spi_write(0x09, 0x80 | ((20 - 3) - 2));
-
-  set_frequency(916.0);
-
-  // Adjust over-current protection
-  spi_write(0x0b, 0x31);
 
   return 0;
 }
@@ -537,7 +556,6 @@ int init_radio() {
 
 static auto msg_arg_error = F("ERR: Argument error");
 static int counter = 0;
-//static uint32_t lastLowBatteryCheckSeconds = 0;
 static uint32_t chipId = 0;
 
 auto timer = timer_create_default();
