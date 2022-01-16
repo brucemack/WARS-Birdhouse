@@ -987,10 +987,10 @@ void setup() {
   Serial.println(F("====================="));
   Serial.println();
 
-  Serial.print("Version: ");
+  Serial.print(F("Version: "));
   Serial.println(SW_VERSION);
 
-  Serial.print("Build: ");
+  Serial.print(F("Build: "));
   Serial.println(__DATE__);
 
   // Extract the MAC address of the chip
@@ -998,7 +998,7 @@ void setup() {
     chipId |= ((ESP.getEfuseMac() >> (40 - i)) & 0xff) << i;
   }
 
-  Serial.print("MAC: ");
+  Serial.print(F("MAC: "));
   Serial.println(chipId, HEX);
 
   preferences.begin("my-app", false); 
@@ -1066,7 +1066,7 @@ void setup() {
 
   // Initialize the radio
   if (init_radio() != 0) {
-    Serial.println("ERR: Problem with radio initialization");
+    Serial.println(F("ERR: Problem with radio initialization"));
   }
   else {
     digitalWrite(LED_PIN, HIGH);
