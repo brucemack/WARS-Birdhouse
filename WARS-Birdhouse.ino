@@ -532,20 +532,23 @@ int init_radio() {
   // Configure the radio
   uint8_t reg = 0;
 
-  // Bw=31.25kHz, CodingRate=4/5, ImplicitHeaderModeOn=Explicit header)
-  // reg = 0b01000010;
-  // Bw=125, CodingRate=4/5, ImplicitHeaderModeOn=Explicit header)
-  reg = 0x72;
+  // 7-4: 0111  (125k BW)
+  // 3-1: 001   (4/5 coding rate)
+  // 0:   0     (Explicit header mode)
+  reg = 0b01110010;
   spi_write(0x1d, reg);
 
-  // SpreadingFactor=9, RxContinuousMode=Normal, RxPayloadCrcOn=Enable)
+  // 7-4:   9 (512 chips/symbol, spreading factor 9)
+  // 3:     0 (RX continuous mode normal)
+  // 2:     1 (CRC mode on)
+  // 1-0:   0 (RX timeout MSB) 
   reg = 0b10010100;
   spi_write(0x1e, reg);
 
   // Preable Length=8 (default)
   // Preamble MSB and LSB
-  spi_write(0x20, 8 >> 8);
-  spi_write(0x21, 8 & 0xff);
+  //spi_write(0x20, 8 >> 8);
+  //spi_write(0x21, 8 & 0xff);
 
   setLowDatarate();
 
@@ -1094,9 +1097,30 @@ void setup() {
 
 static void process_rx_msg(const uint8_t* buf, const unsigned int len);
 static void check_for_rx_msg();
+static void check_for_interrupts();
 
 void loop() {
 
+  // Interrupt stuff
+  check_for_interrupts();
+ 
+  // Service the shell
+  shell.executeIfInput();
+  
+  // Service the timer
+  timer.tick();
+
+  // Check for radio activity
+  event_tick();
+
+  // Look for any received data that should be processed by the application
+  check_for_rx_msg();
+
+  // Keep the watchdog alive
+  esp_task_wdt_reset();
+}
+
+static void check_for_interrupts() {
   // Interrupt stuff
   if (isr_hit) {
 
@@ -1117,21 +1141,6 @@ void loop() {
       event_TxDone();
     }
   }
-
-  // Service the shell
-  shell.executeIfInput();
-  
-  // Service the timer
-  timer.tick();
-
-  // Check for radio activity
-  event_tick();
-
-  // Look for any received data that should be processed by the application
-  check_for_rx_msg();
-
-  // Keep the watchdog alive
-  esp_task_wdt_reset();
 }
 
 /**
