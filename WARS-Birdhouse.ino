@@ -21,7 +21,7 @@
 #include "spi_utils.h"
 #include <arduino-timer.h>
 
-#define SW_VERSION 23
+#define SW_VERSION 24
 
 //#define RST_PIN   14
 // This is the pin that is available on the D1 Mini module:
@@ -835,6 +835,15 @@ int doPrint(int argc, char **argv) {
   shell.println("]");
 }
 
+/** This function handles a request to send a text message to another node
+ *  in the network.  There is no guarantee that the message will actually
+ *  get to the destination.  
+ *  
+ *  Two arguments:
+ *  
+ *  1: The destination node number
+ *  2: The text of the message, limited to 80 characters.
+ */
 int sendText(int argc, char **argv) { 
  
   if (argc != 3) {
@@ -848,6 +857,9 @@ int sendText(int argc, char **argv) {
       return -1;
   }
 
+  // Since we might not be directly connected to the 
+  // destination node we use the routing table to
+  // figure out the "next hop."
   uint8_t nextHop = Routes[target];
   if (nextHop == 0) {
     shell.println(F("ERR: No route"));
@@ -855,15 +867,16 @@ int sendText(int argc, char **argv) {
   }
 
   uint16_t textLen = strlen(argv[2]);
-
   if (textLen > 80) {
     shell.println(F("ERR: Length error"));
     return -1;
   }
 
+  // Assign a unique ID to the message
   counter++;
   uint8_t tx_buf[256];
 
+  // Fill out the standard header
   Header header;
   header.destAddr = nextHop;
   header.sourceAddr = MY_ADDR;
@@ -872,9 +885,12 @@ int sendText(int argc, char **argv) {
   header.finalDestAddr = target;
   header.originalSourceAddr = MY_ADDR;
 
+  // Stream the header and message text into a continguous buffer
   memcpy(tx_buf, &header, sizeof(Header));
   memcpy(tx_buf + sizeof(Header), argv[2], textLen);
 
+  // Push the header/message onto the TX queue for background
+  // processing.
   tx_buffer.push(tx_buf, sizeof(Header) + textLen);
       
   return 0;
@@ -1019,7 +1035,7 @@ void setup() {
   shell.addCommand(F("ping <addr>"), sendPing);
   shell.addCommand(F("reset"), sendReset);
   shell.addCommand(F("blink"), sendBlink);
-  shell.addCommand(F("text"), sendText);
+  shell.addCommand(F("text <addr> <text>"), sendText);
   shell.addCommand(F("boot"), boot);
   shell.addCommand(F("bootradio"), bootRadio);
   shell.addCommand(F("info"), info);
@@ -1028,8 +1044,8 @@ void setup() {
   shell.addCommand(F("setaddr <addr>"), setAddr);
   shell.addCommand(F("setroute <target addr> <next hop addr>"), setRoute);
   shell.addCommand(F("clearroutes"), clearRoutes);
-  shell.addCommand(F("setblimit"), setBlimit);
-  shell.addCommand(F("print"), doPrint);
+  shell.addCommand(F("setblimit <limit_mv>"), setBlimit);
+  shell.addCommand(F("print <text>"), doPrint);
 
   // Increment the boot count
   uint16_t bootCount = preferences.getUShort("bootcount", 0);  
