@@ -26,7 +26,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include "spi_utils.h"
 #include <arduino-timer.h>
 
-#define SW_VERSION 24
+#define SW_VERSION 26
 
 // This is the pin that is available on the D1 Mini module:
 #define RST_PIN   26
@@ -97,16 +97,20 @@ static CircularBuffer<4096> tx_buffer;
 // The circular buffer used for incoming data
 static CircularBuffer<4096> rx_buffer;
 
+// The top bit indicates whether an ACK is needed
 enum MessageType {
   // This message is used when a delivery acknowlegement is needed
-  TYPE_ACK   = 0b00000001,
+  TYPE_ACK           = 0b00000001,
   // The ping message will be acknowledged at every step along the way
-  TYPE_PING  = 0b10000010,
+  TYPE_PING          = 0b10000010,
   // Response is acknowledged as well
-  TYPE_PONG  = 0b10000011,
-  TYPE_RESET = 0b00000100,
-  TYPE_TEXT  = 0b10000101,
-  TYPE_BLINK = 0b00000110
+  TYPE_PONG          = 0b10000011,
+  TYPE_RESET         = 0b00000100,
+  TYPE_TEXT          = 0b10000101,
+  TYPE_BLINK         = 0b00000110,
+  TYPE_SETROUTE      = 0b10000111,
+  TYPE_GETROUTE      = 0b10001000,
+  TYPE_GETROUTE_RESP = 0b10001001
 };
 
 // Every message starts of with this header
@@ -574,6 +578,10 @@ int init_radio() {
 // ===== Application 
 
 static auto msg_arg_error = F("ERR: Argument error");
+static auto msg_no_route = F("ERR: No route available");
+static auto msg_bad_address = F("ERR: Bad address");
+static auto msg_bad_message = F("ERR: Bad message");
+
 static int counter = 0;
 static uint32_t chipId = 0;
 
@@ -593,7 +601,6 @@ struct PongMessage {
   uint32_t uptimeSeconds;
   uint16_t bootCount;
   uint16_t sleepCount;
-  //uint32_t macAddress;
 };
 
 struct ResetMessage {
@@ -602,6 +609,23 @@ struct ResetMessage {
 
 struct BlinkMessage {
   Header header;  
+};
+
+struct SetRouteMessage {
+  Header header;
+  uint8_t targetAddr;
+  uint8_t nextHopAddr;  
+};
+
+struct GetRouteMessage {
+  Header header;
+  uint8_t targetAddr;
+};
+
+struct GetRouteRespMessage {
+  Header header;
+  uint8_t targetAddr;
+  uint8_t nextHopAddr;  
 };
 
 int sendPing(int argc, char **argv) { 
@@ -914,6 +938,96 @@ int sendText(int argc, char **argv) {
   return 0;
 }
 
+int sendSetRoute(int argc, char **argv) { 
+ 
+  if (argc != 4) {
+    shell.println(msg_arg_error);
+    return -1;
+  }
+  
+  uint8_t target = atoi(argv[1]);
+  if (target == 0 || target == 255) {
+      shell.println(msg_bad_address);
+      return -1;
+  }
+
+  uint8_t a1 = atoi(argv[2]);
+  uint8_t a2 = atoi(argv[3]);
+
+  // Since we might not be directly connected to the 
+  // destination node we use the routing table to
+  // figure out the "next hop."
+  uint8_t nextHop = Routes[target];
+  if (nextHop == 0) {
+    shell.println(msg_no_route);
+    return -1;
+  }
+
+  // Assign a unique ID to the message
+  counter++;
+
+  // Fill out the standard header
+  SetRouteMessage msg;
+  msg.header.destAddr = nextHop;
+  msg.header.sourceAddr = MY_ADDR;
+  msg.header.id = counter;
+  msg.header.type = MessageType::TYPE_SETROUTE;
+  msg.header.finalDestAddr = target;
+  msg.header.originalSourceAddr = MY_ADDR;
+  msg.targetAddr = a1;
+  msg.nextHopAddr = a2;
+
+  // Push the header/message onto the TX queue for background
+  // processing.
+  tx_buffer.push(&msg, sizeof(SetRouteMessage));
+      
+  return 0;
+}
+
+int sendGetRoute(int argc, char **argv) { 
+ 
+  if (argc != 3) {
+    shell.println(msg_arg_error);
+    return -1;
+  }
+  
+  uint8_t target = atoi(argv[1]);
+  if (target == 0 || target == 255) {
+      shell.println(msg_bad_address);
+      return -1;
+  }
+
+  uint8_t a1 = atoi(argv[2]);
+
+  // Since we might not be directly connected to the 
+  // destination node we use the routing table to
+  // figure out the "next hop."
+  uint8_t nextHop = Routes[target];
+  if (nextHop == 0) {
+    shell.println(msg_no_route);
+    return -1;
+  }
+
+  // Assign a unique ID to the message
+  counter++;
+
+  // Fill out the standard header
+  GetRouteMessage msg;
+  msg.header.destAddr = nextHop;
+  msg.header.sourceAddr = MY_ADDR;
+  msg.header.id = counter;
+  msg.header.type = MessageType::TYPE_GETROUTE;
+  msg.header.finalDestAddr = target;
+  msg.header.originalSourceAddr = MY_ADDR;
+  msg.targetAddr = a1;
+
+  // Push the header/message onto the TX queue for background
+  // processing.
+  tx_buffer.push(&msg, sizeof(GetRouteMessage));
+      
+  return 0;
+}
+
 static bool isDelim(char d, const char* delims) {
   const char* ptr = delims;
   while (*ptr != 0) {
@@ -1052,8 +1166,8 @@ void setup() {
   shell.attach(Serial); 
   shell.setTokenizer(tokenizer);
   shell.addCommand(F("ping <addr>"), sendPing);
-  shell.addCommand(F("reset"), sendReset);
-  shell.addCommand(F("blink"), sendBlink);
+  shell.addCommand(F("reset <addr>"), sendReset);
+  shell.addCommand(F("blink <addr>"), sendBlink);
   shell.addCommand(F("text <addr> <text>"), sendText);
   shell.addCommand(F("boot"), boot);
   shell.addCommand(F("bootradio"), bootRadio);
@@ -1065,6 +1179,8 @@ void setup() {
   shell.addCommand(F("clearroutes"), clearRoutes);
   shell.addCommand(F("setblimit <limit_mv>"), setBlimit);
   shell.addCommand(F("print <text>"), doPrint);
+  shell.addCommand(F("setrouteremote <addr> <target addr> <next hop addr>"), sendSetRoute);
+  shell.addCommand(F("getrouteremote <addr> <target addr>"), sendGetRoute);
 
   // Increment the boot count
   uint16_t bootCount = preferences.getUShort("bootcount", 0);  
@@ -1190,151 +1306,217 @@ static void check_for_rx_msg() {
   }
 }
 
+/**
+ * @brief Main processing for any message received by the node.
+ * 
+ * @param buf Bytes received 
+ * @param len Length (in bytes)
+ */
 static void process_rx_msg(const uint8_t* buf, const unsigned int len) {
 
-  if (len >= sizeof(Header)) {
+  if (len < sizeof(Header)) {
+    shell.println(msg_bad_message);
+    shell.println(len);
+    return;
+  }
 
-    // Pull the header out
-    Header header;
-    memcpy(&header, buf, sizeof(Header));
+  // Pull the header out
+  Header header;
+  memcpy(&header, buf, sizeof(Header));
 
-    shell.print(F("INF: Got type: "));
-    shell.print(header.type, HEX);
-    shell.print(", id: ");
-    shell.print(header.id);
-    shell.print(", from: ");
-    shell.print(header.sourceAddr);
-    shell.print(", originalSource: ");
-    shell.print(header.originalSourceAddr);
-    shell.print(", finalDest: ");
-    shell.print(header.finalDestAddr);
-    shell.print(", hops: ");
-    shell.print(header.hops);
-    shell.print(", RSSI: ");
-    shell.print(header.receiveRssi);
-    shell.println();
+  shell.print(F("INF: Got type: "));
+  shell.print(header.type, HEX);
+  shell.print(", id: ");
+  shell.print(header.id);
+  shell.print(", from: ");
+  shell.print(header.sourceAddr);
+  shell.print(", originalSource: ");
+  shell.print(header.originalSourceAddr);
+  shell.print(", finalDest: ");
+  shell.print(header.finalDestAddr);
+  shell.print(", hops: ");
+  shell.print(header.hops);
+  shell.print(", RSSI: ");
+  shell.print(header.receiveRssi);
+  shell.println();
 
-    // Look for messages that need to be forwarded on
-    if (header.finalDestAddr != MY_ADDR) {
-      if (header.finalDestAddr > 0 && header.finalDestAddr < 255) {
-        // Look up the route
-        uint8_t nextHop = Routes[header.finalDestAddr];
-        if (nextHop == 0) {
-          shell.println(F("ERR: No route available"));
-        }
-        else {
-          shell.print(F("INF: Routing via "));
-          shell.println(nextHop);
-          // Copy the original message (minus the RSSI information)
-          uint8_t tx_buf[256];
-          memcpy(tx_buf, buf, len);
-          // Fix the header
-          header.destAddr = nextHop;
-          header.sourceAddr = MY_ADDR;
-          header.hops = header.hops + 1;        
-          memcpy(tx_buf, &header, sizeof(Header));
-          // Send the entire message
-          // Notice that we are using the original length
-          tx_buffer.push(tx_buf, len);
-        }
+  // Look for messages that need to be forwarded on to another node
+  if (header.finalDestAddr != MY_ADDR) {
+    if (header.finalDestAddr > 0 && header.finalDestAddr < 255) {
+      // Look up the route
+      uint8_t nextHop = Routes[header.finalDestAddr];
+      if (nextHop == 0) {
+        shell.println(msg_no_route);
       } else {
-        shell.println(F("ERR: Invalid address"));
+        // Copy the original message 
+        uint8_t tx_buf[256];
+        memcpy(tx_buf, buf, len);
+        // Fix the header
+        header.destAddr = nextHop;
+        header.sourceAddr = MY_ADDR;
+        header.hops = header.hops + 1;        
+        memcpy(tx_buf, &header, sizeof(Header));
+        // Send the entire message
+        // Notice that we are using the original length
+        tx_buffer.push(tx_buf, len);
       }
-    }
-    // All other messages are being directed to this node
-    else {
-      
-      // Ping
-      if (header.type == MessageType::TYPE_PING) {
-
-        // Create a pong and send back to the originator of the ping
-        PongMessage msg;
-        // Notice that the first hop is always the node that sent the PING.
-        msg.header.destAddr = header.sourceAddr;
-        msg.header.sourceAddr = MY_ADDR;
-        msg.header.hops = header.hops + 1;        
-        msg.header.id = header.id;
-        msg.header.type = MessageType::TYPE_PONG;
-        msg.header.finalDestAddr = header.originalSourceAddr;
-        msg.header.originalSourceAddr = MY_ADDR;
-
-        msg.version = SW_VERSION;
-        msg.counter = counter;
-        msg.rssi = header.receiveRssi;
-        msg.batteryMv = checkBattery();
-        msg.panelMv = checkPanel();
-        msg.uptimeSeconds = get_time_seconds();
-        msg.bootCount = preferences.getUShort("bootcount", 0);  
-        msg.sleepCount = preferences.getUShort("sleepcount", 0);  
-        //msg.macAddress = chipId;
-        
-        tx_buffer.push((uint8_t*)&msg, sizeof(PongMessage));
-      }
-      // Pong
-      else if (header.type == MessageType::TYPE_PONG) {
-        
-        if (len >= sizeof(PongMessage)) {
-
-          // Re-read the message into the PongMessage format.  
-          PongMessage pong;
-          memcpy(&pong, buf, sizeof(PongMessage));
-  
-          Serial.print("{ \"counter\": ");
-          Serial.print(pong.counter, DEC);
-          Serial.print(", \"origSourceAddr\": ");
-          Serial.print(pong.header.originalSourceAddr, DEC);
-          Serial.print(", \"hops\": ");
-          Serial.print(pong.header.hops, DEC);
-          Serial.print(", \"version\": ");
-          Serial.print(pong.version, DEC);
-          Serial.print(", \"rssi\": ");
-          Serial.print(pong.rssi, DEC);
-          Serial.print(", \"batteryMv\": ");
-          Serial.print(pong.batteryMv, DEC);
-          Serial.print(", \"panelMv\": ");
-          Serial.print(pong.panelMv, DEC);
-          Serial.print(", \"uptimeSeconds\": ");
-          Serial.print(pong.uptimeSeconds, DEC);
-          Serial.print(", \"bootCount\": ");
-          Serial.print(pong.bootCount, DEC);
-          Serial.print(", \"sleepCount\": ");
-          Serial.print(pong.sleepCount, DEC);
-          Serial.println("}");
-          //Serial.print(", \"mac\": \"");
-          //Serial.print(pong.macAddress, HEX);
-          //Serial.println("\" }");
-        }
-        else {
-          Serial.println(F("ERR: Pong too short"));
-        }
-      }
-      // Blink the on-board LED
-      else if (header.type == MessageType::TYPE_BLINK) {
-        digitalWrite(LED_PIN, HIGH);
-        delay(250);
-        digitalWrite(LED_PIN, LOW);
-      }
-      // Reset
-      else if (header.type == MessageType::TYPE_RESET) {
-        shell.println(F("Resetting ..."));
-        ESP.restart();
-      }
-      // Text
-      else if (header.type == MessageType::TYPE_TEXT) {
-        shell.print("MSG: ");
-        // There is no null-termination, so we must use the message length here
-        for (int i = 0; i < len - sizeof(Header); i++) {
-          shell.write(buf[i + sizeof(Header)]);
-        }
-        shell.println();
-      }
-      else {
-        shell.println(F("ERR: Unknown message"));
-      }
+    } else {
+      shell.println(msg_bad_address);
     }
   }
+
+  // All other messages are being directed to this node
   else {
-    shell.println(F("ERR: Invalid message received"));
-    shell.println(len);
+
+    // Ping
+    if (header.type == MessageType::TYPE_PING) {
+
+      // Create a pong and send back to the originator of the ping
+      PongMessage msg;
+      // Notice that the first hop is always the node that sent the PING.
+      msg.header.destAddr = header.sourceAddr;
+      msg.header.sourceAddr = MY_ADDR;
+      msg.header.hops = header.hops + 1;        
+      msg.header.id = header.id;
+      msg.header.type = MessageType::TYPE_PONG;
+      msg.header.finalDestAddr = header.originalSourceAddr;
+      msg.header.originalSourceAddr = MY_ADDR;
+
+      msg.version = SW_VERSION;
+      msg.counter = counter;
+      msg.rssi = header.receiveRssi;
+      msg.batteryMv = checkBattery();
+      msg.panelMv = checkPanel();
+      msg.uptimeSeconds = get_time_seconds();
+      msg.bootCount = preferences.getUShort("bootcount", 0);  
+      msg.sleepCount = preferences.getUShort("sleepcount", 0);  
+      
+      tx_buffer.push((uint8_t*)&msg, sizeof(PongMessage));
+    }
+    
+    // Pong (for display)
+    else if (header.type == MessageType::TYPE_PONG) {
+      
+      if (len < sizeof(PongMessage)) {
+        Serial.println(msg_bad_message);
+        return;
+      }
+
+      // Re-read the message into the PongMessage format.  
+      PongMessage pong;
+      memcpy(&pong, buf, sizeof(PongMessage));
+      // Display
+      shell.print("{ \"counter\": ");
+      shell.print(pong.counter, DEC);
+      shell.print(", \"origSourceAddr\": ");
+      shell.print(pong.header.originalSourceAddr, DEC);
+      shell.print(", \"hops\": ");
+      shell.print(pong.header.hops, DEC);
+      shell.print(", \"version\": ");
+      shell.print(pong.version, DEC);
+      shell.print(", \"rssi\": ");
+      shell.print(pong.rssi, DEC);
+      shell.print(", \"batteryMv\": ");
+      shell.print(pong.batteryMv, DEC);
+      shell.print(", \"panelMv\": ");
+      shell.print(pong.panelMv, DEC);
+      shell.print(", \"uptimeSeconds\": ");
+      shell.print(pong.uptimeSeconds, DEC);
+      shell.print(", \"bootCount\": ");
+      shell.print(pong.bootCount, DEC);
+      shell.print(", \"sleepCount\": ");
+      shell.print(pong.sleepCount, DEC);
+      shell.println("}");
+    }
+    
+    // Blink the on-board LED
+    else if (header.type == MessageType::TYPE_BLINK) {
+      digitalWrite(LED_PIN, HIGH);
+      delay(250);
+      digitalWrite(LED_PIN, LOW);
+    }
+    
+    // Reset
+    else if (header.type == MessageType::TYPE_RESET) {
+      shell.println(F("INF: Resetting ..."));
+      ESP.restart();
+    }
+    
+    // Text (for display)
+    else if (header.type == MessageType::TYPE_TEXT) {
+      shell.print("MSG: ");
+      // There is no null-termination, so we must use the message length here
+      for (int i = 0; i < len - sizeof(Header); i++) {
+        shell.write(buf[i + sizeof(Header)]);
+      }
+      shell.println();
+    }
+
+    // Set route
+    else if (header.type == MessageType::TYPE_SETROUTE) {
+      if (len < sizeof(SetRouteMessage)) {
+        shell.println(msg_bad_message);
+        return;
+      }
+      // Unpack request
+      SetRouteMessage msg;
+      memcpy(&msg, buf, sizeof(SetRouteMessage));
+      // Modify the routing table
+      Routes[msg.targetAddr] = msg.nextHopAddr;
+      // Save the updated table in the NVRAM
+      preferences.putBytes("routes", Routes, 256);
+      // Log the activity
+      shell.print(F("INF: Set route "));
+      shell.print(msg.targetAddr);
+      shell.print("->");
+      shell.println(msg.nextHopAddr)
+    }
+
+    // Get route
+    else if (header.type == MessageType::TYPE_GETROUTE) {
+      if (len < sizeof(GetRouteMessage)) {
+        shell.println(msg_bad_message);
+        return;
+      }
+      // Unpack request
+      GetRouteMessage msg;
+      memcpy(&msg, buf, sizeof(GetRouteMessage));
+      // Make a response
+      GetRouteRespMessage resp;
+      resp.header.destAddr = header.sourceAddr;
+      resp.header.sourceAddr = MY_ADDR;
+      resp.header.hops = header.hops + 1;        
+      resp.header.id = header.id;
+      resp.header.type = MessageType::TYPE_GETROUTERESP;
+      resp.header.finalDestAddr = header.originalSourceAddr;
+      resp.header.originalSourceAddr = MY_ADDR;
+      resp.targetAddr = msg.targetAddr;
+      // Here we are looking into the routing table
+      resp.nextHopAddr = Routes[msg.targetAddr]; 
+      tx_buffer.push((uint8_t*)&resp, sizeof(GetRouteRespMessage));
+    }
+
+    // Get route response (display)
+    else if (header.type == MessageType::TYPE_GETROUTERESP) {
+      if (len < sizeof(GetRouteRespMessage)) {
+        shell.println(msg_bad_message);
+        return;
+      }
+      // Unpack request
+      GetRouteRespMessage msg;
+      memcpy(&msg, buf, sizeof(GetRouteRespMessage));
+      // Log the activity
+      shell.print(F("GETROUTERESP: { "));
+      shell.print(F("\"origSourceAddr\":")) 
+      shell.print(msg.header.originalSourceAddr);
+      shell.print(F(", \"targetAddr\":")) 
+      shell.print(msg.targetAddr);
+      shell.print(F(", \"nextHopAddr\":")) 
+      shell.print(msg.nextHopAddr);
+      shell.println(" }");
+    }
+    else {
+      shell.println(F("ERR: Unknown message"));
+    }
   }
 }
