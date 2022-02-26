@@ -11,7 +11,12 @@
 // * contrem:arduino-timer
 
 // Build instructions
-// * Set clock frequency to 10MHz to save power
+// * Set clock frequency to 10MHz to save power (also disables WIFI and BT)
+
+/**
+Currently using the ESP32 D1 Mini
+http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
+*/
 
 #include "WiFi.h"
 #include <esp_task_wdt.h>
@@ -23,12 +28,14 @@
 
 #define SW_VERSION 24
 
-//#define RST_PIN   14
 // This is the pin that is available on the D1 Mini module:
 #define RST_PIN   26
 #define DIO0_PIN  4
 #define LED_PIN   2
+// Analog input pin for measuring battery, connected via 1:2 voltage divider
 #define BATTERY_LEVEL_PIN 33
+// Analog input pin for measuring pannel, connected via 1:6 voltage divider
+#define PANEL_LEVEL_PIN 34
 
 // Watchdog timeout in seconds (NOTE: I think this time might be off because
 // we are changing the CPU clock frequency)
@@ -37,7 +44,7 @@
 #define US_TO_S_FACTOR 1000000
 
 // Deep sleep duration when low battery is detected
-#define DEEP_SLEEP_SECONDS 60 * 30
+#define DEEP_SLEEP_SECONDS 60 * 60
 
 // How frequently to check the batter condition
 #define BATTERY_CHECK_INTERVAL_SECONDS 30
@@ -54,10 +61,19 @@ static int32_t get_time_seconds() {
 }
 
 // Returns the battery level in mV
+// The voltage is sampled via a 1:2 voltage divider 
 uint16_t checkBattery() {
-  const float batteryScale = (3.3 / 4096.0) * 2.0;
-  float batteryLevel = (float)analogRead(BATTERY_LEVEL_PIN) * batteryScale;
-  return batteryLevel * 1000.0;
+  const float scale = (3.3 / 4096.0) * 2.0;
+  float level = (float)analogRead(BATTERY_LEVEL_PIN) * scale;
+  return level * 1000.0;
+}
+
+// Returns the panel level in mV
+// The voltage is sampled via a 1:6 voltage divider 
+uint16_t checkPanel() {
+  const float scale = (3.3 / 4096.0) * 6.0;
+  float level = (float)analogRead(PANEL_LEVEL_PIN) * scale;
+  return level * 1000.0;
 }
 
 // The states of the state machine
@@ -732,6 +748,8 @@ int info(int argc, char **argv) {
     shell.print(preferences.getUShort("blimit", 0));
     shell.print(F(", \"batteryMv\": "));
     shell.print(checkBattery());
+    shell.print(F(", \"panelMv\": "));
+    shell.print(checkPanel());
     shell.print(F(", \"routes\": ["));
     bool first = true;
     for (int i = 0; i < 256; i++) {
@@ -983,7 +1001,8 @@ static bool check_low_battery(void*) {
     // Keep track of how many times this has happened
     uint16_t sleepCount = preferences.getUShort("sleepcount", 0);  
     preferences.putUShort("sleepcount", sleepCount + 1);   
-    // Put the radio into SLEEP mode
+    // Put the radio into SLEEP mode to minimize power consumpion.  Per the 
+    // datasheet the sleep current is 1uA.
     set_mode_SLEEP();
     // Put the ESP32 into a deep sleep that will be awakened using the timer.
     // Wakeup will look like reboot.
@@ -1243,7 +1262,7 @@ static void process_rx_msg(const uint8_t* buf, const unsigned int len) {
         msg.counter = counter;
         msg.rssi = header.receiveRssi;
         msg.batteryMv = checkBattery();
-        msg.panelMv = 0;
+        msg.panelMv = checkPanel();
         msg.uptimeSeconds = get_time_seconds();
         msg.bootCount = preferences.getUShort("bootcount", 0);  
         msg.sleepCount = preferences.getUShort("sleepcount", 0);  
