@@ -26,7 +26,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include "spi_utils.h"
 #include <arduino-timer.h>
 
-#define SW_VERSION 26
+#define SW_VERSION 27
 
 // This is the pin that is available on the D1 Mini module:
 #define RST_PIN   26
