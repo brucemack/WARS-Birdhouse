@@ -110,7 +110,7 @@ enum MessageType {
   TYPE_BLINK         = 0b00000110,
   TYPE_SETROUTE      = 0b10000111,
   TYPE_GETROUTE      = 0b10001000,
-  TYPE_GETROUTE_RESP = 0b10001001
+  TYPE_GETROUTERESP  = 0b10001001
 };
 
 // Every message starts of with this header
@@ -979,7 +979,7 @@ int sendSetRoute(int argc, char **argv) {
 
   // Push the header/message onto the TX queue for background
   // processing.
-  tx_buffer.push(&msg, sizeof(SetRouteMessage));
+  tx_buffer.push((const uint8_t*)&msg, sizeof(SetRouteMessage));
       
   return 0;
 }
@@ -1023,7 +1023,7 @@ int sendGetRoute(int argc, char **argv) {
 
   // Push the header/message onto the TX queue for background
   // processing.
-  tx_buffer.push(&msg, sizeof(GetRouteMessage));
+  tx_buffer.push((const uint8_t*)&msg, sizeof(GetRouteMessage));
       
   return 0;
 }
@@ -1469,7 +1469,7 @@ static void process_rx_msg(const uint8_t* buf, const unsigned int len) {
       shell.print(F("INF: Set route "));
       shell.print(msg.targetAddr);
       shell.print("->");
-      shell.println(msg.nextHopAddr)
+      shell.println(msg.nextHopAddr);
     }
 
     // Get route
@@ -1493,7 +1493,7 @@ static void process_rx_msg(const uint8_t* buf, const unsigned int len) {
       resp.targetAddr = msg.targetAddr;
       // Here we are looking into the routing table
       resp.nextHopAddr = Routes[msg.targetAddr]; 
-      tx_buffer.push((uint8_t*)&resp, sizeof(GetRouteRespMessage));
+      tx_buffer.push((const uint8_t*)&resp, sizeof(GetRouteRespMessage));
     }
 
     // Get route response (display)
@@ -1507,11 +1507,11 @@ static void process_rx_msg(const uint8_t* buf, const unsigned int len) {
       memcpy(&msg, buf, sizeof(GetRouteRespMessage));
       // Log the activity
       shell.print(F("GETROUTERESP: { "));
-      shell.print(F("\"origSourceAddr\":")) 
+      shell.print(F("\"origSourceAddr\":")); 
       shell.print(msg.header.originalSourceAddr);
-      shell.print(F(", \"targetAddr\":")) 
+      shell.print(F(", \"targetAddr\":"));
       shell.print(msg.targetAddr);
-      shell.print(F(", \"nextHopAddr\":")) 
+      shell.print(F(", \"nextHopAddr\":")); 
       shell.print(msg.nextHopAddr);
       shell.println(" }");
     }
