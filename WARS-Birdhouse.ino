@@ -26,7 +26,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include "spi_utils.h"
 #include <arduino-timer.h>
 
-#define SW_VERSION 27
+#define SW_VERSION 28
 
 // This is the pin that is available on the D1 Mini module:
 #define RST_PIN   26
@@ -41,10 +41,10 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 // we are changing the CPU clock frequency)
 #define WDT_TIMEOUT 5
 
-#define US_TO_S_FACTOR 1000000
+#define S_TO_US_FACTOR 1000000UL
 
 // Deep sleep duration when low battery is detected
-#define DEEP_SLEEP_SECONDS 60 * 60
+#define DEEP_SLEEP_SECONDS (60UL * 60UL)
 
 // How frequently to check the batter condition
 #define BATTERY_CHECK_INTERVAL_SECONDS 30
@@ -877,6 +877,17 @@ int doPrint(int argc, char **argv) {
   shell.println("]");
 }
 
+/**
+ * Used to put a comment into the console log
+ */
+int doRem(int argc, char **argv) { 
+
+  if (argc != 2) {
+    shell.println(msg_arg_error);
+    return -1;
+  }
+}
+
 /** This function handles a request to send a text message to another node
  *  in the network.  There is no guarantee that the message will actually
  *  get to the destination.  
@@ -1111,7 +1122,7 @@ static bool check_low_battery(void*) {
   uint16_t battery = checkBattery();
   // If the battery is low then deep sleep
   if (lowBatteryLimitMv != 0 && battery < lowBatteryLimitMv) {
-    shell.println(F("INF: Low battery detected"));
+    shell.println(F("INF: Low battery, entering deep sleep"));
     // Keep track of how many times this has happened
     uint16_t sleepCount = preferences.getUShort("sleepcount", 0);  
     preferences.putUShort("sleepcount", sleepCount + 1);   
@@ -1120,7 +1131,7 @@ static bool check_low_battery(void*) {
     set_mode_SLEEP();
     // Put the ESP32 into a deep sleep that will be awakened using the timer.
     // Wakeup will look like reboot.
-    esp_sleep_enable_timer_wakeup(DEEP_SLEEP_SECONDS * US_TO_S_FACTOR);
+    esp_sleep_enable_timer_wakeup(DEEP_SLEEP_SECONDS * S_TO_US_FACTOR);
     esp_deep_sleep_start();
   }
   // Keep repeating
@@ -1153,6 +1164,16 @@ void setup() {
   Serial.print(F("MAC: "));
   Serial.println(chipId, HEX);
 
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  switch (wakeup_reason){
+    case ESP_SLEEP_WAKEUP_EXT0: Serial.println("Wakeup caused by external signal using RTC_IO"); break;
+    case ESP_SLEEP_WAKEUP_EXT1: Serial.println("Wakeup caused by external signal using RTC_CNTL"); break;
+    case ESP_SLEEP_WAKEUP_TIMER: Serial.println("Wakeup caused by timer"); break;
+    case ESP_SLEEP_WAKEUP_TOUCHPAD: Serial.println("Wakeup caused by touchpad"); break;
+    case ESP_SLEEP_WAKEUP_ULP: Serial.println("Wakeup caused by ULP program"); break;
+    default: Serial.printf("Wakeup was not caused by deep sleep: %d\n",wakeup_reason); break;
+  }
+
   preferences.begin("my-app", false); 
 
   // Radio interrupt pin
@@ -1179,6 +1200,7 @@ void setup() {
   shell.addCommand(F("clearroutes"), clearRoutes);
   shell.addCommand(F("setblimit <limit_mv>"), setBlimit);
   shell.addCommand(F("print <text>"), doPrint);
+  shell.addCommand(F("rem <text>"), doRem);
   shell.addCommand(F("setrouteremote <addr> <target addr> <next hop addr>"), sendSetRoute);
   shell.addCommand(F("getrouteremote <addr> <target addr>"), sendGetRoute);
 
