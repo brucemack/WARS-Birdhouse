@@ -1,5 +1,5 @@
-WARS Birdhouse Project
-======================
+WARS LoRA Birdhouse Project
+===========================
 
 The objective of this project is to explore the potential of using low-cost LoRA radios to build simple mesh networks. 
 
@@ -22,13 +22,19 @@ A tree-mounted repeater installed in a tree inside of a cloverleaf on-/off-ramp.
 
 ![house4](images/IMG_0856.jpg)
 
+Software Overview
+=================
+
+The birdhouse is controlled using an ESP32 at the moment, although this decision is under  consideration.  All nodes support a serial interface for interacting with the network, but this only connected for desktop nodes.  
+
+We are not using off-the-shelf drivers for the LoRA chip - this is completely homebrew.
+
+The serial command processor is implemented using this [very good project](https://github.com/philj404/SimpleSerialShell).
+
 Reference Material
 ==================
 
 * Reference for LoRA module (RFM95W): https://www.hoperf.com/modules/lora/RFM95.html
 * Reference for 18650 battery: https://cdn.sparkfun.com/datasheets/Prototyping/ICR18650%202600mAH%20datasheet.pdf
 * Reference for LDO Voltage Regulator: https://ww1.microchip.com/downloads/en/DeviceDoc/MCP1700-Low-Quiescent-Current-LDO-20001826E.pdf
-
-Software Overview
-=================
 
