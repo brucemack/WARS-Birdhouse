@@ -16,7 +16,7 @@ The birdhouse repeater (internal view):
 
 A tower-mounted birdhouse repeater at the QTH of KC1FSZ.
 
-![house3](images/IMG_0853.jpg)
+![house3](images/IMG_0853.jpg |width=100px)
 
 A tree-mounted repeater installed in a tree inside of a cloverleaf on-/off-ramp.
 
