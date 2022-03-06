@@ -1,13 +1,15 @@
 WARS LoRa Birdhouse Project
 ===========================
 
-The objective of this project is to explore the potential of using low-cost LoRa radios to build simple mesh networks for pasings text messages around town.
+This project explores the potential of using low-cost LoRa radios to build simple mesh networks that can pass text messages around town.
 
-Nodes on the network are autonomous, solar-powered birdhouses that each contain a 100mW radio.  These birdhouses can run 24x7 assuming reasonable weather conditions. 
+Nodes on the network are autonomous, solar-powered birdhouses that each contain a 100mW radio (Semtech SX1276).  These birdhouses can run 24x7 assuming reasonable weather conditions. 
 
-The software supports a simple message routing protocol that allows packets to "hop" between houses in the network to reach their final destination.
+Commodity components have been used to keep birdhouse costs to a minimum.  
 
-Messages have been rounted between birdhouses that were separated by approximately 1 kilometer.  Antenna hieght is important. 
+The software supports a simple message routing protocol that allows packets to "hop" between houses to reach their final destination.
+
+Messages have been successfully routed between birdhouses that were separated by approximately 1 kilometer.  Antenna height is important. 
 
 An internet gateway is also under development.
 
