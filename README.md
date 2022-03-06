@@ -13,6 +13,11 @@ Messages have been successfully routed between birdhouses that were separated by
 
 An internet gateway is also under development.
 
+Related Technology
+==================
+
+* LoRaWAN: Uses LoRa stations organized in a star topology.  The hub of each star is a gateway to the public internet.  This project is not related to LoRaWAN in any way.
+
 Hardware Overview
 =================
 
