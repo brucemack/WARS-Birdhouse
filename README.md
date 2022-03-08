@@ -70,7 +70,7 @@ Areas for Experimentation
 
 Software
 --------
-* Improved power efficiency using more agressive sleeping.  Leverage the SX1276 carrier detect interrupt to allow the system to sleep during periods of inactivity.
+* Improved power efficiency using more agressive sleeping.  Leverage the SX1276 channel activity detection (CAD) interrupt to allow the system to sleep during periods of inactivity.
 * Dynamic route discovery.
 * A more user-friendly desktop application written in Python.
 * Store and forward.
