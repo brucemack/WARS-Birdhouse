@@ -26,11 +26,14 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include "spi_utils.h"
 #include <arduino-timer.h>
 
-#define SW_VERSION 28
+#define SW_VERSION 29
 
 // This is the pin that is available on the D1 Mini module:
 #define RST_PIN   26
+// This is the ESP32 pin that is connected to the DIO0 pin on the RFM95W module.
 #define DIO0_PIN  4
+// NOTE: GPIO36 is the same as RTC_GPIO0 
+// Generally the on-board LED on the ESP32 module
 #define LED_PIN   2
 // Analog input pin for measuring battery, connected via 1:2 voltage divider
 #define BATTERY_LEVEL_PIN 33
@@ -79,13 +82,15 @@ uint16_t checkPanel() {
 // The states of the state machine
 enum State { IDLE, LISTENING, TRANSMITTING, TRANSMITTING_ACK, LISTENING_FOR_ACK };
 
+// The overall state
 static State state = State::IDLE;
-
 // The state we need to go into after a transmit is successful
 static State stateAfterTransmit = State::LISTENING;
 // This is the message ID that we are waiting to have acknowledged.
+// NOTE: Only relevant in LISTENING_FOR_ACK state.
 static uint16_t listenAckId = 0;
 // This is the time we started waiting for the ACK. Used for timeout tracking.
+// NOTE: Only relevant in LISTENING_FOR_ACK state.
 static uint32_t listenAckStart = 0;
 // The number of times we've retried the transmit
 static uint16_t transmitRetry = 0;
@@ -414,12 +419,11 @@ void enable_interrupt_RxDone() {
 /** Sets the radio frequency from a decimal value that is quoted
  *   in MHz.
  */
-const float CRYSTAL_MHZ = 32000000.0;
-const float FREQ_STEP = (CRYSTAL_MHZ / 524288);
-
 // See page 103
 void set_frequency(float freq_mhz) {
-  uint32_t f = (freq_mhz * 1000000.0) / FREQ_STEP;
+  const float CRYSTAL_MHZ = 32000000.0;
+  const float FREQ_STEP = (CRYSTAL_MHZ / 524288);
+  const uint32_t f = (freq_mhz * 1000000.0) / FREQ_STEP;
   spi_write(0x06, (f >> 16) & 0xff);
   spi_write(0x07, (f >> 8) & 0xff);
   spi_write(0x08, f & 0xff);
@@ -1140,9 +1144,11 @@ static bool check_low_battery(void*) {
 
 void setup() {
 
-  delay(1000);
+  // Changed to speed up boot
+  delay(100);
   Serial.begin(115200);
-  delay(1000);
+  // Removed this to speed up boot
+  //delay(1000);
   
   Serial.println();
   Serial.println(F("====================="));
@@ -1224,8 +1230,9 @@ void setup() {
   shell.println(lowBatteryLimitMv);
 
   // Get the initial routing table loaded from NVRAM
-  for (int i = 0; i < 256; i++)
+  for (int i = 0; i < 256; i++) {
     Routes[i] = 0;
+  }
   preferences.getBytes("routes", Routes, 256);
 
   // Interrupt setup from radio
@@ -1235,30 +1242,51 @@ void setup() {
   // Initialize SPI and configure
   delay(100);
   spi_setup();
-  
-  // Reset the radio 
-  reset_radio();
-  delay(250);
 
-  // Initialize the radio
-  if (init_radio() != 0) {
-    Serial.println(F("ERR: Problem with radio initialization"));
-  }
-  else {
-    digitalWrite(LED_PIN, HIGH);
-    delay(200);
-    digitalWrite(LED_PIN, LOW);
-    delay(200);
+  // Starting here, the process depends on why we are rebooting.
+  // Check to see if we are rebooting because of a radio interrupt.
+  // There is an assumption that we were in the State::LISTENING 
+  // state when the processor was put to sleep.
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
+    
+    // One LED flash
     digitalWrite(LED_PIN, HIGH);
     delay(200);
     digitalWrite(LED_PIN, LOW);
 
-    // Start listening for messages
+    // Given that we just came up from an interrupt trigger, setup 
+    // the state as if we were waiting for a message, and then 
+    // set the flag that will cause the ISR code to run.
     state = State::LISTENING;
     enable_interrupt_RxDone();
-    set_mode_RXCONTINUOUS();  
+    isr_hit = true;
   }
-
+  // Any other reason for a reboot causes full radio reset/initialization
+  else {
+    // Reset the radio 
+    reset_radio();
+    delay(250);
+ 
+    // Initialize the radio
+    if (init_radio() != 0) {
+      Serial.println(F("ERR: Problem with radio initialization"));
+    } else {
+      digitalWrite(LED_PIN, HIGH);
+      delay(200);
+      digitalWrite(LED_PIN, LOW);
+      delay(200);
+      digitalWrite(LED_PIN, HIGH);
+      delay(200);
+      digitalWrite(LED_PIN, LOW);
+  
+      // Start listening for messages
+      state = State::LISTENING;
+      enable_interrupt_RxDone();
+      // Put the radio on the receive mode
+      set_mode_RXCONTINUOUS();  
+    }
+  }
+  
   // Enable the battery check timer
   timer.every(BATTERY_CHECK_INTERVAL_SECONDS * 1000, check_low_battery);
 
