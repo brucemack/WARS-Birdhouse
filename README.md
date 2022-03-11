@@ -39,6 +39,10 @@ A tree-mounted repeater prototype installed in a tree inside of a cloverleaf on-
 
 ![house4](images/IMG_0856.jpg)
 
+The parts for the prototype birdhouse.
+
+
+
 Hardware Notes
 --------------
 * Voltage readings are taken on solar panels and batteries.
@@ -57,6 +61,7 @@ A static routing mechanism is being used at the moment.  The routing table for e
 Reference Material
 ==================
 
+* LoRa rules, regulations, and terminology: https://lora.readthedocs.io/en/latest/#rules-and-regulations
 * Reference for LoRa radio module (RFM95W): https://www.hoperf.com/modules/lora/RFM95.html
 * Reference for 18650 battery: https://cdn.sparkfun.com/datasheets/Prototyping/ICR18650%202600mAH%20datasheet.pdf
 * Reference for LDO Voltage Regulator: https://ww1.microchip.com/downloads/en/DeviceDoc/MCP1700-Low-Quiescent-Current-LDO-20001826E.pdf
