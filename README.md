@@ -27,21 +27,21 @@ The birdhouse repeater prototype (external view):
 
 ![house1](images/IMG_0645.jpg)
 
-The birdhouse repeater prototype (internal view):
+The birdhouse repeater prototype (internal electronics view):
 
 ![house2](images/IMG_0852.jpg)
 
-A tower-mounted birdhouse repeater prototype at the QTH of KC1FSZ.
+The wood parts for the birdhouse repeater prototype:
+
+![house4](images/IMG_0642.jpg)
+
+A tower-mounted birdhouse repeater prototype at the QTH of KC1FSZ:
 
 ![house3](images/IMG_0853.jpg)
 
-A tree-mounted repeater prototype installed in a tree inside of a cloverleaf on-/off-ramp.
+A tree-mounted repeater prototype installed in a tree inside of a cloverleaf on-/off-ramp:
 
 ![house4](images/IMG_0856.jpg)
-
-The parts for the prototype birdhouse.
-
-![house4](images/IMG_0642.jpg)
 
 Hardware Notes
 --------------
@@ -68,6 +68,7 @@ Reference Material
 * Reference for STM32L031 microcontroller: https://www.st.com/resource/en/datasheet/stm32l031k6.pdf
 * STM32L0 hardware design guide: https://www.st.com/resource/en/application_note/an4467-getting-started-with-stm32l0xx-hardware-development-stmicroelectronics.pdf
 * Reference for the ESP32 D1 Mini: https://wiki.csgalileo.org/_media/projects/internetofthings/d1_mini_esp32_-_pinout.pdf
+* An article on correcting non-linearity in the ESP32 AD converter: https://github.com/e-tinkers/esp32-adc-calibrate
 
 Detailed Parts List
 -------------------
