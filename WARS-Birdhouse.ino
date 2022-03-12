@@ -778,6 +778,10 @@ int info(int argc, char **argv) {
     shell.print(checkBattery());
     shell.print(F(", \"panelMv\": "));
     shell.print(checkPanel());
+    shell.print(F(", \"bootCount\": "));
+    shell.print(preferences.getUShort("bootcount", 0));
+    shell.print(F(", \"sleepCount\": "));
+    shell.print(preferences.getUShort("sleepcount", 0));
     shell.print(F(", \"routes\": ["));
     bool first = true;
     for (int i = 0; i < 256; i++) {
@@ -1043,6 +1047,14 @@ int sendGetRoute(int argc, char **argv) {
   return 0;
 }
 
+/**
+ * Clears out diagnostic counters
+ */
+int doResetCounters(int argc, char **argv) { 
+  preferences.putUShort("bootcount", 0);
+  preferences.putUShort("sleepcount", 0);
+}
+
 static bool isDelim(char d, const char* delims) {
   const char* ptr = delims;
   while (*ptr != 0) {
@@ -1209,6 +1221,7 @@ void setup() {
   shell.addCommand(F("rem <text>"), doRem);
   shell.addCommand(F("setrouteremote <addr> <target addr> <next hop addr>"), sendSetRoute);
   shell.addCommand(F("getrouteremote <addr> <target addr>"), sendGetRoute);
+  shell.addCommand(F("resetcounters"), doResetCounters);
 
   // Increment the boot count
   uint16_t bootCount = preferences.getUShort("bootcount", 0);  
