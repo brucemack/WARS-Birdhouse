@@ -5,6 +5,8 @@ This project explores the potential of using low-cost/low-bandwidth LoRa radios 
 
 Nodes on the network are autonomous, solar-powered birdhouses that each contain a 100mW radio (Semtech SX1276).  These birdhouses can run 24x7 assuming reasonable weather conditions.  USB-connected desktop nodes are used to access the network from a computer.  An internet gateway node is also under development. 
 
+Birdhouse packaging was chosen in order to blend into the surroudings more easily.  
+
 The birdhouse is run by an ESP32 microcontroller at the moment, although this decision is under  consideration.  A more power-efficient STM32 prototype is being worked on.
 
 Commodity components are being used to keep birdhouse costs to a minimum.  Our goal is to keep the node cost under $50 USD. 
@@ -96,7 +98,7 @@ Hardware (Future)
 Software
 --------
 * Improved power efficiency using more agressive sleeping.  Leverage the SX1276 receive interrupt or channel activity detection (CAD) interrupt to allow the system to sleep during periods of inactivity.
-* Dynamic route discovery. At the moment the routes are static.
+* Dynamic route discovery. At the moment the routes are static, but they can be modified over-the-air.
 * Store and forward for times when a node is offline.
 * Message sequence to avoid duplicate delivery
 * Network time synchronization
