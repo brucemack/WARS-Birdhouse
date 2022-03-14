@@ -13,7 +13,7 @@ The software supports a simple message routing protocol that allows packets to "
 
 The 915 MHz ISM band is used to simplify licensing considerations.  
 
-A prototype network of 5 stations has been constructed in Wellesley, MA.  Messages have been successfully routed between birdhouses that were separated by approximately 1 kilometer.  Antenna height is important.  The houses have be subjected to bad weather conditions.  
+A prototype network of 5 stations has been constructed in Wellesley, MA.  Messages have been successfully routed back and forth across the entire mesh, including hops between birdhouses that were separated by approximately 1 kilometer.  Antenna height is important.  The houses have been subjected to bad weather conditions.  
 
 Related Technology
 ==================
