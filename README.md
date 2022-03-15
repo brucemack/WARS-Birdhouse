@@ -108,6 +108,45 @@ Software
 end-users to interact with the network.
 * Network security.
 
+Development Notes
+=================
+
+One-Time Build Setup (Arduino IDE, Windows)
+-------------------------------------------
+
+Make sure you have the latest Arduino IDE installed.  All testing has been
+done using version 1.8.19.  Raising build problems when running older 
+versions of the IDE is strongly discouraged.
+
+Make sure you have the Git client installed on your computer.  This will 
+be needed by anyone who is contributing changes to the code base.  Here is 
+the location of a binary install for Git: https://git-scm.com/download/win.
+
+Make sure you have the latest board support for the ESP32 installed in 
+your Ardunio IDE using the Boards Manager feature. This page has a good overview: https://docs.espressif.com/projects/arduino-esp32/en/latest/installing.html.
+
+The Additional Board Manager URL is: https://dl.espressif.com/dl/package_esp32_index.json.
+
+Install these two Arduino libraries using the Arduino IDE:
+
+* SimpleSerialShell
+* arduino-timer
+
+Open a command window and switch into your Arduino sketch directory.  
+Typically something like this:
+
+        cd c:\Users\<USER>\Documents\Arduino
+
+Clone the repo for the main sketch from the GitHub:
+
+        git clone https://github.com/brucemack/WARS-Birdhouse.git
+
+Open the sketech in the Arduino IDE.
+
+Make sure these settings are chosen under the Tools menu:
+* Board: ESP32 Dev Module
+* CPU Frequency: 10MHz
+* Port: (Whatever COM port your development board appears as)
 
 
 
