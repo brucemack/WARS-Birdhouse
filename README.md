@@ -123,9 +123,7 @@ be needed by anyone who is contributing changes to the code base.  Here is
 the location of a binary install for Git: https://git-scm.com/download/win.
 
 Make sure you have the latest board support for the ESP32 installed in 
-your Ardunio IDE using the Boards Manager feature. This page has a good overview: https://docs.espressif.com/projects/arduino-esp32/en/latest/installing.html.
-
-The Additional Board Manager URL is: https://dl.espressif.com/dl/package_esp32_index.json.
+your Ardunio IDE using the Boards Manager feature. This page has a good overview: https://docs.espressif.com/projects/arduino-esp32/en/latest/installing.html.  The Additional Board Manager URL is: https://dl.espressif.com/dl/package_esp32_index.json.
 
 Install these two Arduino libraries using the Arduino IDE:
 
@@ -148,5 +146,5 @@ Make sure these settings are chosen under the Tools menu:
 * CPU Frequency: 10MHz
 * Port: (Whatever COM port your development board appears as)
 
-
+Now you should be able to compile.
 
