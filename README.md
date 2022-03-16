@@ -22,7 +22,10 @@ A prototype network of 5 stations has been constructed in Wellesley, MA.  Messag
 Related Technology
 ==================
 
-* LoRaWAN: Uses LoRa stations organized in a star topology.  The hub of each star is a gateway to the public internet.  This project is not related to LoRaWAN in any way.
+* AREDN (Amateur Radio Emergency Mesh Network): a cool
+system that leverages WIFI technology to create off-grid
+IP networks that support emergency communications.  The WARS Birdhouse projecet uses a differnet wireless technology and is not interoperable with the ARDEN system. ARDEN is designed for much higher bandwidth.  See https://www.arednmesh.org. 
+* LoRaWAN: A cool system that uses LoRa stations organized in a star topology.  The hub of each star is a gateway to the public internet.  This project is not related to LoRaWAN in any way.
 
 Hardware Overview
 =================
