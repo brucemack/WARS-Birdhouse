@@ -5,9 +5,9 @@ This project explores the potential of using low-cost/low-bandwidth LoRa radios 
 
 Nodes on the network are autonomous, solar-powered birdhouses that each contain a 100mW radio (Semtech SX1276).  These birdhouses can run 24x7 assuming reasonable weather conditions.  USB-connected desktop nodes are used to access the network from a computer.  An internet gateway node is also under development. 
 
-Birdhouse packaging was chosen in order to blend into the surroudings more easily. 
+Birdhouse packaging was chosen in order to blend into the surroundings more easily. 
 
-Low-power, solar design allows the birdhouses to be 100% autonomous.  This makes it relatively easy to install a repeater station in any location that has good sun exposure and good visibilty to other stations. 
+Low-power, solar design allows the birdhouses to be 100% autonomous.  This makes it relatively easy to install a repeater station in any location that has good sun exposure and good visibility to other stations. 
 
 The birdhouse is run by an ESP32 microcontroller at the moment, although this decision is under  consideration.  A more power-efficient STM32 prototype is being worked on.
 
@@ -22,9 +22,9 @@ A prototype network of 5 stations has been constructed in Wellesley, MA.  Messag
 Related Technology
 ==================
 
-* AREDN (Amateur Radio Emergency Mesh Network): a cool
+* AREDN (Amateur Radio Emergency Mesh Network): A cool
 system that leverages WIFI technology to create off-grid
-IP networks that support emergency communications.  The WARS Birdhouse projecet uses a differnet wireless technology and is not interoperable with the ARDEN system. ARDEN is designed for much higher bandwidth.  See https://www.arednmesh.org. 
+IP networks that support emergency communications.  The WARS Birdhouse project uses a different wireless technology and is not interoperable with the ARDEN system. ARDEN is designed for much higher bandwidth.  See https://www.arednmesh.org. 
 * LoRaWAN: A cool system that uses LoRa stations organized in a star topology.  The hub of each star is a gateway to the public internet.  This project is not related to LoRaWAN in any way.
 
 Hardware Overview
@@ -84,32 +84,33 @@ Detailed Parts List
 Areas for Further Experimentation
 =================================
 
-Hardware 2.0
-------------
-* Fully integrated PCB using surface mount compontents
+Hardware 2.0 (In Process)
+-------------------------
+* Fully integrated PCB using surface mount components
 * Switch to a ultra-low-power microprocessor: STM32L031
 * SMA connector for more robust antenna experimentation
 
 Hardware (Future)
 -----------------
 * Replace the linear regulator with a boost converter to improve battery usage.
-* Complete the packaging of the birdhouse to ensure weatherproofing and full compatibilty with avian residency.
+* Complete the packaging of the birdhouse to ensure weatherproofing and full compatibility with avian residency.
 * Improved power efficiency using smaller microcontrollers.
 * Cheaper antennas.
 * Gain antennas for longer distance links.
-* RF switch to allow dynamic switching between two antennas.  This might faciliate A/B testing, or possibly stations that have a directional/gain antenna for trunking and an omni-directional antenna for local access.
+* RF switch to allow dynamic switching between two antennas.  This might facilitate A/B testing, or possibly stations that have a directional/gain antenna for trunking and an omni-directional antenna for local access.
 * A custom PCB to simplify construction for club builds.
 
 Software
 --------
-* Improved power efficiency using more agressive sleeping.  Leverage the SX1276 receive interrupt or channel activity detection (CAD) interrupt to allow the system to sleep during periods of inactivity.
+* Improved power efficiency using more aggressive sleeping.  Leverage the SX1276 receive interrupt or channel activity detection (CAD) interrupt to allow the system to sleep during periods of inactivity.
 * Dynamic route discovery. At the moment the routes are static, but they can be modified over-the-air.
 * Store and forward for times when a node is offline.
-* Message sequence to avoid duplicate delivery
-* Network time synchronization
-* A more user-friendly desktop application written in Python.  This will make it easer for 
+* Message sequence to avoid duplicate delivery.
+* Network time synchronization.
+* A more user-friendly desktop application written in Python.  This will make it easer for casual users of the work.
 end-users to interact with the network.
 * Network security.
+* Over-the-air (OTA) software upgrades.
 
 Development Notes
 =================
@@ -128,7 +129,7 @@ the location of a binary install for Git: https://git-scm.com/download/win.
 Make sure you have the latest board support for the ESP32 installed in 
 your Ardunio IDE using the Boards Manager feature. This page has a good overview: https://docs.espressif.com/projects/arduino-esp32/en/latest/installing.html.  The Additional Board Manager URL is: https://dl.espressif.com/dl/package_esp32_index.json.
 
-Install these two Arduino libraries using the Arduino IDE:
+Install these two Arduino libraries using the Arduino IDE (Manage Libraries):
 
 * SimpleSerialShell
 * arduino-timer
@@ -142,7 +143,7 @@ Clone the repo for the main sketch from the GitHub:
 
         git clone https://github.com/brucemack/WARS-Birdhouse.git
 
-Open the sketech in the Arduino IDE.
+Open the sketch in the Arduino IDE.
 
 Make sure these settings are chosen under the Tools menu:
 * Board: ESP32 Dev Module
@@ -150,4 +151,3 @@ Make sure these settings are chosen under the Tools menu:
 * Port: (Whatever COM port your development board appears as)
 
 Now you should be able to compile.
-
