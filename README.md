@@ -81,9 +81,9 @@ Packet types are interpreted as follows:
 * 6: Station engineering data response.  
   * See below for details of response.
 * 7: Network path test request.  
-  * Stations will add their node ID and RSSI data to this message as it is routed through the network.
+  * Stations will add their node ID and last-hop RSSI data to this message as it is routed through the network.
 * 8: Network path test response.  
-  * Stations will add their node ID and RSSI data to this message as it is routed through the network.
+  * Stations will add their node ID and last-hop RSSI data to this message as it is routed through the network.
 * 9: Set security seed.  Used to establish the seed used to validate privileged requests.
 * 10: Set route request.  (A privileged operation)
 * 11: Get route data request.
