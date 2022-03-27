@@ -36,8 +36,7 @@ The network runs on the 33cm (902-928 MHz) amateur band.  We are running on 916 
 in the digital portion of the band plan for 33cm.
 
 The LoRa message format is documented here in compliance with FCC regulations.  There is no encryption 
-used anywere in the design.  The information contained here is all that a listener would need to interpret the 
-messages.
+used anywhere in the design.  The information contained here is all that a listener would need to interpret the messages.
 
 The standard LoRa physical packet format is used.  Particulars on LoRa parameters:
 
@@ -59,6 +58,15 @@ The payload above contains a 36-byte header followed by a variable length packet
 * Source/destination addresses are 16-bit integer (little endian).  More on addresses below.
 
 ![packet](images/packet-header-2.png)
+
+Station Address Scheme
+----------------------
+Each station is assigned a 16-bit address. Some addresses have special significance:
+* 0x0000: Not used
+* 0x0001: Gateway station to other meshes
+* 0x0002 through 0x0007: Un-routed stations used for administrative/maintenance purposes.
+* 0x0008 through 0xfffe: Used for normal stations on the network.
+* 0xffff: The broadcast address
 
 Hardware Overview
 =================
