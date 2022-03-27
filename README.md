@@ -44,6 +44,7 @@ The standard LoRa physical packet format is used.  Particulars on LoRa parameter
 * CRC enabled, 4/5 coding rate
 * Explicit header mode is used
 * LoRa spreading factor 9
+* 12 symbol preamble
 
 Here is a summary of the physical layer packet format from the Semtech documentation:
 
