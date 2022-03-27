@@ -106,9 +106,10 @@ Packet types are interpreted as follows:
 
 ### Acknowledgement/De-Duplication 
 
-Most messages are acknowledged on each hop.  Note that this doesn't mean that the acknowledgement
-reaches the original sender, it just means that each station will get an ACK to indicate that 
-a message has been handed off to the next station in the route path.
+Most packet types are acknowledged on each hop.  Packet type 1 is used for this purpose.  Note that this 
+doesn't mean that the acknowledgement reaches the original sender, it just means that each 
+station will get an ACK to indicate that a packet has been handed off to the next station in 
+the route path.
 
 Acknowledgement packets (type 1) and Station ID packets (type 2) are not acknowledged.
 
