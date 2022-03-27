@@ -29,6 +29,37 @@ IP networks that support emergency communications.  The WARS Birdhouse project u
 * LoRaWAN: A cool system that uses LoRa stations organized in a star topology.  The hub of each star is a gateway to the public internet.  This technology uses encryption and is not 
 legal for amateur projects. 
 
+Protocol Notes
+==============
+
+The network runs on the 33cm (902-928 MHz) amateur band.  We are running on 916 MHz, which lies
+in the digital portion of the band plan for 33cm.
+
+The LoRa message format is documented here in compliance with FCC regulations.  There is no encryption 
+used anywere in the design.  The information contained here is all that a listener would need to interpret the 
+messages.
+
+The standard LoRa physical packet format is used.  Particulars on LoRa parameters:
+
+* 125k bandwidth mode
+* CRC enabled, 4/5 coding rate
+* Explicit header mode is used
+* LoRa spreading factor 9
+
+Here is a summary of the physical layer packet format from the Semtech documentation:
+
+![packet](images/lora-phy-packet.png)
+
+The payload above contains a 36-byte header followed by a variable length packet format.  Particulars:
+
+* 36-byte fixed size 
+* Version is 2 (at the moment)
+* Packet ID is used for acknowledgement and duplicate packet elimination.  16-bit integer (little endian).
+* Call signs are in ASCII format, padded with spaces as needed
+* Source/destination addresses are 16-bit integer (little endian).  More on addresses below.
+
+![packet](images/packet-header-2.png)
+
 Hardware Overview
 =================
 
@@ -66,34 +97,6 @@ All nodes support a serial interface for interacting with the network, but this 
 The serial command processor is implemented using this [very good project](https://github.com/philj404/SimpleSerialShell).
 
 A static routing mechanism is being used at the moment.  The routing table for each node can be changed remotely.  Dynamic routing will be developed in a future phase.
-
-Protocol Notes
-==============
-
-The LoRa message format is documented here in compliance with FCC regulations.  There is no encryption 
-used anywere in the design.  The information contained here is all that a listener would need to interpret the 
-messages.
-
-The standardLoRa physical packet format is used.  Particulars:
-
-* 125k bandwidth mode
-* CRC enabled, 4/5 coding rate
-* Explicit header mode is used
-* LoRa spreading factor 9
-
-Here is a summary of the physical layer packet format from the Semtech documentation:
-
-![packet](images/lora-phy-packet.png)
-
-The payload above contains a 36-byte header followed by the packet format.  Particulars:
-
-* 36-byte fixed size 
-* Version is 2 (at the moment)
-* Packet ID is used for acknowledgement and duplicate packet elimination.  16-bit integer (little endian).
-* Call signs are in ASCII format, padded with spaces as needed
-* Source/destination addresses are 16-bit integer (little endian).  More on addresses below.
-
-![packet](images/packet-header-2.png)
 
 Reference Material
 ==================
