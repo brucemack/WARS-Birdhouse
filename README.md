@@ -15,7 +15,8 @@ Commodity components are being used to keep birdhouse costs to a minimum.  Our g
 
 The software supports a simple message routing protocol that allows packets to "hop" between houses to reach their final destination.
 
-The 915 MHz ISM band is used to simplify licensing considerations.  
+The 33cm ham band (902-928 MHz) is used given that this is an experimental technology.  All 
+nodes must be installed/operated by FCC licensed amateur/ham radio operators.  
 
 A prototype network of 5 stations has been constructed in Wellesley, MA.  Messages have been successfully routed back and forth across the entire mesh, including hops between birdhouses that were separated by approximately 1 kilometer.  Antenna height is important.  The houses have been subjected to bad weather conditions.  
 
@@ -25,7 +26,8 @@ Related Technology
 * AREDN (Amateur Radio Emergency Mesh Network): A cool
 system that leverages WIFI technology to create off-grid
 IP networks that support emergency communications.  The WARS Birdhouse project uses a different wireless technology and is not interoperable with the ARDEN system. ARDEN is designed for much higher bandwidth.  See https://www.arednmesh.org. 
-* LoRaWAN: A cool system that uses LoRa stations organized in a star topology.  The hub of each star is a gateway to the public internet.  This project is not related to LoRaWAN in any way.
+* LoRaWAN: A cool system that uses LoRa stations organized in a star topology.  The hub of each star is a gateway to the public internet.  This technology uses encryption and is not 
+legal for amateur projects. 
 
 Hardware Overview
 =================
