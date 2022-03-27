@@ -67,6 +67,35 @@ The serial command processor is implemented using this [very good project](https
 
 A static routing mechanism is being used at the moment.  The routing table for each node can be changed remotely.  Dynamic routing will be developed in a future phase.
 
+Protocol Notes
+==============
+
+The LoRa message format is documented here in compliance with FCC regulations.  There is no encryption 
+used anywere in the design.  The information contained here is all that is required to interpret the 
+messages.
+
+The standardLoRa physical packet format is used.  Particulars:
+
+* 125k bandwidth
+* 4/5 coding rate
+* Explicit header mode is used
+* LoRa spreading factor 9
+* CRC enabled
+
+Here is a summary of the physical layer packet format from the Semtech documentation:
+
+![packet](images/lora-phy-packet.png)
+
+The payload above contains a 36-byte header followed by the packet format.  Particulars:
+
+* 36-byte fixed size 
+* Version is 2 (at the moment)
+* Packet ID is used for acknowledgement and duplicaiton elimination.  16-bit integer (little endian)
+* Call signs are in ASCII format, padded with spaces as needed
+* Source/destination addresses are 16-bit integer (little endian).  More on addresses below.
+
+![packet](images/packet-header-2.png)
+
 Reference Material
 ==================
 
