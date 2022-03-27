@@ -78,9 +78,12 @@ Packet types are interpreted as follows:
 * 3: Ping request.
 * 4: Ping response (pong).
 * 5: Station engineering data request.
-* 6: Station engineering data response.  More details below.
-* 7: Network path test request.  Stations will automatically add RSSI data to this message as it is routed through the network.
-* 8: Network path test response.  Stations will automatically add RSSI dat to this message as it is routed through the network.
+* 6: Station engineering data response.  
+  * See below for details of response.
+* 7: Network path test request.  
+  * Stations will add their node ID and RSSI data to this message as it is routed through the network.
+* 8: Network path test response.  
+  * Stations will add their node ID and RSSI data to this message as it is routed through the network.
 * 9: Set security seed.  Used to establish the seed used to validate privileged requests.
 * 10: Set route request.  (A privileged operation)
 * 11: Get route data request.
@@ -88,7 +91,7 @@ Packet types are interpreted as follows:
 * 13: Discover route request (FUTURE USE).
 * 14: Discover route response (FUTURE USE).
 * 15: Station reset request. (A privileged operation)
-* 16: Set station clock request.
+* 16: Set station clock request. (A privileged operation)
 * 17: Reset engineering counters request.
 * 18-31: (RESERVED)
 * 32: Routine text traffic.
