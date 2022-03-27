@@ -52,21 +52,44 @@ Here is a summary of the physical layer packet format from the Semtech documenta
 The payload above contains a 36-byte header followed by a variable length packet format.  Particulars:
 
 * 36-byte fixed size 
-* Version is 2 (at the moment)
-* Packet ID is used for acknowledgement and duplicate packet elimination.  16-bit integer (little endian).
+* Version (PV) is 2 (at the moment)
+* Packet type (PT) describes the nature/handling of the message.  More on types below.
+* Packet ID (PID) is used for acknowledgement and duplicate packet elimination.  16-bit integer (little endian).
 * Call signs are in ASCII format, padded with spaces as needed
 * Source/destination addresses are 16-bit integer (little endian).  More on addresses below.
 
 ![packet](images/packet-header-2.png)
 
-Station Address Scheme
-----------------------
+### Station Addressing Scheme
+
 Each station is assigned a 16-bit address. Some addresses have special significance:
 * 0x0000: Not used
 * 0x0001: Gateway station to other meshes
 * 0x0002 through 0x0007: Un-routed stations used for administrative/maintenance purposes.
 * 0x0008 through 0xfffe: Used for normal stations on the network.
 * 0xffff: The broadcast address
+
+### Packet Types
+
+Packet types are interpreted as follows:
+* 0: Not used
+* 1: General acknowledgement packet, used for reliable delivery.
+* 2: Station ID/beacon packet.
+* 3: Station engineering data request.
+* 4: Station engineering data response.  More details below.
+* 5: Network path test request.  Stations will automatically add RSSI data to this message as it is routed through the network.
+* 6: Network path test response.  Stations will automatically add RSSI dat to this message as it is routed through the network.
+* 7: Set security seed.  Used to establish the seed used to validate privileged requests.
+* 8: Set route request.  (A privileged operation)
+* 9: Get route data request.
+* 10: Get route data response.
+* 11: Station reset request. (A privileged operation)
+* 12-15: (RESERVED)
+* 16: Routine text traffic, ASCII payload.
+* 17: Priority/emergency text traffic, ASCII payload.
+* 18: Routine binary/data traffic (*NO ENCRYPTION ALLOWED*).
+* 19: Priority/emergency binary/data traffic (*NO ENCRYPTION ALLOWED*).
+* 20: Station alert.  Used for sounding audible alarms, etc.
 
 Hardware Overview
 =================
