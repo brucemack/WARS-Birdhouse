@@ -75,21 +75,46 @@ Packet types are interpreted as follows:
 * 0: Not used
 * 1: General acknowledgement packet, used for reliable delivery.
 * 2: Station ID/beacon packet.
-* 3: Station engineering data request.
-* 4: Station engineering data response.  More details below.
-* 5: Network path test request.  Stations will automatically add RSSI data to this message as it is routed through the network.
-* 6: Network path test response.  Stations will automatically add RSSI dat to this message as it is routed through the network.
-* 7: Set security seed.  Used to establish the seed used to validate privileged requests.
-* 8: Set route request.  (A privileged operation)
-* 9: Get route data request.
-* 10: Get route data response.
-* 11: Station reset request. (A privileged operation)
-* 12-15: (RESERVED)
-* 16: Routine text traffic, ASCII payload.
-* 17: Priority/emergency text traffic, ASCII payload.
-* 18: Routine binary/data traffic (*NO ENCRYPTION ALLOWED*).
-* 19: Priority/emergency binary/data traffic (*NO ENCRYPTION ALLOWED*).
-* 20: Station alert.  Used for sounding audible alarms, etc.
+* 3: Ping request.
+* 4: Ping response (pong).
+* 5: Station engineering data request.
+* 6: Station engineering data response.  More details below.
+* 7: Network path test request.  Stations will automatically add RSSI data to this message as it is routed through the network.
+* 8: Network path test response.  Stations will automatically add RSSI dat to this message as it is routed through the network.
+* 9: Set security seed.  Used to establish the seed used to validate privileged requests.
+* 10: Set route request.  (A privileged operation)
+* 11: Get route data request.
+* 12: Get route data response.
+* 13: Discover route request (FUTURE USE).
+* 14: Discover route response (FUTURE USE).
+* 15: Station reset request. (A privileged operation)
+* 16: Set station clock request.
+* 17: Reset engineering counters request.
+* 18-31: (RESERVED)
+* 32: Routine text traffic, ASCII payload.
+* 33: Priority/emergency text traffic, ASCII payload.
+* 34: Routine binary/data traffic (*NO ENCRYPTION ALLOWED*).
+* 35: Priority/emergency binary/data traffic (*NO ENCRYPTION ALLOWED*).
+* 36: Station alert.  Used for sounding audible alarms, etc.
+
+#### Station Engineering Data Packet
+
+This packet returns technical data that is used to monitor the state of 
+a station.  Format is a follows:
+
+* 0-1: Firmware version 
+* 2-3: Battery voltage in mV
+* 4-5: Panel voltage in mV
+* 6-9: Uptime in seconds
+* 10-13: Time (in seconds since the epoch)
+* 14-15: Boot count
+* 16-17: Sleep count 
+* 18-19: Receive message count
+* 20-21: Delivery error count
+* 22-23: Temperature (when option installed)
+* 24-25: Humidity (when option installed)
+
+2 byte and 4 byte integers are in little-endian format.
 
 Hardware Overview
 =================
