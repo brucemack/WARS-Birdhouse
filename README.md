@@ -104,6 +104,18 @@ Packet types are interpreted as follows:
   * Variable size, max size is 128 bytes.  *NO ENCRYPTION ALLOWED!*
 * 36: Station alert.  Used for sounding audible alarms, etc.
 
+### Acknowledgement/De-Duplication 
+
+Most messages are acknowledged on each hop.  Note that this doesn't mean that the acknowledgement
+reaches the original sender, it just means that each station will get an ACK to indicate that 
+a message has been handed off to the next station in the route path.
+
+Acknowledgement packets (type 1) and Station ID packets (type 2) are not acknowledged.
+
+Stations will maintain a counter for each node that is receives packet from.  Duplicate packets
+will be discarded based on the Packet ID counter.  A window will be used to avoid confusion when 
+the counter wraps.
+
 #### Station Engineering Data Packet
 
 This packet returns technical data that is used to monitor the state of 
