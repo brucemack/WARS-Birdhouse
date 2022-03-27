@@ -91,10 +91,14 @@ Packet types are interpreted as follows:
 * 16: Set station clock request.
 * 17: Reset engineering counters request.
 * 18-31: (RESERVED)
-* 32: Routine text traffic, ASCII payload.
-* 33: Priority/emergency text traffic, ASCII payload.
-* 34: Routine binary/data traffic (*NO ENCRYPTION ALLOWED*).
-* 35: Priority/emergency binary/data traffic (*NO ENCRYPTION ALLOWED*).
+* 32: Routine text traffic.
+  * ASCII, free-text payload.  Variable size, max size is 128 bytes.
+* 33: Priority/emergency text traffic.
+  * ASCII, free-text payload.  Variable size, max size is 128 bytes.
+* 34: Routine binary/data traffic.
+  * Variable size, max size is 128 bytes.  *NO ENCRYPTION ALLOWED!*
+* 35: Priority/emergency binary/data traffic.
+  * Variable size, max size is 128 bytes.  *NO ENCRYPTION ALLOWED!*
 * 36: Station alert.  Used for sounding audible alarms, etc.
 
 #### Station Engineering Data Packet
