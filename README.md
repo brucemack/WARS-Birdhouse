@@ -20,17 +20,29 @@ nodes must be installed/operated by FCC licensed amateur/ham radio operators.
 
 A prototype network of 5 stations has been constructed in Wellesley, MA.  Messages have been successfully routed back and forth across the entire mesh, including hops between birdhouses that were separated by approximately 1 kilometer.  Antenna height is important.  The houses have been subjected to bad weather conditions.  
 
+Architecture Overview
+=====================
+
+![Architecture](images/topology.png)
+
+How Do I Access The Network?
+============================
+
+Users access the network using desktop stations that are fitted with USB serial ports.  The desktop station runs exactly the same firmware as the birdhouse repeaters, but also allows access to a serial command protocol that can send and receive messages on the network.  The desktop stations have all of the same RF components, but generally don't have the solar/battery installation since they can be powered from the USB port.
+
+Currently users interact with the network using a serial terminal program running on a PC, but a Python desktop user interface is planned to improve ergonomics.  
+
 Related Technology
 ==================
 
+* LoRaHAM (https://github.com/travisgoodspeed/loraham): A great open-source project that appears to have explored some similar territory.  The project appears to be inactive at this time.
 * AREDN (Amateur Radio Emergency Mesh Network): A cool
 system that leverages WIFI technology to create off-grid
 IP networks that support emergency communications.  The WARS Birdhouse project uses a different wireless technology and is not interoperable with the ARDEN system. ARDEN is designed for much higher bandwidth.  See https://www.arednmesh.org. 
-* LoRaWAN: A cool system that uses LoRa stations organized in a star topology.  The hub of each star is a gateway to the public internet.  This technology uses encryption and is not 
-legal for amateur projects. 
+* LoRaWAN: A cool system that uses LoRa stations organized in a star topology.  The hub of each star is a gateway to the public internet.  This technology uses encryption and is not legal for amateur projects. 
 
-Protocol Notes
-==============
+Protocol Documentation
+======================
 
 The network runs on the 33cm (902-928 MHz) amateur band.  We are running on 916 MHz, which lies
 in the digital portion of the band plan for 33cm.
