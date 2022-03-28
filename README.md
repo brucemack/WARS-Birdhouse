@@ -28,9 +28,9 @@ Architecture Overview
 How Do I Access The Network?
 ============================
 
-Users access the network using desktop stations that are fitted with USB serial ports.  The desktop station runs exactly the same firmware as the birdhouse repeaters, but also allows access to a serial command protocol that can send and receive messages on the network.  The desktop stations have all of the same RF components, but generally don't have the solar/battery installation since they can be powered from the USB port.
+Users access the network using desktop stations that are fitted with a USB serial port.  The desktop station runs exactly the same firmware as the birdhouse repeater, but also it allows access to a serial command protocol that can send and receive messages on the network.  The desktop stations have all of the same RF components and are full-fledged nodes on the network (with their own addresses).  Desktop nodes don't use the solar/battery installation since they can be powered from the USB port.
 
-Currently users interact with the network using a serial terminal program running on a PC, but a Python desktop user interface is planned to improve ergonomics.  
+Currently users interact with the network using a serial terminal program running on a PC, but a Python desktop user interface is planned to improve ergonomics.  The serial commands are described in a later section.
 
 Related Technology
 ==================
@@ -273,3 +273,11 @@ Make sure these settings are chosen under the Tools menu:
 * Port: (Whatever COM port your development board appears as)
 
 Now you should be able to compile.
+
+Relevant FCC Regulations
+========================
+
+* Part 97.311 Defines spread-spectrum (SS) rules.
+* Part 97.303 (N) Defines rules for the 33cm band.  Basically, hams must share the band with other services.  There are also geographical restrictions in Texas, New Mexico, Colorado, and Wyoming.
+* Part 97.309 (B) Talks about unspecified data emission codes.  Basically, all formats need to be clearly documented. 
+
