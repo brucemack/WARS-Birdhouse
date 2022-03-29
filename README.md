@@ -106,7 +106,8 @@ Packet types are interpreted as follows:
 * 15: Station reset request. (A privileged operation)
 * 16: Set station clock request. (A privileged operation)
 * 17: Reset engineering counters request.
-* 18-31: (RESERVED)
+* 18: Firmware update request (FUTURE USE, privileged)
+* 19-31: (RESERVED)
 * 32: Routine text traffic.
   * ASCII, free-text payload.  Variable size, max size is 128 bytes.
 * 33: Priority/emergency text traffic.
@@ -142,10 +143,18 @@ a station.  Format is a follows:
 * 10-13: Time (in seconds since the epoch)
 * 14-15: Boot count
 * 16-17: Sleep count 
-* 18-19: Receive message count
-* 20-21: Delivery error count
+* 18-19: Receive packet count 
+* 20-21: Routing error count
 * 22-23: Temperature (when option installed)
 * 24-25: Humidity (when option installed)
+* 26-27: Device class
+  * 0: Unspecified
+  * 1: WARS Desktop
+  * 2: WARS Birdhouse 
+  * 3: WARS Mesh gateway
+  * 4: WARS Internet gateway
+* 28-29: Device revision
+* 30-31: Wrong-node receive packet count 
 
 2 byte and 4 byte integers are in little-endian format.
 
@@ -175,6 +184,7 @@ A tree-mounted repeater prototype installed in a tree inside of a cloverleaf on-
 Hardware Notes
 --------------
 * Voltage readings are taken on solar panels and batteries.
+* The V2 schematic can be found [here](kicad/WARS+Birdhouse+V2.pdf)
 
 Software Overview
 =================
