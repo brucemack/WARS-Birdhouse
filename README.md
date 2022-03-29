@@ -184,7 +184,7 @@ A tree-mounted repeater prototype installed in a tree inside of a cloverleaf on-
 Hardware Notes
 --------------
 * Voltage readings are taken on solar panels and batteries.
-* The V2 schematic can be found [here](https://github.com/brucemack/WARS-Birdhouse/kicad/WARS Birdhouse V2.pdf).
+* The V2 schematic can be found [here](https://github.com/brucemack/WARS-Birdhouse/kicad/WARS%20Birdhouse%20V2.pdf).
 
 Software Overview
 =================
