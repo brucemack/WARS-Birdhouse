@@ -3,7 +3,7 @@ WARS LoRa Birdhouse Project
 
 This project explores the potential of using low-cost/low-bandwidth LoRa radios to build simple mesh networks that can pass text messages around town.  Networks of this type could be useful for emergency communications or 
 other applications that can take advantage of the fully-autonomous nature of the repeater stations. This 
-project is being undertaken by members of the Wellesley Amateur Radio Society (W1TKZ grid FN42).  The design is 
+project is being undertaken by members of the Wellesley Amateur Radio Society (W1TKZ, grid FN42).  The design is 
 made available for amateur (non-commercial) purposes in the spirit of experimentation and knowledge sharing
 amongst the ham community.  At the very least, we're creating homes for some lucky birds in our area.
 
