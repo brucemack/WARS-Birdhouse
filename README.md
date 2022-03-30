@@ -7,7 +7,7 @@ project is being undertaken by members of the Wellesley Amateur Radio Society (W
 made available for amateur (non-commercial) purposes in the spirit of experimentation and knowledge sharing
 amongst the ham community.  At the very least, we're creating homes for some lucky birds in our area.
 
-Please contact Bruce MacKinnon (KC1FSZ) for more detail on the technical aspects of this project.  I am 
+Please contact Bruce MacKinnon (KC1FSZ) if you have technical questions.  I am 
 interested in home-brew radio projects, many of which can be 
 found [on my QRZ page](https://www.qrz.com/db/kc1fsz). 
 
@@ -44,6 +44,8 @@ A proof-of-concept network of 5 stations has been constructed in Wellesley, MA. 
 ![Snow](images/snow.jpg)
 
 A 15 node beta network is currently in the planning stages.  This includes upgrades of the hardware and firmware.
+
+If you are interested in _high-speed_ mesh networks built using commercial hardware this project might not be your thing.  Please take a look at AREDN (https://www.arednmesh.org) instead.  The AREDN team is going great work.
 
 Architecture Overview
 =====================
