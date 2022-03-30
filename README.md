@@ -108,8 +108,8 @@ The payload above contains a 36-byte header followed by a variable length packet
 Each station is assigned a 16-bit address. Some addresses have special significance:
 * 0x0000: Not used
 * 0x0001 through 0xffef: Used for normal stations on the network.
-* 0xfff0: Gateway station to other meshes
-* 0xfff1 through 0xfffe: Un-routed stations used for administrative/maintenance purposes.
+* 0xfff0 through 0xfffd: Un-routed stations used for administrative/maintenance purposes.
+* 0xfffe: Gateway station to other meshes
 * 0xffff: The broadcast address
 
 ### Packet Types
