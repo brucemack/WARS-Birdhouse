@@ -63,7 +63,11 @@ How Can I Get A Birdhouse?
 ==========================
 
 Hardware/firmware is still be refined as part of a club project.  All firmware, KiCAD files, and woodworking
-dimensions are available on this site for anyone who wants to build a birdhouse. 
+dimensions are available on this site for anyone who wants to build a birdhouse for themselves.
+
+After our next hardware iteration (V2) is tested we will be making the components available in kit form.
+
+If you live in a strategic location and you would like a fully-assembled, tested station we will be happy to provide one free of charge. :-)
 
 Please contact the network administrator to be assigned a node address on the network.
 
