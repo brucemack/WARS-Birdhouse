@@ -1,24 +1,42 @@
 WARS LoRa Birdhouse Project
 ===========================
 
-This project explores the potential of using low-cost/low-bandwidth LoRa radios to build simple mesh networks that can pass text messages around town.  This project is being undertaken by members of the Wellesley Amateur Radio Society.
+This project explores the potential of using low-cost/low-bandwidth LoRa radios to build simple mesh networks that can pass text messages around town.  Networks of this type could be useful for emergency communications or 
+other applications that can take advantage of the fully-autonomous nature of the repeater stations. This 
+project is being undertaken by members of the Wellesley Amateur Radio Society (grid FN42).  The design is 
+made available for amateur (non-commercial) purposes in the spirit of experimentation and knowledge sharing
+amongst the ham community.
 
-Nodes on the network are autonomous, solar-powered birdhouses that each contain a 100mW radio (Semtech SX1276).  These birdhouses can run 24x7 assuming reasonable weather conditions.  USB-connected desktop nodes are used to access the network from a computer.  An internet gateway node is also under development. 
+Please contact Bruce MacKinnon (KC1FSZ) for more detail.
 
-Birdhouse packaging was chosen in order to blend into the surroundings more easily. 
+Design Overview
+================
+
+Nodes on the network are autonomous, solar-powered birdhouses that each contain a 20dBm/100mW radio (Semtech SX1276).  These birdhouses can run 24x7 assuming reasonable weather conditions.  USB-connected desktop nodes are used to access the network from a computer via serial connection.  An internet gateway node is also 
+under development. 
+
+LoRa range experiments have been widely documented.  Your milage will vary considerably depending on terrain, 
+station hight, etc.  1km link ranges are reasonable in suburban areas. 
+
+Birdhouse packaging was chosen in order to blend into the surroundings more easily.
 
 Low-power, solar design allows the birdhouses to be 100% autonomous.  This makes it relatively easy to install a repeater station in any location that has good sun exposure and good visibility to other stations. 
+
+The desktop station model is powered by the USB connection, does not have the battery/solar components, but 
+is identical to the birdhouse repeaters from an RF/firmware perspective.
 
 The birdhouse is run by an ESP32 microcontroller at the moment, although this decision is under  consideration.  A more power-efficient STM32 prototype is being worked on.
 
 Commodity components are being used to keep birdhouse costs to a minimum.  Our goal is to keep the node cost under $50 USD. 
 
-The software supports a simple message routing protocol that allows packets to "hop" between houses to reach their final destination.
+The software supports a simple message routing protocol that allows packets to "hop" between houses to reach their final destination.  Other control packets are used to extract engineering data and to control 
+message routing.
 
 The 33cm ham band (902-928 MHz) is used given that this is an experimental technology.  All 
 nodes must be installed/operated by FCC licensed amateur/ham radio operators.  
 
-A prototype network of 5 stations has been constructed in Wellesley, MA.  Messages have been successfully routed back and forth across the entire mesh, including hops between birdhouses that were separated by approximately 1 kilometer.  Antenna height is important.  The houses have been subjected to bad weather conditions.  
+A prototype network of 5 stations has been constructed in Wellesley, MA.  Messages have been successfully routed back and forth across the entire mesh, including hops between birdhouses that were separated by approximately 1 kilometer.  Antenna height is important, as always.  The houses have been subjected to bad New England weather conditions.  It is an open question as to how the system will perform when our trees have leaves on them 
+again!
 
 Architecture Overview
 =====================
@@ -32,20 +50,12 @@ Users access the network using desktop stations that are fitted with a USB seria
 
 Currently users interact with the network using a conventional serial terminal running on a PC (ie. PUTTY or something similar).  No special software is required.  A Python desktop user interface is planned to improve ergonomics.  The serial commands are described in a later section.
 
-Related Technology
-==================
-
-* LoRaHAM (https://github.com/travisgoodspeed/loraham): A great open-source project that appears to have explored some similar territory.  The project appears to be inactive at this time.
-* AREDN (Amateur Radio Emergency Mesh Network): A cool
-system that leverages WIFI technology to create off-grid
-IP networks that support emergency communications.  The WARS Birdhouse project uses a different wireless technology and is not interoperable with the ARDEN system. ARDEN is designed for much higher bandwidth.  See https://www.arednmesh.org. 
-* LoRaWAN: A cool system that uses LoRa stations organized in a star topology.  The hub of each star is a gateway to the public internet.  This technology uses encryption and is not legal for amateur projects. 
-
 Protocol Documentation
 ======================
 
-The network runs on the 33cm (902-928 MHz) amateur band.  We are running on 916 MHz, which lies
-in the digital portion of the band plan for 33cm.
+The network runs on the 33cm (902-928 MHz) amateur band.  We are running on 906.5 MHz, which lies
+in the digital portion of the ARRL band plan for 33cm.  According to the NESMC 902 MHz band plan, 
+this frequency is in the "mixed use" section of the band.
 
 The LoRa message format is documented here in compliance with FCC regulations.  There is no encryption 
 used anywhere in the design.  The information contained here is all that a listener would need to interpret the messages.
@@ -158,8 +168,8 @@ a station.  Format is a follows:
 
 2 byte and 4 byte integers are in little-endian format.
 
-Hardware Overview
-=================
+Hardware Overview (Electronics)
+===============================
 
 The birdhouse repeater prototype (external view):
 
@@ -168,10 +178,6 @@ The birdhouse repeater prototype (external view):
 The birdhouse repeater prototype (internal electronics view):
 
 ![house2](images/IMG_0852.jpg)
-
-The wood parts for the birdhouse repeater prototype:
-
-![house4](images/IMG_0642.jpg)
 
 A tower-mounted birdhouse repeater prototype at the QTH of KC1FSZ:
 
@@ -186,6 +192,23 @@ Hardware Notes
 * Voltage readings are taken on solar panels and batteries.
 * The V2 schematic can be found [here](https://github.com/brucemack/WARS-Birdhouse/blob/main/kicad/WARS%20Birdhouse%20V2.pdf).
 
+Hardware Overview (Woodwork)
+============================
+
+Repeater nodes are packaged in a standardized birdhouse enclosure that was designed for easy assembly.  
+Six pieces of wood are required.  Components are attached using wood screws.  The birdhouse is fully
+functional for small bird species.    
+
+The roof is sloped at a 32 degree angle according to the recommended optimal configuration for 
+solar generation at 42 degrees North latitude where the initial network was deployed. The design
+may need to be adjusted for other locations.  
+
+The wood parts for the birdhouse repeater prototype:
+
+![house4](images/IMG_0642.jpg)
+
+(Cutting dimensions to follow shortly)
+
 Software Overview
 =================
 
@@ -197,9 +220,20 @@ The serial command processor is implemented using this [very good project](https
 
 A static routing mechanism is being used at the moment.  The routing table for each node can be changed remotely.  Dynamic routing will be developed in a future phase.
 
+Related Technology
+==================
+
+* LoRaHAM (https://github.com/travisgoodspeed/loraham): A great open-source project that appears to have explored some similar territory.  The project appears to be inactive at this time.
+* AREDN (Amateur Radio Emergency Mesh Network): A cool
+system that leverages WIFI technology to create off-grid
+IP networks that support emergency communications.  The WARS Birdhouse project uses a different wireless technology and is not interoperable with the ARDEN system. ARDEN is designed for much higher bandwidth.  See https://www.arednmesh.org. 
+* LoRaWAN: A cool system that uses LoRa stations organized in a star topology.  The hub of each star is a gateway to the public internet.  This technology uses encryption and is not legal for amateur projects. 
+
 Reference Material
 ==================
 
+* The Ubiquity Link Planner is very helpful for understanding land features between 
+potential station sites: https://link.ui.com/#.2q
 * LoRa rules, regulations, and terminology: https://lora.readthedocs.io/en/latest/#rules-and-regulations
 * Reference for LoRa radio module (RFM95W): https://www.hoperf.com/modules/lora/RFM95.html
 * Reference for 18650 battery: https://cdn.sparkfun.com/datasheets/Prototyping/ICR18650%202600mAH%20datasheet.pdf
@@ -291,3 +325,12 @@ Relevant FCC Regulations
 * Part 97.303 (N) Defines rules for the 33cm band.  Basically, hams must share the band with other services.  There are also geographical restrictions in Texas, New Mexico, Colorado, and Wyoming.
 * Part 97.309 (B) Talks about unspecified data emission codes.  Basically, all formats need to be clearly documented. 
 
+Copyright Information 
+=====================
+
+Copyright (C) 2022 - Bruce MacKinnon KC1FSZ
+
+This work is covered under the terms of the GNU Public License (V3).  Please consult the 
+LICENSE file for more information.  
+
+This work is being made available for non-commercial use
