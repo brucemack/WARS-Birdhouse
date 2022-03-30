@@ -216,7 +216,16 @@ A tree-mounted repeater prototype installed in a tree inside of a cloverleaf on-
 
 ![house4](images/IMG_0856.jpg)
 
-(Cutting dimensions to follow shortly)
+Cut list:
+* 1"x6" nominal stock (5.5" actual)
+  * Sides: 8 1/2" length with 32 degree mitre
+  * Roof: 7 1/4" length with 32 degree bevel on table saw
+* 1"x5" nominal stock (4.5" actual)
+  * Back: 12" length
+  * Bottom: 6" length
+  * Front: 5 1/4" with 32 degree bevel on table saw. Hole 1 1/2" diameter.
+
+<span style="color:red">*PLEASE USE CAUTION WHEN WORKING WITH POWER TOOLS!*</span>
 
 Software Overview
 =================
@@ -226,7 +235,7 @@ means much more work, and much more learning.
 
 All nodes support a serial interface for interacting with the network, but this is only connected for desktop nodes.  
 
-The serial command processor is implemented using this [very good project](https://github.com/philj404/SimpleSerialShell).
+The serial command processor is implemented using this [very good project](https://github.com/philj404/SimpleSerialShell) by Phil Jensen.
 
 A static routing mechanism is being used at the moment.  The routing table for each node can be changed remotely.  Dynamic routing will be developed in a future phase.
 
