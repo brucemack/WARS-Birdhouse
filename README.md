@@ -5,7 +5,7 @@ This project explores the potential of using low-cost/low-bandwidth LoRa radios 
 other applications that can take advantage of the fully-autonomous nature of the repeater stations. This 
 project is being undertaken by members of the Wellesley Amateur Radio Society (W1TKZ grid FN42).  The design is 
 made available for amateur (non-commercial) purposes in the spirit of experimentation and knowledge sharing
-amongst the ham community.  At the very least, we're creating homes for some lucky birds in the area.
+amongst the ham community.  At the very least, we're creating homes for some lucky birds in our area.
 
 Please contact Bruce MacKinnon (KC1FSZ) for more detail on the technical aspects of this project.  I am 
 interested in home-brew radio projects, many of which can be 
