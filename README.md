@@ -62,7 +62,7 @@ Currently users interact with the network using a conventional serial terminal r
 How Can I Get A Birdhouse?
 ==========================
 
-Hardware/firmware is still be refined as part of a club project.  All firmware, KiCAD files, and woodworking
+Hardware/firmware is still being refined as part of a club project.  All firmware, KiCAD files, and woodworking
 dimensions are available on this site for anyone who wants to build a birdhouse for themselves.
 
 After our next hardware iteration (V2) is tested we will be making the components available in kit form.
@@ -75,7 +75,9 @@ Protocol Documentation
 ======================
 
 The network runs on the 33cm (902-928 MHz) amateur band.  We are running on 906.5 MHz, which lies
-in the digital portion of the ARRL band plan for 33cm.  According to the NESMC 902 MHz band plan, 
+in the digital portion of the ARRL band plan for 33cm.  According to the New England Spectrum Management Council (NESMC, https://www.nesmc.org/) 902 MHz band plan, this frequency is in the "mixed use" section of the band, and does not need coordination.
+
+According to the NESMC 902 MHz band plan, 
 this frequency is in the "mixed use" section of the band.
 
 The LoRa message format is documented here in compliance with FCC regulations.  There is no encryption 
@@ -265,6 +267,7 @@ wireless technology and is not interoperable with the ARDEN system.  See https:/
 Reference Material
 ==================
 
+* Radio Mobile by VE2DBE: https://www.ve2dbe.com/english1.html is a great program for understanding local-area/LOS propagation. 
 * The Ubiquity Link Planner is very helpful for understanding land features between 
 potential station sites: https://link.ui.com/#.2q
 * LoRa rules, regulations, and terminology: https://lora.readthedocs.io/en/latest/#rules-and-regulations
@@ -365,5 +368,6 @@ Copyright (C) 2022 - Bruce MacKinnon KC1FSZ
 This work is covered under the terms of the GNU Public License (V3).  Please consult the 
 LICENSE file for more information.  
 
-This work is being made available for non-commercial use by the amateur radio community.
+This work is being made available for non-commercial use by the amateur radio community. Redistribution, commercial use or sale of any part is prohibited.
+
 
