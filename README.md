@@ -45,7 +45,7 @@ A proof-of-concept network of 5 stations has been constructed in Wellesley, MA. 
 
 A 15 node beta network is currently in the planning stages.  This includes upgrades of the hardware and firmware.
 
-If you are interested in _high-speed_ mesh networks built using commercial hardware this project might not be your thing.  Please take a look at AREDN (https://www.arednmesh.org) instead.  The AREDN team is going great work.
+If you are interested in _high-speed_ mesh networks built using commercial hardware this project might not be your thing.  Please take a look at AREDN (https://www.arednmesh.org) instead.  The AREDN team is doing great work.
 
 Architecture Overview
 =====================
