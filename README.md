@@ -225,7 +225,7 @@ Cut list:
   * Bottom: 6" length
   * Front: 5 1/4" with 32 degree bevel on table saw. Hole 1 1/2" diameter.
 
-<span style="color:red">*PLEASE USE CAUTION WHEN WORKING WITH POWER TOOLS!*</span>
+**PLEASE USE CAUTION WHEN WORKING WITH POWER TOOLS!**
 
 Software Overview
 =================
