@@ -55,7 +55,7 @@ Architecture Overview
 How Do I Access The Network?
 ============================
 
-Users access the network using desktop stations that are fitted with a USB serial port.  The desktop station runs exactly the same firmware as the birdhouse repeater, but also it allows access to a serial command protocol that can send and receive messages on the network.  The desktop stations have all of the same RF components and are full-fledged nodes on the network (with their own addresses).  Desktop nodes don't use the solar/battery installation since they can be powered from the USB port.
+Users access the network using desktop stations that are fitted with a USB serial port.  The desktop station runs exactly the same firmware as the birdhouse repeater.  A serial command protocol is used to send and receive messages on the network.  The desktop stations have all of the required RF components and are full-fledged nodes on the network (with their own addresses).  Desktop nodes don't use the solar/battery installation since they can be powered from the USB port.
 
 Currently users interact with the network using a conventional serial terminal running on a PC (ie. PUTTY or something similar).  No special software is required.  A Python desktop user interface is planned to improve ergonomics.  The serial commands are described in a later section.
 
