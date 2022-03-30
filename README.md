@@ -77,9 +77,6 @@ Protocol Documentation
 The network runs on the 33cm (902-928 MHz) amateur band.  We are running on 906.5 MHz, which lies
 in the digital portion of the ARRL band plan for 33cm.  According to the New England Spectrum Management Council (NESMC, https://www.nesmc.org/) 902 MHz band plan, this frequency is in the "mixed use" section of the band, and does not need coordination.
 
-According to the NESMC 902 MHz band plan, 
-this frequency is in the "mixed use" section of the band.
-
 The LoRa message format is documented here in compliance with FCC regulations.  There is no encryption 
 used anywhere in the design.  The information contained here is all that a listener would need to interpret the messages.
 
@@ -358,7 +355,8 @@ Relevant FCC Regulations
 
 * Part 97.311 Defines spread-spectrum (SS) rules.
 * Part 97.303 (N) Defines rules for the 33cm band.  Basically, hams must share the band with other services.  There are also geographical restrictions in Texas, New Mexico, Colorado, and Wyoming.
-* Part 97.309 (B) Talks about unspecified data emission codes.  Basically, all formats need to be clearly documented. 
+* Part 97.309 (B) Talks about unspecified data emission codes.  Basically, all formats need to be clearly documented. See above. 
+* Are any part 15 regulations relevant here?
 
 Copyright Information 
 =====================
