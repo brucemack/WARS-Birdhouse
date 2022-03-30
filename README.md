@@ -9,7 +9,7 @@ amongst the ham community.
 
 Please contact Bruce MacKinnon (KC1FSZ) for more detail on the technical aspects of this project.
 
-Will this work?  Let's find out!
+Will this bird fly?  Let's find out!
 
 Design Overview
 ================
@@ -233,10 +233,12 @@ A static routing mechanism is being used at the moment.  The routing table for e
 Related Technology
 ==================
 
-* LoRaHAM (https://github.com/travisgoodspeed/loraham): A great open-source project that appears to have explored some similar territory.  The project appears to be inactive at this time.
-* AREDN (Amateur Radio Emergency Mesh Network): A cool
+* AREDN (Amateur Radio Emergency Mesh Network): A very cool
 system that leverages WIFI technology to create off-grid
-IP networks that support emergency communications.  The WARS Birdhouse project uses a different wireless technology and is not interoperable with the ARDEN system. ARDEN is designed for much higher bandwidth.  See https://www.arednmesh.org. 
+IP networks that support emergency communications.  These guys are doing much higher speeds and 
+are using much more sophisticated hardware.  The WARS Birdhouse project uses a different 
+wireless technology and is not interoperable with the ARDEN system.  See https://www.arednmesh.org. 
+* LoRaHAM (https://github.com/travisgoodspeed/loraham): A great open-source project that explored some similar territory.  The project appears to be inactive at this time.
 * LoRaWAN: A cool system that uses LoRa stations organized in a star topology.  The hub of each star is a gateway to the public internet.  This technology uses encryption and is not legal for amateur projects. 
 
 Reference Material
@@ -322,7 +324,7 @@ Open the sketch in the Arduino IDE.
 
 Make sure these settings are chosen under the Tools menu:
 * Board: ESP32 Dev Module
-* CPU Frequency: 10MHz
+* CPU Frequency: 10MHz, WIFI/Bluetooth disabled
 * Port: (Whatever COM port your development board appears as)
 
 Now you should be able to compile.
