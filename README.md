@@ -5,18 +5,18 @@ This project explores the potential of using low-cost/low-bandwidth LoRa radios 
 other applications that can take advantage of the fully-autonomous nature of the repeater stations. This 
 project is being undertaken by members of the Wellesley Amateur Radio Society (W1TKZ grid FN42).  The design is 
 made available for amateur (non-commercial) purposes in the spirit of experimentation and knowledge sharing
-amongst the ham community.
+amongst the ham community.  At the very least, we're creating homes for some lucky birds in the area.
 
 Please contact Bruce MacKinnon (KC1FSZ) for more detail on the technical aspects of this project.  I am 
 interested in home-brew radio projects, many of which can be 
 found [on my QRZ page](https://www.qrz.com/db/kc1fsz). 
 
-Will this bird fly?  Let's find out!
+Will this bird fly?  Let's find out!  
 
 Design Overview
 ================
 
-Nodes on the network are autonomous, solar-powered birdhouses that each contain a +20dBm/100mW radio (Semtech SX1276).  These birdhouses can run 24x7 assuming reasonable weather conditions.  USB-connected desktop nodes are used to access the network from a computer via serial connection.  An internet gateway node is also 
+Nodes on the network are autonomous, solar-powered birdhouses that each contain a +20dBm/100mW radio (Semtech SX1276).  These birdhouses will run 24x7 assuming reasonable weather conditions.  USB-connected desktop nodes are used to access the network from a computer via serial connection.  An internet gateway node is also 
 under development. 
 
 LoRa range experiments have been widely documented.  Your milage will vary considerably depending on terrain, 
@@ -39,7 +39,9 @@ message routing.
 The 33cm ham band (902-928 MHz) is used given that this is an experimental technology.  All 
 nodes must be installed/operated by FCC licensed amateur/ham radio operators.  
 
-A prototype network of 5 stations has been constructed in Wellesley, MA.  Messages have been successfully routed back and forth across the entire mesh, including hops between birdhouses that were separated by approximately 1 kilometer.  Antenna height is important, as always.  The houses have been subjected to bad New England weather conditions, including extended periods of cloudy weather and sub-zero temperatures.  It is an open question as to how the system will perform when our trees have leaves on them again!
+A proof-of-concept network of 5 stations has been constructed in Wellesley, MA.  Messages have been successfully routed back and forth across the entire mesh, including hops between birdhouses that were separated by approximately 1 kilometer.  Antenna height is important, as always.  The houses have been subjected to bad New England weather conditions, including extended periods of cloudy weather and sub-zero temperatures.  It is an open question as to how the system will perform when our trees have leaves on them again!
+
+A 15 node beta network is currently in the planning stages.  This includes upgrades of the hardware and firmware.
 
 Architecture Overview
 =====================
