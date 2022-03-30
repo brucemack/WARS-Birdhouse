@@ -39,7 +39,7 @@ message routing.
 The 33cm ham band (902-928 MHz) is used given that this is an experimental technology.  All 
 nodes must be installed/operated by FCC licensed amateur/ham radio operators.  
 
-A proof-of-concept network of 5 stations has been constructed in Wellesley, MA.  Messages have been successfully routed back and forth across the entire mesh, including hops between birdhouses that were separated by approximately 1 kilometer.  Antenna height is important, as always.  The houses have been subjected to bad New England weather conditions, including extended periods of cloudy weather and sub-zero temperatures.  It is an open question as to how the system will perform when our trees have leaves on them again!
+A proof-of-concept network of 5 stations has been constructed in Wellesley, MA.  Messages have been successfully routed back and forth across the entire mesh, including hops between birdhouses that were separated by approximately 1 kilometer.  Antenna height is important, as always.  The houses have been subjected to bad New England weather conditions including snow, ice, extended periods of cloudy weather and sub-zero temperatures.  It is an open question as to how the system will perform when our trees have leaves on them again!
 
 ![Snow](images/snow.jpg)
 
