@@ -18,7 +18,7 @@ Nodes on the network are autonomous, solar-powered birdhouses that each contain 
 under development. 
 
 LoRa range experiments have been widely documented.  Your milage will vary considerably depending on terrain, 
-station hight, etc.  1km link ranges are reasonable in suburban areas. 
+station hight, etc. Testing shows that 1 km link ranges are reasonable in suburban areas. 
 
 Birdhouse packaging was chosen in order to blend into the surroundings more easily.
 
@@ -51,13 +51,13 @@ Users access the network using desktop stations that are fitted with a USB seria
 
 Currently users interact with the network using a conventional serial terminal running on a PC (ie. PUTTY or something similar).  No special software is required.  A Python desktop user interface is planned to improve ergonomics.  The serial commands are described in a later section.
 
-Please contact the network administrator to be assigned a node address on the network.
-
 How Can I Get A Birdhouse?
 ==========================
 
 Hardware/firmware is still be refined as part of a club project.  All firmware, KiCAD files, and woodworking
 dimensions are available on this site for anyone who wants to build a birdhouse. 
+
+Please contact the network administrator to be assigned a node address on the network.
 
 Protocol Documentation
 ======================
@@ -192,10 +192,6 @@ A tower-mounted birdhouse repeater prototype at the QTH of KC1FSZ:
 
 ![house3](images/IMG_0853.jpg)
 
-A tree-mounted repeater prototype installed in a tree inside of a cloverleaf on-/off-ramp:
-
-![house4](images/IMG_0856.jpg)
-
 Hardware Notes
 --------------
 * Voltage readings are taken on solar panels and batteries.
@@ -216,12 +212,17 @@ The wood parts for the birdhouse repeater prototype:
 
 ![house4](images/IMG_0642.jpg)
 
+A tree-mounted repeater prototype installed in a tree inside of a cloverleaf on-/off-ramp:
+
+![house4](images/IMG_0856.jpg)
+
 (Cutting dimensions to follow shortly)
 
 Software Overview
 =================
 
-The LoRa software is completely homebrew - no off-the-shelf drivers are being used.  
+The LoRa software is completely homebrew - no off-the-shelf drivers are being used.  This
+means much more work, and much more learning.
 
 All nodes support a serial interface for interacting with the network, but this is only connected for desktop nodes.  
 
@@ -269,11 +270,10 @@ Hardware (Future)
 -----------------
 * Replace the linear regulator with a boost converter to improve battery usage.
 * Complete the packaging of the birdhouse to ensure weatherproofing and full compatibility with avian residency.
-* Improved power efficiency using smaller microcontrollers.
 * Cheaper antennas.
 * Gain antennas for longer distance links.
 * RF switch to allow dynamic switching between two antennas.  This might facilitate A/B testing, or possibly stations that have a directional/gain antenna for trunking and an omni-directional antenna for local access.
-* A custom PCB to simplify construction for club builds.
+* A hand-held station with an LCD RSSI display for scouting potential station locations.
 
 Software
 --------
@@ -342,4 +342,5 @@ Copyright (C) 2022 - Bruce MacKinnon KC1FSZ
 This work is covered under the terms of the GNU Public License (V3).  Please consult the 
 LICENSE file for more information.  
 
-This work is being made available for non-commercial use
+This work is being made available for non-commercial use by the amateur radio community.
+
