@@ -107,9 +107,9 @@ The payload above contains a 36-byte header followed by a variable length packet
 
 Each station is assigned a 16-bit address. Some addresses have special significance:
 * 0x0000: Not used
-* 0x0001: Gateway station to other meshes
-* 0x0002 through 0x0007: Un-routed stations used for administrative/maintenance purposes.
-* 0x0008 through 0xfffe: Used for normal stations on the network.
+* 0x0001 through 0xffef: Used for normal stations on the network.
+* 0xfff0: Gateway station to other meshes
+* 0xfff1 through 0xfffe: Un-routed stations used for administrative/maintenance purposes.
 * 0xffff: The broadcast address
 
 ### Packet Types
@@ -179,10 +179,12 @@ a station.  Format is a follows:
 * 24-25: Humidity (when option installed)
 * 26-27: Device class
   * 0: Unspecified
-  * 1: WARS Desktop
-  * 2: WARS Birdhouse 
-  * 3: WARS Mesh gateway
-  * 4: WARS Internet gateway
+  * 1: WARS Desktop ESP32
+  * 2: WARS Birdhouse ESP32
+  * 3: WARS Mesh gateway STM32
+  * 4: WARS Internet gateway STM32
+  * 5: WARS Desktop STM32
+  * 6: WARS Birdhouse STM32
 * 28-29: Device revision
 * 30-31: Wrong-node receive packet count 
 
