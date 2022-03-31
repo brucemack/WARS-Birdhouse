@@ -1,12 +1,16 @@
 #ifndef _packets_h
 #define _packets_h
 
+#include <string.h>
+
+typedef uint16_t nodeaddr_t;
+
 static const uint8_t PACKET_VERSION = 2;
-static const uint16_t BROADCAST_ADDR = 0xffff;
+static const nodeaddr_t BROADCAST_ADDR = 0xffff;
 
 // The top bit indicates whether an ACK is needed
 enum MessageType {
-    TYPE_UNUSED        = 0
+    TYPE_UNUSED        = 0,
     // This message is used when a delivery acknowledgment is needed
     TYPE_ACK           = 1,
     // Used to spontaneously 
@@ -32,17 +36,17 @@ struct Header {
     uint8_t version;
     uint8_t type;
     uint16_t id;
-    uint8_t sourceCall[8];
-    uint8_t finalDestCall[8];
-    uint8_t originalSourceCall[8];
-    uint16_t destAddr;
-    uint16_t sourceAddr;
+    char sourceCall[8];
+    char finalDestCall[8];
+    char originalSourceCall[8];
+    nodeaddr_t destAddr;
+    nodeaddr_t sourceAddr;
     // Used for multi-hop communication.  This is the node that is 
     // the ultimate destination of a message.
-    uint16_t finalDestAddr;
+    nodeaddr_t finalDestAddr;
     // Used for multi-hop communication.  This is the node that 
     // originated the message.
-    uint16_t originalSourceAddr;
+    nodeaddr_t originalSourceAddr;
 
     Header() 
     : version(PACKET_VERSION) 
@@ -55,7 +59,7 @@ struct Header {
      * 
      * @param rx_buf 
      */
-    Header(const uint8_t* rx_buf) {
+    Header(const char* rx_buf) {
         memcpy(this, rx_buf, sizeof(Header));
     }
 
@@ -67,11 +71,11 @@ struct Header {
      * @param myAddr 
      */
     void createAckFor(const Header& rx_packet, 
-        const uint8_t* myCall, uint16_t myAddr) {
+        const char* myCall, uint16_t myAddr) {
         version = PACKET_VERSION;
-        type = MessageType::TYPE_ACK;
+        type = TYPE_ACK;
         id = rx_packet.id;
-        memcpy(sourceCall, myCall, 8);
+        loadCall(sourceCall, myCall);
         memcpy(finalDestCall, rx_packet.finalDestCall, 8);
         memcpy(originalSourceCall, rx_packet.originalSourceCall, 8);
         destAddr = rx_packet.sourceAddr;
@@ -84,32 +88,69 @@ struct Header {
         return !(type == 1 || type == 2) && (destAddr != BROADCAST_ADDR);
     }
 
-    void setSourceAddr(uint16_t addr) {
+    void setSourceAddr(nodeaddr_t addr) {
         sourceAddr = addr;
     }
 
-    void setDestAddr(uint16_t addr) {
+    void setDestAddr(nodeaddr_t addr) {
         destAddr = addr;
     }
 
-    void setOriginalSourceAddr(uint16_t addr) {
+    void setOriginalSourceAddr(nodeaddr_t addr) {
         originalSourceAddr = addr;
     }
 
-    void setFinalDestAddr(uint16_t addr) {
+    void setFinalDestAddr(nodeaddr_t addr) {
         finalDestAddr = addr;
     }
 
-    void setSourceCall(const uint8_t* call) {
-        memcpy(sourceCall, call);
+    void setSourceCall(const char* call) {
+        loadCall(sourceCall, call);
     }
 
-    void setOriginalSourceCall(const uint8_t* call) {
-        memcpy(originalSourceCall, call);
+    void getSourceCall(char* call) {
+        unloadCall(call, sourceCall);
     }
 
-    bool isRelevant(uint16_t myAddr) const {
+    void setOriginalSourceCall(const char* call) {
+        loadCall(originalSourceCall, call);
+    }
+
+    void getOriginalSourceCall(char* call) {
+        unloadCall(call, originalSourceCall);
+    }
+
+    void setFinalDestCall(const char* call) {
+        loadCall(finalDestCall, call);
+    }
+
+    bool isRelevant(nodeaddr_t myAddr) const {
         return destAddr == myAddr || destAddr == BROADCAST_ADDR;
+    }
+
+    /**
+     * @brief Copies a null-terminated string into a non-null
+     * terminated buffer which is space-padded.
+     * 
+     * @param dest 
+     * @param sourceWithNull 
+     */
+    static void loadCall(char* dest, const char* sourceWithNull) {
+        // Blank out target
+        for (unsigned int i = 0; i < 8; i++)
+            dest[i] = ' ';
+        // Copy until we see a null
+        for (unsigned int i = 0; i < 8 && sourceWithNull[i] != 0; i++)
+            dest[i] = sourceWithNull[i];
+    }
+
+    static void unloadCall(char* destWithNull, const char* source) {
+        // Null out target
+        for (unsigned int i = 0; i < 9; i++)
+            destWithNull[i] = 0;
+        // Copy until we see a pad space
+        for (unsigned int i = 0; i < 8 && source[i] != ' '; i++) 
+            destWithNull[i] = source[i];
     }
 };
 
@@ -133,19 +174,19 @@ struct SadRespPacket {
 
 struct SetRoutePacket {
   Header header;
-  uint16_t targetAddr;
-  uint16_t nextHopAddr;  
+  nodeaddr_t targetAddr;
+  nodeaddr_t nextHopAddr;  
 };
 
 struct GetRoutePacket {
   Header header;
-  uint16_t targetAddr;
+  nodeaddr_t targetAddr;
 };
 
 struct GetRouteRespPacket {
   Header header;
-  uint16_t targetAddr;
-  uint16_t nextHopAddr;  
+  nodeaddr_t targetAddr;
+  nodeaddr_t nextHopAddr;  
   uint16_t rxPacketCount;  
   uint16_t txPacketCount;  
 };
