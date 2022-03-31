@@ -68,10 +68,13 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 // How frequently to check the batter condition
 #define BATTERY_CHECK_INTERVAL_SECONDS 30
 
+static const float STATION_FREQUENCY = 906.5;
+
 static Preferences preferences;
 
 // NODE SPECIFIC STUFF
 static uint8_t MY_ADDR = 1;
+static uint8_t MY_CALL[8] = "KC1FSZ  ";
 // Routing table (node 1)
 static uint8_t Routes[256];
 
@@ -118,54 +121,6 @@ static CircularBuffer<4096> tx_buffer;
 // The circular buffer used for incoming data
 static CircularBuffer<4096> rx_buffer;
 
-// The top bit indicates whether an ACK is needed
-enum MessageType {
-  // This message is used when a delivery acknowlegement is needed
-  TYPE_ACK           = 0b00000001,
-  // The ping message will be acknowledged at every step along the way
-  TYPE_PING          = 0b10000010,
-  // Response is acknowledged as well
-  TYPE_PONG          = 0b10000011,
-  TYPE_RESET         = 0b00000100,
-  TYPE_TEXT          = 0b10000101,
-  TYPE_BLINK         = 0b00000110,
-  TYPE_SETROUTE      = 0b10000111,
-  TYPE_GETROUTE      = 0b10001000,
-  TYPE_GETROUTERESP  = 0b10001001
-};
-
-// Every message starts of with this header
-struct Header {
-
-  Header() 
-  : id(0),
-    hops(0),
-    receiveRssi(0) {
-  }
-  
-  uint8_t destAddr;
-  uint8_t sourceAddr;
-  // The high bit controls whether an acknowledgement is required
-  uint8_t type;
-  uint16_t id;
-  // Used for multi-hop communication.  This is the node that is 
-  // the ultimate destination of a message.
-  uint8_t finalDestAddr;
-  // Used for multi-hop communication.  This is the node that 
-  // originated the message.
-  uint8_t originalSourceAddr;
-  // Used for multi-hop communication.  This is the number of hops
-  // that the packet has traversed.
-  uint8_t hops;
-  // When possible this will be filled in on the *local* side of the 
-  // receive.
-  int16_t receiveRssi;
-
-  bool isAckRequired() {
-    return (type & 0b10000000) != 0;
-  }
-};
-
 // ----- Interrupt Service -------
 
 static volatile bool isr_hit = false;
@@ -196,7 +151,7 @@ void event_TxDone() {
 void event_RxDone() {
 
   // How much data is available?
-  uint8_t len = spi_read(0x13);
+  const uint8_t len = spi_read(0x13);
   // Reset the FIFO read pointer to the beginning of the packet we just got
   spi_write(0x0d, spi_read(0x10));
   // Stream in from the FIFO. 
@@ -227,19 +182,15 @@ void event_RxDone() {
     return;
   }
 
+  // Pull in the header into a structure so we can look at it
+  Header rx_header(rx_buf);
+
   // Ignore messsages targeted for other stations
-  if (rx_buf[0] != MY_ADDR && rx_buf[0] != 255) {
+  if (!rx_header.isRelevant(MY_ADDR)) {
+    // TODO: COUNTER
     //Serial.println(F("INF: Ignored message for another node"));
     return;
   }
-
-  // Pull in the header 
-  Header rx_header;
-  memcpy(&rx_header, rx_buf, sizeof(Header));
-  // Tweak the RSSI attribute in the header 
-  rx_header.receiveRssi = lastRssi;
-  // Write the fixed header back into the receive buffer
-  memcpy(rx_buf, &rx_header, sizeof(Header));
 
   // Check to see if this is an ack that we are waiting for
   if (rx_header.type == MessageType::TYPE_ACK) {
@@ -253,34 +204,28 @@ void event_RxDone() {
       listenAckStart = 0;
       transmitRetry = 0;
     } else {
-      Serial.print(F("INF: Ignorning ACK for "));
+      Serial.print(F("INF: Ignoring ACK for "));
       Serial.println(rx_header.id);
     }
   } 
   // Any other message will be forwarded to the application
   else {
-    // Put the data into the circular queue
+    // Put the RSSI data into the receive circular queue 
+    rx_buffer.push(&lastRssi, sizeof(lastRssi))
+    // Put the entire data into the circular queue (not just header)
     rx_buffer.push(rx_buf, len);
 
-    // Check to see if an ACK was requested by the sender.  If so, create the ACK
-    // and transmit it.
+    // Check to see if an ACK is required for this packet.  If so, 
+    // create the ACK and transmit it.
     if (rx_header.isAckRequired()) {
-
+      // A testing feature that will skip ACKs
       if (skipAckCount != 0) {
         skipAckCount--;
         Serial.println(F("INF: Skipping an ACK (test)"));
       }
       else {
         Header ack_header;
-        // Respond to the node that sent us the message
-        ack_header.destAddr = rx_header.sourceAddr;
-        ack_header.sourceAddr = MY_ADDR;
-        ack_header.type = MessageType::TYPE_ACK;
-        // Maintain the same ID
-        ack_header.id = rx_header.id;
-        ack_header.finalDestAddr = rx_header.sourceAddr;
-        ack_header.originalSourceAddr = MY_ADDR;
-        ack_header.hops = rx_header.hops + 1;
+        ack_header.createAckFor(rx_header, MY_CALL, MY_ADDR);
         // Go into stand-by so we know that nothing else is coming in
         set_mode_STDBY();
         // Move the data into the radio FIFO
@@ -369,9 +314,7 @@ static void event_tick_LISTENING() {
   // Take a look at the header so we can determine whether an ACK is 
   // going to be required for this message.
   // TODO: SEE IF WE CAN SOLVE THIS USING A CAST RATHER THAN A COPY!
-  Header tx_header;
-  ::memcpy((uint8_t*)&tx_header, tx_buf, sizeof(Header));
-
+  Header tx_header(tx_buf);
   if (tx_header.isAckRequired()) {
     // After transmission we will need to wait for the ACK
     stateAfterTransmit = State::LISTENING_FOR_ACK;
@@ -521,7 +464,7 @@ static void setLowDatarate() {
 }
 
 /** 
- *  All of the one-time initializaiton of the radio
+ *  All of the one-time initialization of the radio
  */
 int init_radio() {
 
@@ -547,7 +490,7 @@ int init_radio() {
   // RX base:
   spi_write(0x0f, 0);
 
-  set_frequency(916.0);
+  set_frequency(STATION_FREQUENCY);
 
   // Set LNA boost
   spi_write(0x0c, spi_read(0x0c) | 0x03);
@@ -607,47 +550,6 @@ static uint32_t chipId = 0;
 
 auto timer = timer_create_default();
 
-struct PingMessage {
-  Header header;  
-};
-
-struct PongMessage {
-  Header header;  
-  uint16_t version;
-  uint16_t counter;
-  int16_t rssi;
-  uint16_t batteryMv;
-  uint16_t panelMv;
-  uint32_t uptimeSeconds;
-  uint16_t bootCount;
-  uint16_t sleepCount;
-};
-
-struct ResetMessage {
-  Header header;  
-};
-
-struct BlinkMessage {
-  Header header;  
-};
-
-struct SetRouteMessage {
-  Header header;
-  uint8_t targetAddr;
-  uint8_t nextHopAddr;  
-};
-
-struct GetRouteMessage {
-  Header header;
-  uint8_t targetAddr;
-};
-
-struct GetRouteRespMessage {
-  Header header;
-  uint8_t targetAddr;
-  uint8_t nextHopAddr;  
-};
-
 int sendPing(int argc, char **argv) { 
  
   if (argc != 2) {
@@ -662,16 +564,18 @@ int sendPing(int argc, char **argv) {
     
     uint8_t nextHop = Routes[target];
     if (nextHop != 0) {
+      Header header;
+      header.type = MessageType::TYPE_PING;
+      header.id = counter;
+      // Addressing
+      header.setSourceAddr(MY_ADDR);
+      header.setOriginalSourceAddr(MY_ADDR);
+      header.setDestAddr(nextHop);
+      header.setFinalDestAddr(target);
+      header.setSourceCall(MY_CALL);
+      header.setOriginalSourceCall(MY_CALL);
 
-      PingMessage msg;
-      msg.header.destAddr = nextHop;
-      msg.header.sourceAddr = MY_ADDR;
-      msg.header.id = counter;
-      msg.header.type = MessageType::TYPE_PING;
-      msg.header.finalDestAddr = target;
-      msg.header.originalSourceAddr = MY_ADDR;
-
-      tx_buffer.push((uint8_t*)&msg, sizeof(PingMessage));
+      tx_buffer.push((uint8_t*)&header, sizeof(Header));
       
       return 0;
 
