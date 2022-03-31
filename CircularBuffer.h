@@ -20,6 +20,8 @@
 #ifndef _CircularBuffer_h
 #define _CircularBuffer_h
 
+#include <stdint.h>
+
 /** 
  *  A circular queue for byte buffers of arbitrary length. 
  */
@@ -95,7 +97,7 @@ public:
     entry_size = _buf[ptr] << 8;
     ptr = _incAndWrap(ptr);
     entry_size |= _buf[ptr];
-    ptr = _incAndWrap(ptr;
+    ptr = _incAndWrap(ptr);
 
     // Rotate through the OOB section and the IB section
     for (unsigned int i = 0; i < entry_size; i++) {
@@ -121,7 +123,7 @@ public:
   
 private:
 
-  const unsigned int _bufLen = S;
+  static const unsigned int _bufLen = S;
 
   // The size of the OOB header
   const unsigned int _oobBufLen;
@@ -142,18 +144,7 @@ private:
    * @return true 
    * @return false 
    */
-  bool _pushRaw(const uint8_t* oobBuf, const uint8_t* buf, unsigned int bufLen) {
-    // Deal with the fixed-length OOB part
-    for (unsigned int i = 0; i < _oobBufLen; i++) {
-      // Store into the buffer
-      _buf[_back] = oobBuf[i];
-      // Advance and wrap
-      _back = _incAndWrap(_back);
-      // Check for overflow
-      if (_back == _front) {
-        return false;
-      }
-    }
+  bool _pushRaw(const uint8_t* buf, unsigned int bufLen) {
     // Deal with the variable length IB part    
     for (unsigned int i = 0; i < bufLen; i++) {
       // Store into the buffer
