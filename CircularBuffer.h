@@ -26,9 +26,10 @@
 template<unsigned int S> class CircularBuffer {
 public:
 
-  CircularBuffer() 
+  CircularBuffer(unsigned int oobBufLen) 
   : _front(0),
-    _back(0)
+    _back(0),
+    _oobBufLen(oobBufLen)
   {
   }
 
@@ -36,34 +37,51 @@ public:
     return _front == _back;
   }
 
-  // Returns true if the push was successful, otherwise false.  For example, if the buffer
-  // is completely full.
-  // NOTE: A two-byte length header is put into the buffer to manage size.
-  bool push(const uint8_t* buf, unsigned int len) {
+  /**
+   * @brief Push a fixed-length OOB buffer and a variable length
+   * buffer onto the circular buffer.
+   * 
+   * Returns true if the push was successful, otherwise false.  For example, 
+   * if the buffer is completely full a push will fail.
+   *
+   * NOTE: A two-byte length header is put into the buffer to manage size.
+   */
+  bool push(const uint8_t* oobBuf, const uint8_t* buf, unsigned int bufLen) {
     // Keep the original pointer in case a failure/rollback is necessary.
-    unsigned int original_back = _back;
+    unsigned int originalBack = _back;
+    // We are putting the combined length of the OOB and IB buffers
+    // onto the circular buffer
+    unsigned int totalLen = bufLen + _oobBufLen;
     // Write a two-byte length
     uint8_t temp[2];
-    temp[0] = (len >> 8) & 0xff;
-    temp[1] = len & 0xff;
-    if (_pushRaw(temp, 2) && _pushRaw(buf, len)) {
+    temp[0] = (totalLen >> 8) & 0xff;
+    temp[1] = totalLen & 0xff;
+    // Push the different components onto the circular buffer
+    if (_pushRaw(temp, 2) && 
+        _pushRaw(oobBuf, _oobBufLen) && 
+        _pushRaw(buf, bufLen)) {
       return true;
     }
-    // Reset like nothing happened
-    _back = original_back;
+    // If anything fails then reset like nothing happened
+    _back = originalBack;
+    // Return the error condition
     return false;
   }
 
   // The *len argument starts off with the maximum space available in buf and ends
   // with the actual number of bytes taken from the queue.
-  void pop(uint8_t* buf, unsigned int* len) {
+  void pop(uint8_t* oobBuf, uint8_t* buf, unsigned int* len) {
     // Get the next buffer and move pointer 
-    _front = _peek(buf, len);
+    _front = _peek(oobBuf, buf, len);
   }
 
-  void peek(uint8_t* buf, unsigned int* len) {
+  void peek(uint8_t* oobBuf, uint8_t* buf, unsigned int* len) {
     // Get the next buffer but don't move the pointer
-    _peek(buf, len);
+    _peek(oobBuf, buf, len);
+  }
+
+  unsigned int _incAndWrap(unsigned int ptr) {
+    return (ptr + 1) % _bufLen;
   }
 
   /**
@@ -71,16 +89,19 @@ public:
    */
   void popAndDiscard() {
     unsigned int ptr = _front;
-    // Get out the length
+    
+    // Get out the length (first two bytes)
     unsigned int entry_size = 0;
     entry_size = _buf[ptr] << 8;
-    ptr = (ptr + 1) % _bufSize;
+    ptr = _incAndWrap(ptr);
     entry_size |= _buf[ptr];
-    ptr = (ptr + 1) % _bufSize;  
-    // Rotate through the message
-    for (int i = 0; i < entry_size; i++) {
-      ptr = (ptr + 1) % _bufSize;
+    ptr = _incAndWrap(ptr;
+
+    // Rotate through the OOB section and the IB section
+    for (unsigned int i = 0; i < entry_size; i++) {
+      ptr = _incAndWrap(ptr);
     }
+
     // Reset the front pointer
     _front = ptr;
   }
@@ -89,19 +110,21 @@ public:
    * This combines isEmpty() and pop() to provide an easy atomic 
    * pop operation.
    */
-  bool popIfNotEmpty(uint8_t* buf, unsigned int* len) {
+  bool popIfNotEmpty(uint8_t* oobBuf, uint8_t* buf, unsigned int* len) {
     if (isEmpty()) {
       return false;
     } else {
-      pop(buf, len);
+      pop(oobBuf, buf, len);
       return true;
     }
   }
   
 private:
 
-  const unsigned int _bufSize = S;
+  const unsigned int _bufLen = S;
 
+  // The size of the OOB header
+  const unsigned int _oobBufLen;
   // Where we pop (read) from
   volatile unsigned int _front;
   // Where we push (write) to
@@ -109,41 +132,76 @@ private:
   // The actual space
   volatile uint8_t _buf[S];
 
-  bool _pushRaw(const uint8_t* buf, unsigned int len) {
-    for (unsigned int i = 0; i < len; i++) {
+  /**
+   * @brief This puts an entry onto the circular buffer, making 
+   * sure that a wrap-around situation doesn't happen.
+   * 
+   * @param oobBuf 
+   * @param buf 
+   * @param len 
+   * @return true 
+   * @return false 
+   */
+  bool _pushRaw(const uint8_t* oobBuf, const uint8_t* buf, unsigned int bufLen) {
+    // Deal with the fixed-length OOB part
+    for (unsigned int i = 0; i < _oobBufLen; i++) {
       // Store into the buffer
-      _buf[_back] = buf[i];
+      _buf[_back] = oobBuf[i];
       // Advance and wrap
-      _back = (_back + 1) % _bufSize;
+      _back = _incAndWrap(_back);
       // Check for overflow
       if (_back == _front) {
         return false;
       }
     }
+    // Deal with the variable length IB part    
+    for (unsigned int i = 0; i < bufLen; i++) {
+      // Store into the buffer
+      _buf[_back] = buf[i];
+      // Advance and wrap
+      _back = _incAndWrap(_back);
+      // Check for overflow
+      if (_back == _front) {
+        return false;
+      }
+    }
+    // If we get here then the push was successful
     return true;
   }
 
-  // The *len argument starts off with the maximum space available in buf and ends
+  // The *bufLen argument starts off with the maximum space available in buf and ends
   // with the actual number of bytes taken from the queue.
   // Returns the location of the new front of the queue.
-  unsigned int _peek(uint8_t* buf, unsigned int* len) {
-    unsigned int available_space = *len;
+  unsigned int _peek(uint8_t* oobBuf, uint8_t* buf, unsigned int* bufLen) {
+
     unsigned int ptr = _front;
-    // Get out the length
+
+    // Get out the length (inclusive of OOB and IB parts)
     unsigned int entry_size = 0;
     entry_size = _buf[ptr] << 8;
-    ptr = (ptr + 1) % _bufSize;
+    ptr = _incAndWrap(ptr);
     entry_size |= _buf[ptr];
-    ptr = (ptr + 1) % _bufSize;
-    
-    *len = 0;
+    ptr = _incAndWrap(ptr);
+
+    // Get the OOB data
+    for (unsigned int i = 0; i < _oobBufLen; i++) {
+      oobBuf[i] = _buf[ptr];
+      ptr = _incAndWrap(ptr);
+      entry_size--;
+    }
+
+    // Capture the maximum space available
+    unsigned int available_space = *bufLen;
+    *bufLen = 0;
     
     for (int i = 0; i < entry_size; i++) {
+      // Notice that when we exceed the maximum space we 
+      // just start quietly ignoring the IB data.
       if (i < available_space) {
         buf[i] = _buf[ptr];
-        (*len)++;
+        (*bufLen)++;
       }
-      ptr = (ptr + 1) % _bufSize;
+      ptr = _incAndWrap(ptr);
     }
 
     return ptr;

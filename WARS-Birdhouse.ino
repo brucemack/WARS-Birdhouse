@@ -210,10 +210,10 @@ void event_RxDone() {
   } 
   // Any other message will be forwarded to the application
   else {
-    // Put the RSSI data into the receive circular queue 
-    rx_buffer.push(&lastRssi, sizeof(lastRssi))
-    // Put the entire data into the circular queue (not just header)
-    rx_buffer.push(rx_buf, len);
+
+    // Put the RSSI (OOB) and the entire packet (not just the header)
+    // into the circular queue
+    rx_buffer.push(&lastRssi, rx_buf, len);
 
     // Check to see if an ACK is required for this packet.  If so, 
     // create the ACK and transmit it.
