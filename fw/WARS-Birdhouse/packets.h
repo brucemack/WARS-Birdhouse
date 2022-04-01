@@ -2,8 +2,7 @@
 #define _packets_h
 
 #include <string.h>
-
-typedef uint16_t nodeaddr_t;
+#include "Utils.h"
 
 static const uint8_t PACKET_VERSION = 2;
 static const nodeaddr_t BROADCAST_ADDR = 0xffff;

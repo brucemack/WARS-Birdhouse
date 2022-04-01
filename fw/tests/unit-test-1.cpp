@@ -9,7 +9,7 @@ using namespace std;
 
 void test_buffer() {
 
-    CircularBuffer<4096> buf(2);
+    CircularBufferImpl<4096> buf(2);
 
     assert(buf.isEmpty());
 
@@ -62,7 +62,7 @@ void test_buffer() {
     }
 
     // Test the overflow situation
-    CircularBuffer<16> buf2(2);
+    CircularBufferImpl<16> buf2(2);
     {
         uint16_t oobInt = 1;
         uint8_t text1[11] = { "0123456789" };
@@ -81,7 +81,7 @@ void test_buffer() {
     }
 
     // Test the wrap situation
-    CircularBuffer<20> buf3(2);
+    CircularBufferImpl<20> buf3(2);
     {
         uint16_t oobInt = 1;
         uint8_t text1[5] = { "0123" };
@@ -118,7 +118,7 @@ void test_buffer() {
     }
 
     // ZERO LENGTH OOB
-    CircularBuffer<128> buf4(0);
+    CircularBufferImpl<128> buf4(0);
     assert(buf4.isEmpty());
 
     // Put some data on the queue

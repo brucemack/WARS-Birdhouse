@@ -22,20 +22,35 @@
 
 #include <stdint.h>
 
+/**
+ * @brief Base interface for the circular buffer concept.
+ * 
+ */
+class CircularBuffer {
+public:
+
+  virtual bool isEmpty() const  = 0;
+  virtual bool push(const uint8_t* oobBuf, const uint8_t* buf, unsigned int bufLen) = 0;
+  virtual void pop(uint8_t* oobBuf, uint8_t* buf, unsigned int* len) = 0;
+  virtual bool popIfNotEmpty(uint8_t* oobBuf, uint8_t* buf, unsigned int* len) = 0;
+  virtual void peek(uint8_t* oobBuf, uint8_t* buf, unsigned int* len) const = 0;
+  virtual void popAndDiscard() = 0;
+};
+
 /** 
  *  A circular queue for byte buffers of arbitrary length. 
  */
-template<unsigned int S> class CircularBuffer {
+template<unsigned int S> class CircularBufferImpl : CircularBuffer {
 public:
 
-  CircularBuffer(unsigned int oobBufLen) 
+  CircularBufferImpl(unsigned int oobBufLen) 
   : _front(0),
     _back(0),
     _oobBufLen(oobBufLen)
   {
   }
 
-  bool isEmpty() {
+  bool isEmpty() const {
     return _front == _back;
   }
 
@@ -77,12 +92,12 @@ public:
     _front = _peek(oobBuf, buf, len);
   }
 
-  void peek(uint8_t* oobBuf, uint8_t* buf, unsigned int* len) {
+  void peek(uint8_t* oobBuf, uint8_t* buf, unsigned int* len) const {
     // Get the next buffer but don't move the pointer
     _peek(oobBuf, buf, len);
   }
 
-  unsigned int _incAndWrap(unsigned int ptr) {
+  static unsigned int _incAndWrap(unsigned int ptr) {
     return (ptr + 1) % _bufLen;
   }
 
@@ -163,7 +178,7 @@ private:
   // The *bufLen argument starts off with the maximum space available in buf and ends
   // with the actual number of bytes taken from the queue.
   // Returns the location of the new front of the queue.
-  unsigned int _peek(uint8_t* oobBuf, uint8_t* buf, unsigned int* bufLen) {
+  unsigned int _peek(uint8_t* oobBuf, uint8_t* buf, unsigned int* bufLen) const {
 
     unsigned int ptr = _front;
 
