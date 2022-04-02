@@ -4,12 +4,14 @@
 #include "OutboundPacketManager.h"
 #include "CircularBuffer.h"
 #include "Clock.h"
+#include "Instrumentation.h"
 
 class MessageProcessor {
 public:
 
     MessageProcessor(Clock& clock, CircularBuffer& rxBuffer, CircularBuffer& txBuffer,
-        RoutingTable& routingTable, nodeaddr_t myAddr, const char* myCall);
+        RoutingTable& routingTable, Instrumentation& instrumentation,
+        nodeaddr_t myAddr, const char* myCall);
 
     void pump();
 
@@ -23,11 +25,13 @@ private:
     CircularBuffer& _rxBuffer;
     CircularBuffer& _txBuffer;
     RoutingTable& _routingTable;
+    Instrumentation& _instrumentation;
     nodeaddr_t _myAddr;
     char _myCall[9];
     
     OutboundPacketManager _opm;
     unsigned int _idCounter;
+    uint32_t _startTime;
 };
 
 #endif

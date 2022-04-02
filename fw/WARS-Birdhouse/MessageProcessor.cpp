@@ -13,17 +13,25 @@ extern Stream& logger;
 static const char* msg_bad_message = "ERR: Bad message";
 static const char* msg_no_route = "ERR: No route";
 static const int32_t SEND_TIMEOUT = 10 * 1000;
+static const uint8_t SW_VERSION = 1;
 
-MessageProcessor::MessageProcessor(Clock& clock, 
-    CircularBuffer& rxBuffer, CircularBuffer& txBuffer,
-    RoutingTable& routingTable, nodeaddr_t myAddr, const char* myCall) 
+MessageProcessor::MessageProcessor(
+    Clock& clock, 
+    CircularBuffer& rxBuffer, 
+    CircularBuffer& txBuffer,
+    RoutingTable& routingTable,  
+    Instrumentation& instrumentation,
+    nodeaddr_t myAddr, 
+    const char* myCall) 
     : _clock(clock),
       _rxBuffer(rxBuffer),
       _txBuffer(txBuffer),
       _routingTable(routingTable),
+      _instrumentation(instrumentation),
       _myAddr(myAddr),
       _opm(clock, txBuffer),
-      _idCounter(1) {
+      _idCounter(1),
+      _startTime(clock.time()) {
         // TODO: REVIEW THIS CLOSELY
       strncpy(_myCall, myCall, 8);
 }
@@ -67,6 +75,7 @@ void MessageProcessor::_process(int16_t rssi,
 
   // Look for messages that need to be forwarded on to another node
   if (packet.header.getFinalDestAddr() != _myAddr) {
+    // This is a forward route (i.e. twoards the final destination)
     nodeaddr_t nextHop = _routingTable.nextHop(
       packet.header.getFinalDestAddr());
     if (nextHop != RoutingTable::NO_ROUTE) {
@@ -80,8 +89,11 @@ void MessageProcessor::_process(int16_t rssi,
       outPacket.header.setSourceAddr(_myAddr);
       // Arrange for sending.
       // NOTE: WE USE THE SAME LENGTH THAT WE GOT ON THE RX
-      _opm.allocateIfPossible(outPacket, packetLen, 
+      bool good = _opm.allocateIfPossible(outPacket, packetLen, 
         _clock.time() + SEND_TIMEOUT);
+      if (!good) {
+        logger.println("ERR: Full, no forward");
+      }
     }
     else {
       // TODO: COUNTERS
@@ -93,45 +105,67 @@ void MessageProcessor::_process(int16_t rssi,
   // We process them according to the type.
   else {
 
-    // Get the first hop for the response message
+    // Get the first hop for the response message. This is 
+    // routing back towards the origin of the packet.
     const nodeaddr_t firstHop = _routingTable.nextHop(
       packet.header.getOriginalSourceAddr());
 
-    // Ping
-    if (packet.header.getType() == TYPE_PING_REQ) {
-
-      if (firstHop == RoutingTable::NO_ROUTE) {
+    // Do an error check to make sure we don't have a response
+    // routing problem.
+    if (packet.header.isResponseRequired() && 
+        firstHop == RoutingTable::NO_ROUTE) {
         logger.print("ERR: No route to ");
         logger.print(packet.header.getOriginalSourceAddr());
         logger.println();
-      }
+        return;
+    }
 
+    // Ping
+    if (packet.header.getType() == TYPE_PING_REQ) {
       // Create a pong and send back to the originator of the ping
-      PingRespPacket resp;
+      Packet resp;
       resp.header.setupResponseFor(packet.header, _myCall, _myAddr, 
         TYPE_PING_RESP, _getUniqueId(), firstHop);
       bool good = _opm.allocateIfPossible(resp, sizeof(Header), 
         _clock.time() + SEND_TIMEOUT);
+      if (!good) {
+        logger.printf("ERR: Full, no resp");
+      }
+    }
 
-      // Notice that the first hop is always the node that sent the PING.
-      msg.header.destAddr = header.sourceAddr;
-      msg.header.sourceAddr = MY_ADDR;
-      msg.header.hops = header.hops + 1;        
-      msg.header.id = header.id;
-      msg.header.type = MessageType::TYPE_PONG;
-      msg.header.finalDestAddr = header.originalSourceAddr;
-      msg.header.originalSourceAddr = MY_ADDR;
+    // Get Station Engineering Data
+    else if (packet.header.getType() == TYPE_GETSED_REQ) {
 
-      msg.version = SW_VERSION;
-      msg.counter = counter;
-      msg.rssi = header.receiveRssi;
-      msg.batteryMv = checkBattery();
-      msg.panelMv = checkPanel();
-      msg.uptimeSeconds = get_time_seconds();
-      msg.bootCount = preferences.getUShort("bootcount", 0);  
-      msg.sleepCount = preferences.getUShort("sleepcount", 0);  
-      
-      tx_buffer.push((uint8_t*)&msg, sizeof(PongMessage));
+      Packet resp;
+      resp.header.setupResponseFor(packet.header, _myCall, _myAddr, 
+        TYPE_GETSED_RESP, _getUniqueId(), firstHop);
+
+      SadRespPayload respPayload;
+      respPayload.version = SW_VERSION;
+      respPayload.batteryMv = _instrumentation.getBatteryVoltage();
+      respPayload.panelMv = _instrumentation.getPanelVoltage();
+      respPayload.uptimeSeconds = (_clock.time() - _startTime) / 1000;
+      respPayload.time = _clock.time();
+      respPayload.bootCount = _instrumentation.getBootCount();
+      respPayload.sleepCount = _instrumentation.getSleepCount();
+      // #### TODO
+      respPayload.rxPacketCount = 0;
+      // #### TODO
+      respPayload.routeErrorCount = 0;
+      respPayload.temp = _instrumentation.getTemperature();
+      respPayload.humidity = _instrumentation.getHumidity();
+      respPayload.deviceClass = _instrumentation.getDeviceClass();
+      respPayload.deviceRevision = _instrumentation.getDeviceRevision();
+      // #### TODO
+      respPayload.wrongNodeRxCount = 0;
+
+      memcpy(resp.payload,(void*)&respPayload,sizeof(SadRespPayload));
+
+      bool good = _opm.allocateIfPossible(resp, sizeof(Header) + sizeof(SadRespPayload), 
+        _clock.time() + SEND_TIMEOUT);
+      if (!good) {
+        logger.printf("ERR: Full, no resp");
+      }
     }
     
     // Pong (for display)
