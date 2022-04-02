@@ -1,12 +1,14 @@
 #include "OutboundPacket.h"
 
+#ifdef ARDUINO
 #include <Arduino.h>
+#endif
 
 extern Stream& logger;
 
 #define RETRY_INTERVAL_SECONDS 2
 
-using namespace std;
+//using namespace std;
 
 OutboundPacket::OutboundPacket()
 : _isAllocated(false) {

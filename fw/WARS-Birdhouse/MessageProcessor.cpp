@@ -3,36 +3,48 @@
 #include "packets.h"
 #include "RoutingTable.h"
 
-// TODO: CLEANUP
-#include "tests/mocks/Arduino.h"
-#include <stdint.h>
+#ifdef ARDUINO
+#include <Arduino.h>
+#endif
+
+extern Stream& logger;
 
 static const char* msg_bad_message = "ERR: Bad message";
 static const char* msg_no_route = "ERR: No route";
 
-/**
- * @brief Main processing for any message received by the node.
- * 
- * @param buf Bytes received 
- * @param len Length (in bytes)
- */
-static void process_rx_msg(int16_t rssi, 
-  const uint8_t* buf, const unsigned int len,
-  CircularBuffer& tx_buffer, Stream& shell,  
-  RoutingTable& routingTable, nodeaddr_t myAddr) {
+MessageProcessor::MessageProcessor(Clock& clock, 
+    CircularBuffer& rxBuffer, CircularBuffer& txBuffer,
+    RoutingTable& routingTable, nodeaddr_t myAddr, const char* myCall) 
+    : _clock(clock),
+      _rxBuffer(rxBuffer),
+      _txBuffer(txBuffer),
+      _routingTable(routingTable),
+      _myAddr(myAddr),
+      _opm(clock, txBuffer) {
+        // TODO: REVIEW THIS CLOSELY
+      strncpy(_myCall, myCall, 8);
+}
 
-  if (len < sizeof(Header)) {
-    shell.println(msg_bad_message);
-    shell.println(len);
+void MessageProcessor::pump() {
+    int16_t rssi = 0;
+    Packet packet;
+    unsigned int packetLen = sizeof(Packet);
+    bool notEmpty = _rxBuffer.popIfNotEmpty((void*)&rssi, (void*)&packet, &packetLen);
+    if (notEmpty) {
+        _process(rssi, packet, packetLen);
+    }
+}
+
+void MessageProcessor::_process(int16_t rssi, const Packet& packet, unsigned int packetLen) { 
+
+  // Error checking on new packet
+  if (packetLen < sizeof(Header)) {
+    logger.println(msg_bad_message);
     return;
   }
 
-  // Pull the header out of the received buffer 
-  Header header;
-  memcpy(&header, buf, sizeof(Header));
-
   shell.print(F("INF: Got type: "));
-  shell.print(header.type, HEX);
+  shell.print(packet.header.type);
   shell.print(", id: ");
   shell.print(header.id);
   shell.print(", from: ");

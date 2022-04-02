@@ -5,6 +5,12 @@
 #include "CircularBuffer.h"
 #include "packets.h"
 
+/**
+ * @brief Used for tracking a packet that needs to the transmitted.  
+ * A copy of the packet is retained inside of the OutboundPacketManager
+ * in case a re-transmit is needed.  This object is als used to manage
+ * retransmissions.
+ */
 class OutboundPacket {
 public:
 
@@ -15,6 +21,12 @@ public:
     void allocate(const Packet& packet, unsigned int packetLen,
         bool ackRequired, uint32_t giveUpTime);
 
+    /**
+     * @brief Causes a transmit or re-transmit it the time is right.
+     * 
+     * @param clock 
+     * @param tx_buffer 
+     */
     void transmitIfReady(const Clock& clock, CircularBuffer& tx_buffer);
 
     /**
