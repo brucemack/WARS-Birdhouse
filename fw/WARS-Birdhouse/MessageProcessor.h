@@ -5,6 +5,7 @@
 #include "CircularBuffer.h"
 #include "Clock.h"
 #include "Instrumentation.h"
+#include "RoutingTable.h"
 
 class MessageProcessor {
 public:

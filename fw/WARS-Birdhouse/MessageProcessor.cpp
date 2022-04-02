@@ -128,7 +128,7 @@ void MessageProcessor::_process(int16_t rssi,
       bool good = _opm.allocateIfPossible(resp, sizeof(Header), 
         _clock.time() + SEND_TIMEOUT);
       if (!good) {
-        logger.printf("ERR: Full, no resp");
+        logger.println("ERR: Full, no resp");
       }
     }
 
@@ -164,7 +164,7 @@ void MessageProcessor::_process(int16_t rssi,
       bool good = _opm.allocateIfPossible(resp, sizeof(Header) + sizeof(SadRespPayload), 
         _clock.time() + SEND_TIMEOUT);
       if (!good) {
-        logger.printf("ERR: Full, no resp");
+        logger.println("ERR: Full, no resp");
       }
     }
     
@@ -180,7 +180,7 @@ void MessageProcessor::_process(int16_t rssi,
       memcpy((void*)&respPayload,packet.payload, sizeof(SadRespPayload));
 
       // Display
-      logger.print("{ \"version\": ");
+      logger.print("GETSED_RESP: { \"version\": ");
       logger.print(respPayload.version);
       logger.print(", \"batteryMv\": ");
       logger.print(respPayload.batteryMv);
@@ -224,98 +224,81 @@ void MessageProcessor::_process(int16_t rssi,
         logger.println(msg_bad_message);
         return;
       }
-
+      // Unpack the request
       SetRouteReqPayload payload;
       memcpy((void*)&payload, packet.payload, sizeof(SetRouteReqPayload));
-      
 
+      _routingTable.setRoute(payload.targetAddr, payload.nextHopAddr);
 
-    else if (header.type == MessageType::TYPE_SETROUTE) {
-      if (len < sizeof(SetRouteMessage)) {
-        shell.println(msg_bad_message);
-        return;
-      }
-      // Unpack request
-      SetRouteMessage msg;
-      memcpy(&msg, buf, sizeof(SetRouteMessage));
-      // Modify the routing table
-      Routes[msg.targetAddr] = msg.nextHopAddr;
-      // Save the updated table in the NVRAM
-      preferences.putBytes("routes", Routes, 256);
-      // Log the activity
-      shell.print(F("INF: Set route "));
-      shell.print(msg.targetAddr);
-      shell.print("->");
-      shell.println(msg.nextHopAddr);
+      logger.print("INF: Set route ");
+      logger.print(payload.targetAddr);
+      logger.print("->");
+      logger.print(payload.nextHopAddr);
+      logger.println();
     }
 
     // Get route
-    else if (header.type == MessageType::TYPE_GETROUTE) {
-      if (len < sizeof(GetRouteMessage)) {
-        shell.println(msg_bad_message);
+    else if (packet.header.getType() == TYPE_GETROUTE_REQ) {
+
+      if (packetLen < sizeof(Header) + sizeof(GetRouteReqPayload)) {
+        logger.println(msg_bad_message);
         return;
       }
-      // Unpack request
-      GetRouteMessage msg;
-      memcpy(&msg, buf, sizeof(GetRouteMessage));
-      // Make a response
-      GetRouteRespMessage resp;
-      resp.header.destAddr = header.sourceAddr;
-      resp.header.sourceAddr = MY_ADDR;
-      resp.header.hops = header.hops + 1;        
-      resp.header.id = header.id;
-      resp.header.type = MessageType::TYPE_GETROUTERESP;
-      resp.header.finalDestAddr = header.originalSourceAddr;
-      resp.header.originalSourceAddr = MY_ADDR;
-      resp.targetAddr = msg.targetAddr;
-      // Here we are looking into the routing table
-      resp.nextHopAddr = Routes[msg.targetAddr]; 
-      tx_buffer.push((const uint8_t*)&resp, sizeof(GetRouteRespMessage));
+      
+      // Unpack the request
+      GetRouteReqPayload payload;
+      memcpy((void*)&payload, packet.payload, sizeof(GetRouteReqPayload));
+
+      // Look up the route
+      nodeaddr_t nextHop = _routingTable.nextHop(payload.targetAddr);
+
+      // Build a response
+      Packet resp;
+      resp.header.setupResponseFor(packet.header, _myCall, _myAddr, 
+        TYPE_GETROUTE_RESP, _getUniqueId(), firstHop);
+
+      // Populate the response payload    
+      GetRouteRespPayload respPayload;
+      respPayload.targetAddr = payload.targetAddr;
+      respPayload.nextHopAddr = nextHop;
+      // #### TODO
+      respPayload.txPacketCount = 0;
+      // #### TODO
+      respPayload.rxPacketCount = 0;
+
+      memcpy(resp.payload,(void*)&respPayload, sizeof(respPayload));
+
+      bool good = _opm.allocateIfPossible(resp, sizeof(Header) + sizeof(respPayload), 
+        _clock.time() + SEND_TIMEOUT);
+      if (!good) {
+        logger.println("ERR: Full, no resp");
+      }
     }
 
     // Get route response (display)
-    else if (header.type == MessageType::TYPE_GETROUTERESP) {
-      if (len < sizeof(GetRouteRespMessage)) {
-        shell.println(msg_bad_message);
+    else if (packet.header.getType() == TYPE_GETROUTE_RESP) {
+
+      if (packetLen < sizeof(Header) + sizeof(GetRouteRespPayload)) {
+        logger.println(msg_bad_message);
         return;
       }
-      // Unpack request
-      GetRouteRespMessage msg;
-      memcpy(&msg, buf, sizeof(GetRouteRespMessage));
+      
+      // Unpack the request
+      GetRouteRespPayload payload;
+      memcpy((void*)&payload, packet.payload, sizeof(GetRouteRespPayload));
+
       // Log the activity
-      shell.print(F("GETROUTERESP: { "));
-      shell.print(F("\"origSourceAddr\":")); 
-      shell.print(msg.header.originalSourceAddr);
-      shell.print(F(", \"targetAddr\":"));
-      shell.print(msg.targetAddr);
-      shell.print(F(", \"nextHopAddr\":")); 
-      shell.print(msg.nextHopAddr);
-      shell.println(" }");
+      logger.print(F("GETROUTE_RESP: { "));
+      logger.print(F("\"origSourceAddr\":")); 
+      logger.print(packet.header.getOriginalSourceAddr());
+      logger.print(F(", \"targetAddr\":"));
+      logger.print(payload.targetAddr);
+      logger.print(F(", \"nextHopAddr\":")); 
+      logger.print(payload.nextHopAddr);
+      logger.println(" }");
     }
     else {
-      shell.println(F("ERR: Unknown message"));
+      logger.println(F("ERR: Unknown message"));
     }
   }
-}
-
-/**
- * @brief Look to see if any data is available on the RX queue.
- */
-static void check_for_rx_msg(CircularBuffer& rx_buffer, CircularBuffer& tx_buffer,
-  Stream& shell, RoutingTable& routingTable, nodeaddr_t myAddr) {
-  int16_t rssi = 0;
-  unsigned int msg_len = 256;
-  uint8_t msg[msg_len];
-  bool notEmpty = rx_buffer.popIfNotEmpty((uint8_t*)&rssi, msg, &msg_len);
-  if (notEmpty) {
-    process_rx_msg(rssi, msg, msg_len, tx_buffer, shell, 
-      routingTable, myAddr);
-  }
-}
-
-void process(CircularBuffer& rx_buffer, CircularBuffer& tx_buffer, 
-  Stream& shell, RoutingTable& routingTable,
-  nodeaddr_t myAddr) {
-  check_for_rx_msg(rx_buffer, tx_buffer, shell, routingTable,
-    myAddr);
 }
