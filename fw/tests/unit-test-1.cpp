@@ -48,12 +48,13 @@ void test_OutboundPacket() {
     OutboundPacketManager opm(clock, txBuffer);
     assert(opm.getFreeCount() == 8);
 
-    clock.setTime(100);
+    clock.setTime(10 * 1000);
 
-    // Make a packet send send
+    // Make a packet to send
     Packet packet0;
+    packet0.header.setId(1);
     packet0.header.setSourceAddr(1);
-    packet0.header.setDestAddr(7);
+    packet0.header.setDestAddr(3);
     packet0.header.setOriginalSourceAddr(1);
     packet0.header.setFinalDestAddr(7);
     packet0.header.setSourceCall("KC1FSZ");
@@ -63,15 +64,148 @@ void test_OutboundPacket() {
     unsigned int packet0Len = sizeof(Header) + 1;
 
     // Queue something 
-    assert(opm.allocateIfPossible(packet0, packet0Len, true, 200));
+    assert(opm.allocateIfPossible(packet0, packet0Len, true, 12 * 1000));
     assert(opm.getFreeCount() == 7);
 
     // Move things
     opm.pump();
 
+    // See that the transmission went onto the queue
+    assert(!txBuffer.isEmpty());
+    txBuffer.popAndDiscard();
+    assert(txBuffer.isEmpty());
+
     // Validate that we still are holding a slot (not ACKed)
     assert(opm.getFreeCount() == 7);
-}   
+
+    // Create an ACK that we can use 
+    Packet ackPacket0;
+    ackPacket0.header.createAckFor(packet0.header, "W1TKZ", 3);
+    assert(ackPacket0.header.getId() == 1);
+    assert(ackPacket0.header.getSourceAddr() == 3);
+    assert(ackPacket0.header.getDestAddr() == 1);
+    char call[9];
+    ackPacket0.header.getSourceCall(call);
+    // Make sure the ACK packet uses his own call
+    assert(strcmp(call, "W1TKZ") == 0);
+
+    // Show the ACK to the OPM
+    opm.processAck(ackPacket0);
+
+    // Move things
+    opm.pump();
+
+    // Validate that the slot is freed now
+    assert(opm.getFreeCount() == 8);
+
+    // ==============================================================
+    // Validate Re-Transmit And Timeout
+
+    clock.setTime(20 * 1000);
+
+    // Make a packet to send
+    Packet packet1;
+    packet1.header.setId(2);
+    packet1.header.setSourceAddr(1);
+    packet1.header.setDestAddr(3);
+    packet1.header.setOriginalSourceAddr(1);
+    packet1.header.setFinalDestAddr(7);
+    packet1.header.setSourceCall("KC1FSZ");
+    packet1.header.setOriginalSourceCall("KC1FSZ");
+    packet1.header.setFinalDestCall("WA3ITR");
+    packet1.payload[0] = 'A';
+    unsigned int packet1Len = sizeof(Header) + 1;
+
+    // Nothing in the TX queue
+    assert(txBuffer.isEmpty());
+
+    // Queue something for delivery 
+    assert(opm.allocateIfPossible(packet1, packet1Len, true, 30 * 1000));
+    assert(opm.getFreeCount() == 7);
+
+    // Move things
+    opm.pump();
+
+    // See the message on the queue, and pop it (should have been the only one)
+    assert(!txBuffer.isEmpty());
+    txBuffer.popAndDiscard();
+    assert(txBuffer.isEmpty());
+
+    // Validate that we still are holding a slot (not ACKed yet)
+    assert(opm.getFreeCount() == 7);
+
+    // Move time forward (three seconds) so that we can see the 
+    // re-transmit.
+    clock.setTime(23 * 1000);
+
+    // Move things
+    opm.pump();
+
+    // Pull the message off the TX queue and have a look
+    assert(!txBuffer.isEmpty());
+    Packet packet2;
+    unsigned int packet2Len = sizeof(Packet);
+    txBuffer.pop(0, &packet2, &packet2Len);
+    assert(packet2Len == sizeof(Header) + 1);
+    assert(packet2.payload[0] == 'A');
+    assert(packet2.header.getDestAddr() == 3);
+
+    // Move time forward so that we can see the timeout
+    clock.setTime(31 * 1000);
+
+    // Move things
+    opm.pump();
+
+    // Validate that we still are holding a slot (not ACKed yet)
+    assert(opm.getFreeCount() == 8);
+
+    // ========================================================
+    // Queue Two Messages That Don't Need ACK
+
+    clock.setTime(40 * 1000);
+    
+    Packet packet3;
+    packet3.header.setId(3);
+    packet3.header.setSourceAddr(1);
+    packet3.header.setDestAddr(3);
+    packet3.header.setOriginalSourceAddr(1);
+    packet3.header.setFinalDestAddr(7);
+    packet3.header.setSourceCall("KC1FSZ");
+    packet3.header.setOriginalSourceCall("KC1FSZ");
+    packet3.header.setFinalDestCall("WA3ITR");
+    packet3.payload[0] = '3';
+    unsigned int packet3Len = sizeof(Header) + 1;
+    // Queue something for delivery 
+    assert(opm.allocateIfPossible(packet3, packet3Len, false, clock.time() + 10000));
+
+    Packet packet4;
+    packet4.header.setId(4);
+    packet4.header.setSourceAddr(1);
+    packet4.header.setDestAddr(3);
+    packet4.header.setOriginalSourceAddr(1);
+    packet4.header.setFinalDestAddr(7);
+    packet4.header.setSourceCall("KC1FSZ");
+    packet4.header.setOriginalSourceCall("KC1FSZ");
+    packet4.header.setFinalDestCall("WA3ITR");
+    packet4.payload[0] = '4';
+    unsigned int packet4Len = sizeof(Header) + 1;
+    // Queue something for delivery 
+    assert(opm.allocateIfPossible(packet4, packet4Len, false, clock.time() + 10000));
+
+    assert(txBuffer.isEmpty());
+
+    // Move things
+    opm.pump();
+
+    // Validate that all slots are free (no ACKs needed)
+    assert(opm.getFreeCount() == 8);
+
+    // See that both messages went onto queue
+    assert(!txBuffer.isEmpty());
+    txBuffer.popAndDiscard();
+    txBuffer.popAndDiscard();
+    assert(txBuffer.isEmpty());
+}
 
 void test_buffer() {
 

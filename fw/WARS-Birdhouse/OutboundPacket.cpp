@@ -28,10 +28,6 @@ void OutboundPacket::allocate(const Packet& packet, unsigned int packetLen,
 void OutboundPacket::transmitIfReady(const Clock& clock, CircularBuffer& txBuffer) {
     if (!_isAllocated) 
         return;
-    // Check to see if this packet is still pending
-    if (clock.time() - _lastTransmitTime < RETRY_INTERVAL_SECONDS * 1000) {
-        return;
-    }
     // Check for timeouts.  If we hit a timeout then reset the packet
     if (clock.time()  > _giveUpTime) {
         logger.print("WRN: TX timeout ");
@@ -40,6 +36,10 @@ void OutboundPacket::transmitIfReady(const Clock& clock, CircularBuffer& txBuffe
         _reset();
         return;
     } 
+    // Check to see if this packet is still pending
+    if ((clock.time() - _lastTransmitTime) < RETRY_INTERVAL_SECONDS * 1000) {
+        return;
+    }
     // If we make it here than we are ready to transmit
     bool good = txBuffer.push(0, &_packet, _packetLen);
     if (good) {

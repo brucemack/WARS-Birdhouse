@@ -102,8 +102,24 @@ struct Header {
         return !(type == 1 || type == 2) && (destAddr != BROADCAST_ADDR);
     }
 
+    uint16_t getId() const {
+        return id;
+    }
+
+    void setId(uint16_t i) {
+        id = i;
+    }
+
+    nodeaddr_t getSourceAddr() const {
+        return sourceAddr;
+    }
+
     void setSourceAddr(nodeaddr_t addr) {
         sourceAddr = addr;
+    }
+
+    nodeaddr_t getDestAddr() const {
+        return destAddr;
     }
 
     void setDestAddr(nodeaddr_t addr) {
