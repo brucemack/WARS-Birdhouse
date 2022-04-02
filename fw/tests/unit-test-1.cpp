@@ -1,6 +1,9 @@
+#include <Arduino.h>
+
 #include "../WARS-Birdhouse/CircularBuffer.h"
 #include "../WARS-Birdhouse/packets.h"
-#include "../WARS-Birdhouse/OutboundPacket.h"
+#include "../WARS-Birdhouse/OutboundPacketManager.h"
+#include "../WARS-Birdhouse/Clock.h"
 
 #include <iostream>
 #include <assert.h>
@@ -8,11 +11,67 @@
 
 using namespace std;
 
+// Dummy stream for unit test
+class TestStream : public Stream {
+public:
+
+    void print(const char* m) { cout << m; }
+    void print(uint16_t m) { cout << m; }
+    void println() { cout << endl; }
+};
+
+static TestStream testStream;
+Stream& logger = testStream;
+
+// Dummy clock for unit test.
+
+class TestClock : public Clock {
+public:
+
+    uint32_t time() const {
+        return _time;
+    };
+
+    void setTime(uint32_t t) {
+        _time = t;
+    }
+
+private:
+
+    uint32_t _time;
+};
+
 void test_OutboundPacket() {
-    OutboundPacket op;
-    assert(sizeof(Header) == 36);
-    assert(sizeof(op.packet) == 128);
-}
+    
+    TestClock clock;
+    CircularBufferImpl<4096> txBuffer(0);
+    OutboundPacketManager opm(clock, txBuffer);
+    assert(opm.getFreeCount() == 8);
+
+    clock.setTime(100);
+
+    // Make a packet send send
+    Packet packet0;
+    packet0.header.setSourceAddr(1);
+    packet0.header.setDestAddr(7);
+    packet0.header.setOriginalSourceAddr(1);
+    packet0.header.setFinalDestAddr(7);
+    packet0.header.setSourceCall("KC1FSZ");
+    packet0.header.setOriginalSourceCall("KC1FSZ");
+    packet0.header.setFinalDestCall("WA3ITR");
+    packet0.payload[0] = 'A';
+    unsigned int packet0Len = sizeof(Header) + 1;
+
+    // Queue something 
+    assert(opm.allocateIfPossible(packet0, packet0Len, true, 200));
+    assert(opm.getFreeCount() == 7);
+
+    // Move things
+    opm.pump();
+
+    // Validate that we still are holding a slot (not ACKed)
+    assert(opm.getFreeCount() == 7);
+}   
 
 void test_buffer() {
 

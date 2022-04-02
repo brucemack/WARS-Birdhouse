@@ -168,6 +168,13 @@ struct Header {
     }
 };
 
+static const unsigned int MAX_PAYLOAD_SIZE = 128 - sizeof(Header);
+
+struct Packet {
+    Header header;
+    uint8_t payload[MAX_PAYLOAD_SIZE];
+};
+
 struct SadRespPacket {
   Header header;  
   uint16_t version;

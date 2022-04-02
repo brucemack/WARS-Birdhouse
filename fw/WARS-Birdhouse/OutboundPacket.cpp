@@ -1,46 +1,78 @@
 #include "OutboundPacket.h"
 
-#include <assert.h>
-#include <iostream>
+#include <Arduino.h>
+
+extern Stream& logger;
 
 #define RETRY_INTERVAL_SECONDS 2
 
 using namespace std;
 
 OutboundPacket::OutboundPacket()
-: _isUsed(false) {
+: _isAllocated(false) {
 }
 
-void OutboundPacket::transmitIfReady(CircularBuffer& tx_buffer, int32_t time) {
-    if (_isUsed) {
-        // Check for timeouts.  If we hit a timeout then reset the packet
-        if (time > _timeoutTime) {
-            cout << "TIMEOUT " << packet.header.id << endl;
+bool OutboundPacket::isAllocated() const {
+    return _isAllocated;
+}
+
+void OutboundPacket::allocate(const Packet& packet, unsigned int packetLen,
+    bool ackRequired, uint32_t giveUpTime) {
+    _isAllocated = true;
+    ::memcpy((void*)&_packet, (const void*)&packet, packetLen);
+    _packetLen = packetLen;
+    _isAckRequired = ackRequired;
+    _giveUpTime = giveUpTime;
+}
+
+void OutboundPacket::transmitIfReady(const Clock& clock, CircularBuffer& txBuffer) {
+    if (!_isAllocated) 
+        return;
+    // Check to see if this packet is still pending
+    if (clock.time() - _lastTransmitTime < RETRY_INTERVAL_SECONDS * 1000) {
+        return;
+    }
+    // Check for timeouts.  If we hit a timeout then reset the packet
+    if (clock.time()  > _giveUpTime) {
+        logger.print("WRN: TX timeout ");
+        logger.print(_packet.header.id);
+        logger.println();
+        _reset();
+        return;
+    } 
+    // If we make it here than we are ready to transmit
+    bool good = txBuffer.push(0, &_packet, _packetLen);
+    if (good) {
+        logger.print("INF: Queued ");
+        logger.print(_packet.header.id);
+        logger.println();
+        if (_isAckRequired) {
+            // If an acknowledgement is required then record the 
+            // necessary information to manage the retries.
+            _lastTransmitTime = clock.time();
+        } else {
+            // If no acknowledgement is required then we are done.
             _reset();
-        } 
-        // If there is no timeout:
-        else {
-            // Check to see if it is time to send/resend the packet
-            if ((time - _lastTransmitTime) > RETRY_INTERVAL_SECONDS * 1000) {
-                cout << "SENDING " << packet.header.id << endl;
-                bool good = tx_buffer.push(0, &packet, totalLen);
-                if (good) {
-                    if (_isAckRequired) {
-                        // If an acknowledgement is required then record the 
-                        // necessary information to manage the retries.
-                        _lastTransmitTime = time;
-                    } 
-                    else {
-                        _reset();
-                    }    
-                }
-            }
-        }
+        }    
+    } else {
+        logger.println("WRN: TX queue full");
+    }
+}
+
+void OutboundPacket::processAckIfRelevant(const Packet& ackPacket) {
+    // Check it see if this is an ACK that we were waiting for 
+    if (_isAllocated &&
+        ackPacket.header.sourceAddr == _packet.header.destAddr &&
+        ackPacket.header.id == _packet.header.id) {
+        logger.print("INF: ACK on ");
+        logger.print(_packet.header.id);
+        logger.println();
+        _reset();
     }
 }
 
 void OutboundPacket::_reset() {
-    _isUsed = false;
+    _isAllocated = false;
     _lastTransmitTime = 0;
-    totalLen = 0;
+    _packetLen = 0;
 }

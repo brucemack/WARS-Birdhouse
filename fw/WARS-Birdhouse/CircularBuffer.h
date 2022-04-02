@@ -40,7 +40,7 @@ public:
 /** 
  *  A circular queue for byte buffers of arbitrary length. 
  */
-template<unsigned int S> class CircularBufferImpl : CircularBuffer {
+template<unsigned int S> class CircularBufferImpl : public CircularBuffer {
 public:
 
   CircularBufferImpl(unsigned int oobBufLen) 

@@ -1,6 +1,8 @@
 #ifndef _Arduino_h
 #define _Arduino_h
 
+#include <stdint.h>
+
 #define F(x) (x)
 
 #define HEX 1
@@ -8,26 +10,13 @@
 class Stream {
 public:
 
-    void print(const char*) {
-    }
-
-    void print(uint8_t, int) {
-    }
-
-    void print(uint16_t, int) {
-    }
-
-    void print(uint16_t) {
-    }
-
-    void println(const char*) {
-    }
-
-    void println(unsigned int) {
-    }
-
-    void println() {
-    }
+    virtual void print(const char* m) {}
+    virtual void print(uint8_t, int) {}
+    virtual void print(uint16_t, int) {}
+    virtual void print(uint16_t) {};
+    virtual void println(const char*) {};
+    virtual void println(unsigned int) {};
+    virtual void println() {};
 };
 
 #endif
