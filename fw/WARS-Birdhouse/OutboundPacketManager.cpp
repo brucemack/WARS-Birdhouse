@@ -6,11 +6,11 @@ OutboundPacketManager::OutboundPacketManager(const Clock& clock, CircularBuffer&
 }
 
 bool OutboundPacketManager::allocateIfPossible(const Packet& packet, unsigned int packetLen,
-    bool ackRequired, uint32_t giveUpTime) {
+    uint32_t giveUpTime) {
     // Look for an unallocated packet a grab it - first come, first served.
     for (unsigned int i = 0; i < _packetCount; i++) {
         if (!_packets[i].isAllocated()) {
-            _packets[i].allocate(packet, packetLen, ackRequired, giveUpTime);
+            _packets[i].allocate(packet, packetLen, giveUpTime);
             return true;
         }
     }

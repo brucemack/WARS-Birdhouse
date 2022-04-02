@@ -19,11 +19,10 @@ bool OutboundPacket::isAllocated() const {
 }
 
 void OutboundPacket::allocate(const Packet& packet, unsigned int packetLen,
-    bool ackRequired, uint32_t giveUpTime) {
+    uint32_t giveUpTime) {
     _isAllocated = true;
     ::memcpy((void*)&_packet, (const void*)&packet, packetLen);
     _packetLen = packetLen;
-    _isAckRequired = ackRequired;
     _giveUpTime = giveUpTime;
 }
 
@@ -48,7 +47,7 @@ void OutboundPacket::transmitIfReady(const Clock& clock, CircularBuffer& txBuffe
         logger.print("INF: Queued ");
         logger.print(_packet.header.id);
         logger.println();
-        if (_isAckRequired) {
+        if (_packet.header.isAckRequired()) {
             // If an acknowledgement is required then record the 
             // necessary information to manage the retries.
             _lastTransmitTime = clock.time();

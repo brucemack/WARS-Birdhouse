@@ -98,8 +98,16 @@ struct Header {
         uint8_t packetType) {
     }
 
-    bool isAckRequired() {
+    bool isAckRequired() const {
         return !(type == 1 || type == 2) && (destAddr != BROADCAST_ADDR);
+    }
+
+    uint8_t getType() const {
+        return type;
+    }
+
+    void setType(uint8_t t) {
+        type = t;
     }
 
     uint16_t getId() const {
@@ -128,6 +136,10 @@ struct Header {
 
     void setOriginalSourceAddr(nodeaddr_t addr) {
         originalSourceAddr = addr;
+    }
+
+    nodeaddr_t getFinalDestAddr() const {
+        return finalDestAddr;
     }
 
     void setFinalDestAddr(nodeaddr_t addr) {

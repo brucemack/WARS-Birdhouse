@@ -2,6 +2,7 @@
 #include "CircularBuffer.h"
 #include "packets.h"
 #include "RoutingTable.h"
+#include "Clock.h"
 
 #ifdef ARDUINO
 #include <Arduino.h>
@@ -11,6 +12,7 @@ extern Stream& logger;
 
 static const char* msg_bad_message = "ERR: Bad message";
 static const char* msg_no_route = "ERR: No route";
+static const int32_t SEND_TIMEOUT = 10 * 1000;
 
 MessageProcessor::MessageProcessor(Clock& clock, 
     CircularBuffer& rxBuffer, CircularBuffer& txBuffer,
@@ -35,7 +37,8 @@ void MessageProcessor::pump() {
     }
 }
 
-void MessageProcessor::_process(int16_t rssi, const Packet& packet, unsigned int packetLen) { 
+void MessageProcessor::_process(int16_t rssi, 
+  const Packet& packet, unsigned int packetLen) { 
 
   // Error checking on new packet
   if (packetLen < sizeof(Header)) {
@@ -43,37 +46,39 @@ void MessageProcessor::_process(int16_t rssi, const Packet& packet, unsigned int
     return;
   }
 
-  shell.print(F("INF: Got type: "));
-  shell.print(packet.header.type);
-  shell.print(", id: ");
-  shell.print(header.id);
-  shell.print(", from: ");
-  shell.print(header.sourceAddr);
-  shell.print(", originalSource: ");
-  shell.print(header.originalSourceAddr);
-  shell.print(", finalDest: ");
-  shell.print(header.finalDestAddr);
-  shell.print(", RSSI: ");
-  shell.print(rssi);
-  shell.println();
+  logger.print(F("INF: Got type: "));
+  logger.print(packet.header.type);
+  logger.print(", id: ");
+  logger.print(packet.header.id);
+  logger.print(", from: ");
+  logger.print(packet.header.sourceAddr);
+  logger.print(", originalSource: ");
+  logger.print(packet.header.originalSourceAddr);
+  logger.print(", finalDest: ");
+  logger.print(packet.header.finalDestAddr);
+  logger.print(", RSSI: ");
+  logger.print(rssi);
+  logger.println();
 
   // Look for messages that need to be forwarded on to another node
-  if (header.finalDestAddr != myAddr) {
-    nodeaddr_t nextHop = routingTable.nextHop(header.finalDestAddr);
+  if (packet.header.getFinalDestAddr() != _myAddr) {
+    nodeaddr_t nextHop = _routingTable.nextHop(
+      packet.header.getFinalDestAddr());
     if (nextHop != RoutingTable::NO_ROUTE) {
-      // Copy the original message into a clean buffer 
-      uint8_t tx_buf[256];
-      memcpy(tx_buf, buf, len);
+      // Make a clean packet so that we can adjust it
+      Packet outPacket(packet);
       // Tweak the header and overlay 
-      header.destAddr = nextHop;
-      header.sourceAddr = myAddr;
-      memcpy(tx_buf, &header, sizeof(Header));
-      // Send the entire message
-      tx_buffer.push(0, tx_buf, len);
+      outPacket.header.setDestAddr(nextHop);
+      outPacket.header.setSourceAddr(_myAddr);
+      // Arrange for sending.
+      // NOTE: WE USE THE SAME LENGTH THAT WE GOT ON THE RX
+      _opm.allocateIfPossible(outPacket, packetLen, 
+        outPacket.header.isAckRequired(), 
+        _clock.time() + SEND_TIMEOUT);
     }
     else {
       // TODO: COUNTERS
-      shell.println(msg_no_route);
+      logger.println(msg_no_route);
     }
   }
 

@@ -19,7 +19,7 @@ public:
     bool isAllocated() const;
 
     void allocate(const Packet& packet, unsigned int packetLen,
-        bool ackRequired, uint32_t giveUpTime);
+        uint32_t giveUpTime);
 
     /**
      * @brief Causes a transmit or re-transmit it the time is right.
@@ -45,7 +45,6 @@ private:
     // Inclusive of header
     unsigned int _packetLen;
     bool _isAllocated;
-    bool _isAckRequired;
     // When we give up
     uint32_t _giveUpTime;
     // The last time a transmission was attempted

@@ -52,6 +52,7 @@ void test_OutboundPacket() {
 
     // Make a packet to send
     Packet packet0;
+    packet0.header.setType(TYPE_PING_REQ);
     packet0.header.setId(1);
     packet0.header.setSourceAddr(1);
     packet0.header.setDestAddr(3);
@@ -64,7 +65,7 @@ void test_OutboundPacket() {
     unsigned int packet0Len = sizeof(Header) + 1;
 
     // Queue something 
-    assert(opm.allocateIfPossible(packet0, packet0Len, true, 12 * 1000));
+    assert(opm.allocateIfPossible(packet0, packet0Len, 12 * 1000));
     assert(opm.getFreeCount() == 7);
 
     // Move things
@@ -88,6 +89,8 @@ void test_OutboundPacket() {
     ackPacket0.header.getSourceCall(call);
     // Make sure the ACK packet uses his own call
     assert(strcmp(call, "W1TKZ") == 0);
+    // Check type
+    assert(ackPacket0.header.getType() == TYPE_ACK);
 
     // Show the ACK to the OPM
     opm.processAck(ackPacket0);
@@ -105,6 +108,7 @@ void test_OutboundPacket() {
 
     // Make a packet to send
     Packet packet1;
+    packet1.header.setType(TYPE_PING_REQ);
     packet1.header.setId(2);
     packet1.header.setSourceAddr(1);
     packet1.header.setDestAddr(3);
@@ -120,7 +124,7 @@ void test_OutboundPacket() {
     assert(txBuffer.isEmpty());
 
     // Queue something for delivery 
-    assert(opm.allocateIfPossible(packet1, packet1Len, true, 30 * 1000));
+    assert(opm.allocateIfPossible(packet1, packet1Len, 30 * 1000));
     assert(opm.getFreeCount() == 7);
 
     // Move things
@@ -165,6 +169,7 @@ void test_OutboundPacket() {
     clock.setTime(40 * 1000);
     
     Packet packet3;
+    packet3.header.setType(TYPE_ACK);
     packet3.header.setId(3);
     packet3.header.setSourceAddr(1);
     packet3.header.setDestAddr(3);
@@ -176,9 +181,10 @@ void test_OutboundPacket() {
     packet3.payload[0] = '3';
     unsigned int packet3Len = sizeof(Header) + 1;
     // Queue something for delivery 
-    assert(opm.allocateIfPossible(packet3, packet3Len, false, clock.time() + 10000));
+    assert(opm.allocateIfPossible(packet3, packet3Len, clock.time() + 10000));
 
     Packet packet4;
+    packet4.header.setType(TYPE_ACK);
     packet4.header.setId(4);
     packet4.header.setSourceAddr(1);
     packet4.header.setDestAddr(3);
@@ -190,7 +196,7 @@ void test_OutboundPacket() {
     packet4.payload[0] = '4';
     unsigned int packet4Len = sizeof(Header) + 1;
     // Queue something for delivery 
-    assert(opm.allocateIfPossible(packet4, packet4Len, false, clock.time() + 10000));
+    assert(opm.allocateIfPossible(packet4, packet4Len, clock.time() + 10000));
 
     assert(txBuffer.isEmpty());
 

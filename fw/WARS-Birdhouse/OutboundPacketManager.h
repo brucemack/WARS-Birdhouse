@@ -12,7 +12,7 @@ public:
         OutboundPacketManager(const Clock& clock, CircularBuffer& txBuffer);
 
         bool allocateIfPossible(const Packet& packet, unsigned int packetLen,
-                bool ackRequired, uint32_t giveUpTime);
+                uint32_t giveUpTime);
 
         void processAck(const Packet& ackPacket);
 
