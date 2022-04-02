@@ -6,6 +6,7 @@
 #include "../WARS-Birdhouse/Clock.h"
 #include "../WARS-Birdhouse/Instrumentation.h"
 #include "../WARS-Birdhouse/RoutingTable.h"
+#include "../WARS-Birdhouse/MessageProcessor.h"
 
 #include <iostream>
 #include <assert.h>
@@ -76,6 +77,44 @@ public:
         cout << "setRoute " << target << "->" << nextHop << endl;
     }
 };
+
+void transfer() {
+}
+
+void test_MessageProcessor() {
+
+    // Node #1
+    TestClock clock1;
+    TestInstrumentation instrumentation1;
+    TestRoutingTable1 routingTable1;
+    CircularBufferImpl<4096> txBuffer1(0);
+    CircularBufferImpl<4096> rxBuffer1(2);
+    MessageProcessor mp1(clock1, rxBuffer1, txBuffer1,
+        routingTable1, instrumentation1, 1, "KC1FSZ");
+
+    // Send in ping message
+    {
+        // Make a packet to send
+        Packet packet1;
+        packet1.header.setType(TYPE_PING_REQ);
+        packet1.header.setId(2);
+        packet1.header.setSourceAddr(3);
+        packet1.header.setDestAddr(1);
+        packet1.header.setOriginalSourceAddr(7);
+        packet1.header.setFinalDestAddr(1);
+        packet1.header.setSourceCall("W1TKZ");
+        packet1.header.setOriginalSourceCall("WA3ITR");
+        packet1.header.setFinalDestCall("KC1FSZ");
+        unsigned int packet1Len = sizeof(Header);
+        int16_t rssi = 100;
+        rxBuffer1.push(&rssi, (const char*)&packet1, packet1Len);
+    }
+
+    // Make things happen
+    assert(txBuffer1.isEmpty());
+    mp1.pump();
+    assert(!txBuffer1.isEmpty());
+}
 
 void test_OutboundPacket() {
     
@@ -417,5 +456,6 @@ int main(int argc, const char** argv) {
     test_buffer();
     test_header();
     test_OutboundPacket();
+    test_MessageProcessor();
 }
 

@@ -43,6 +43,7 @@ void MessageProcessor::pump() {
     if (notEmpty) {
         _process(rssi, packet, packetLen);
     }
+    _opm.pump();
 }
 
 unsigned int MessageProcessor::_getUniqueId() {
