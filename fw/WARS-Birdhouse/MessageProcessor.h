@@ -17,6 +17,8 @@ private:
 
     void _process(int16_t rssi, const Packet& packet, unsigned int packetLen);
 
+    unsigned int _getUniqueId();
+
     const Clock& _clock;
     CircularBuffer& _rxBuffer;
     CircularBuffer& _txBuffer;
@@ -25,6 +27,7 @@ private:
     char _myCall[9];
     
     OutboundPacketManager _opm;
+    unsigned int _idCounter;
 };
 
 #endif

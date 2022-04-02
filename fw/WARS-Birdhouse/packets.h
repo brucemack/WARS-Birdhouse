@@ -19,8 +19,8 @@ enum MessageType {
     // Response is acknowledged as well
     TYPE_PING_RESP     = 4,
     // Station engineering data
-    TYPE_SAD_REQ       = 5,
-    TYPE_SAD_RESP      = 6,
+    TYPE_GETSED_REQ    = 5,
+    TYPE_GETSED_RESP   = 6,
     TYPE_SETROUTE      = 10,
     TYPE_GETROUTE_REQ  = 11,
     TYPE_GETROUTE_RESP = 12,
@@ -69,18 +69,21 @@ struct Header {
      * @param myCall 
      * @param myAddr 
      */
-    void createAckFor(const Header& rx_packet, 
+    void setupAckFor(const Header& rx_packet, 
         const char* myCall, uint16_t myAddr) {
         version = PACKET_VERSION;
         type = TYPE_ACK;
         id = rx_packet.id;
+        // Address stuff
+        sourceAddr = myAddr;
+        destAddr = rx_packet.sourceAddr;
+        // Echo back the original stuff
+        originalSourceAddr = rx_packet.originalSourceAddr;
+        finalDestAddr = rx_packet.finalDestAddr;
         loadCall(sourceCall, myCall);
+        // Echo back the original stuff
         memcpy(finalDestCall, rx_packet.finalDestCall, 8);
         memcpy(originalSourceCall, rx_packet.originalSourceCall, 8);
-        destAddr = rx_packet.sourceAddr;
-        sourceAddr = myAddr;
-        finalDestAddr = rx_packet.finalDestAddr;
-        originalSourceAddr = rx_packet.originalSourceAddr;
     }
 
     /**
@@ -93,13 +96,34 @@ struct Header {
      * @param myAddr 
      * @param packetType 
      */
-    void createResponseFor(const Header& req_header,
+    void setupResponseFor(const Header& reqHeader,
         const char* myCall, nodeaddr_t myAddr,
-        uint8_t packetType) {
+        uint8_t respType, uint16_t respId, nodeaddr_t respDestAddr) {
+        
+        version = PACKET_VERSION;
+        type = respType;
+        id = respId;
+        // Address stuff
+        sourceAddr = myAddr;
+        destAddr = respDestAddr;
+        originalSourceAddr = myAddr;
+        // SWAP 
+        finalDestAddr = reqHeader.originalSourceAddr;
+        // Call stuff
+        loadCall(sourceCall, myCall);
+        loadCall(originalSourceCall, myCall);
+        // SWAP
+        memcpy(finalDestCall, reqHeader.originalSourceCall, 8);
     }
 
     bool isAckRequired() const {
-        return !(type == 1 || type == 2) && (destAddr != BROADCAST_ADDR);
+        return !(type == TYPE_ACK || type == TYPE_STATION_ID) && 
+          (destAddr != BROADCAST_ADDR);
+    }
+
+    bool isResponseRequired() const {
+        return (type == TYPE_PING_REQ || type == TYPE_GETSED_REQ ||
+          type == TYPE_GETROUTE_REQ);
     }
 
     uint8_t getType() const {
@@ -132,6 +156,10 @@ struct Header {
 
     void setDestAddr(nodeaddr_t addr) {
         destAddr = addr;
+    }
+
+    nodeaddr_t getOriginalSourceAddr() const {
+        return originalSourceAddr; 
     }
 
     void setOriginalSourceAddr(nodeaddr_t addr) {
@@ -203,8 +231,7 @@ struct Packet {
     uint8_t payload[MAX_PAYLOAD_SIZE];
 };
 
-struct SadRespPacket {
-  Header header;  
+struct SadRespPayload {
   uint16_t version;
   uint16_t batteryMv;
   uint16_t panelMv;
@@ -221,19 +248,16 @@ struct SadRespPacket {
   uint16_t wrongNodeRxCount;
 };
 
-struct SetRoutePacket {
-  Header header;
+struct SetRouteReqPayload {
   nodeaddr_t targetAddr;
   nodeaddr_t nextHopAddr;  
 };
 
-struct GetRoutePacket {
-  Header header;
+struct GetRouteReqPayload {
   nodeaddr_t targetAddr;
 };
 
-struct GetRouteRespPacket {
-  Header header;
+struct GetRouteRespPayload {
   nodeaddr_t targetAddr;
   nodeaddr_t nextHopAddr;  
   uint16_t rxPacketCount;  

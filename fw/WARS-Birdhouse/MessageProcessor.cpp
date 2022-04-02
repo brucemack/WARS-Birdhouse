@@ -22,7 +22,8 @@ MessageProcessor::MessageProcessor(Clock& clock,
       _txBuffer(txBuffer),
       _routingTable(routingTable),
       _myAddr(myAddr),
-      _opm(clock, txBuffer) {
+      _opm(clock, txBuffer),
+      _idCounter(1) {
         // TODO: REVIEW THIS CLOSELY
       strncpy(_myCall, myCall, 8);
 }
@@ -35,6 +36,10 @@ void MessageProcessor::pump() {
     if (notEmpty) {
         _process(rssi, packet, packetLen);
     }
+}
+
+unsigned int MessageProcessor::_getUniqueId() {
+  return _idCounter++;
 }
 
 void MessageProcessor::_process(int16_t rssi, 
@@ -67,13 +72,15 @@ void MessageProcessor::_process(int16_t rssi,
     if (nextHop != RoutingTable::NO_ROUTE) {
       // Make a clean packet so that we can adjust it
       Packet outPacket(packet);
-      // Tweak the header and overlay 
+      // Tweak the header and overlay. 
+      // All messages need a unique ID so that the ACK mechanism
+      // will work properly.
+      outPacket.header.setId(_getUniqueId()); 
       outPacket.header.setDestAddr(nextHop);
       outPacket.header.setSourceAddr(_myAddr);
       // Arrange for sending.
       // NOTE: WE USE THE SAME LENGTH THAT WE GOT ON THE RX
       _opm.allocateIfPossible(outPacket, packetLen, 
-        outPacket.header.isAckRequired(), 
         _clock.time() + SEND_TIMEOUT);
     }
     else {
@@ -86,11 +93,26 @@ void MessageProcessor::_process(int16_t rssi,
   // We process them according to the type.
   else {
 
+    // Get the first hop for the response message
+    const nodeaddr_t firstHop = _routingTable.nextHop(
+      packet.header.getOriginalSourceAddr());
+
     // Ping
-    if (header.type == MessageType::TYPE_PING) {
+    if (packet.header.getType() == TYPE_PING_REQ) {
+
+      if (firstHop == RoutingTable::NO_ROUTE) {
+        logger.print("ERR: No route to ");
+        logger.print(packet.header.getOriginalSourceAddr());
+        logger.println();
+      }
 
       // Create a pong and send back to the originator of the ping
-      PongMessage msg;
+      PingRespPacket resp;
+      resp.header.setupResponseFor(packet.header, _myCall, _myAddr, 
+        TYPE_PING_RESP, _getUniqueId(), firstHop);
+      bool good = _opm.allocateIfPossible(resp, sizeof(Header), 
+        _clock.time() + SEND_TIMEOUT);
+
       // Notice that the first hop is always the node that sent the PING.
       msg.header.destAddr = header.sourceAddr;
       msg.header.sourceAddr = MY_ADDR;

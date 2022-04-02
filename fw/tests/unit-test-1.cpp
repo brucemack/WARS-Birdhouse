@@ -81,7 +81,7 @@ void test_OutboundPacket() {
 
     // Create an ACK that we can use 
     Packet ackPacket0;
-    ackPacket0.header.createAckFor(packet0.header, "W1TKZ", 3);
+    ackPacket0.header.setupAckFor(packet0.header, "W1TKZ", 3);
     assert(ackPacket0.header.getId() == 1);
     assert(ackPacket0.header.getSourceAddr() == 3);
     assert(ackPacket0.header.getDestAddr() == 1);
@@ -362,7 +362,7 @@ void test_header() {
     header.setOriginalSourceCall("YY1YYY");
 
     Header ack_header;
-    ack_header.createAckFor(header, MY_CALL, 1); 
+    ack_header.setupAckFor(header, MY_CALL, 1); 
     // Type
     assert(ack_header.type == 1);
     // Source/dest
