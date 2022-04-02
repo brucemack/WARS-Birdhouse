@@ -82,6 +82,23 @@ struct Header {
         finalDestAddr = rx_packet.finalDestAddr;
         originalSourceAddr = rx_packet.originalSourceAddr;
     }
+
+    /**
+     * @brief Fills in this header with the information needed to 
+     * generate a response to the request header.  Deals with 
+     * updating the callsigns and addresses.
+     * 
+     * @param req_header 
+     * @param myCall 
+     * @param myAddr 
+     * @param packetType 
+     */
+    void createResponseFor(const Header& req_header,
+        const char* myCall, nodeaddr_t myAddr,
+        uint8_t packetType, ) {
+
+    }
+
     
     bool isAckRequired() {
         return !(type == 1 || type == 2) && (destAddr != BROADCAST_ADDR);

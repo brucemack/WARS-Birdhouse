@@ -1,5 +1,5 @@
-#include "../CircularBuffer.h"
-#include "../packets.h"
+#include "../WARS-Birdhouse/CircularBuffer.h"
+#include "../WARS-Birdhouse/packets.h"
 
 #include <iostream>
 #include <assert.h>

@@ -30,10 +30,10 @@ class CircularBuffer {
 public:
 
   virtual bool isEmpty() const  = 0;
-  virtual bool push(const uint8_t* oobBuf, const uint8_t* buf, unsigned int bufLen) = 0;
-  virtual void pop(uint8_t* oobBuf, uint8_t* buf, unsigned int* len) = 0;
-  virtual bool popIfNotEmpty(uint8_t* oobBuf, uint8_t* buf, unsigned int* len) = 0;
-  virtual void peek(uint8_t* oobBuf, uint8_t* buf, unsigned int* len) const = 0;
+  virtual bool push(const void* oobBuf, const void* buf, unsigned int bufLen) = 0;
+  virtual void pop(void* oobBuf, void* buf, unsigned int* len) = 0;
+  virtual bool popIfNotEmpty(void* oobBuf, void* buf, unsigned int* len) = 0;
+  virtual void peek(void* oobBuf, void* buf, unsigned int* len) const = 0;
   virtual void popAndDiscard() = 0;
 };
 
@@ -63,7 +63,7 @@ public:
    *
    * NOTE: A two-byte length header is put into the buffer to manage size.
    */
-  bool push(const uint8_t* oobBuf, const uint8_t* buf, unsigned int bufLen) {
+  bool push(const void* oobBuf, const void* buf, unsigned int bufLen) {
     // Keep the original pointer in case a failure/rollback is necessary.
     unsigned int originalBack = _back;
     // We are putting the combined length of the OOB and IB buffers
@@ -87,12 +87,12 @@ public:
 
   // The *len argument starts off with the maximum space available in buf and ends
   // with the actual number of bytes taken from the queue.
-  void pop(uint8_t* oobBuf, uint8_t* buf, unsigned int* len) {
+  void pop(void* oobBuf, void* buf, unsigned int* len) {
     // Get the next buffer and move pointer 
     _front = _peek(oobBuf, buf, len);
   }
 
-  void peek(uint8_t* oobBuf, uint8_t* buf, unsigned int* len) const {
+  void peek(void* oobBuf, void* buf, unsigned int* len) const {
     // Get the next buffer but don't move the pointer
     _peek(oobBuf, buf, len);
   }
@@ -127,7 +127,7 @@ public:
    * This combines isEmpty() and pop() to provide an easy atomic 
    * pop operation.
    */
-  bool popIfNotEmpty(uint8_t* oobBuf, uint8_t* buf, unsigned int* len) {
+  bool popIfNotEmpty(void* oobBuf, void* buf, unsigned int* len) {
     if (isEmpty()) {
       return false;
     } else {
@@ -159,11 +159,11 @@ private:
    * @return true 
    * @return false 
    */
-  bool _pushRaw(const uint8_t* buf, unsigned int bufLen) {
+  bool _pushRaw(const void* buf, unsigned int bufLen) {
     // Deal with the variable length IB part    
     for (unsigned int i = 0; i < bufLen; i++) {
       // Store into the buffer
-      _buf[_back] = buf[i];
+      _buf[_back] = ((uint8_t*)buf)[i];
       // Advance and wrap
       _back = _incAndWrap(_back);
       // Check for overflow
@@ -178,7 +178,7 @@ private:
   // The *bufLen argument starts off with the maximum space available in buf and ends
   // with the actual number of bytes taken from the queue.
   // Returns the location of the new front of the queue.
-  unsigned int _peek(uint8_t* oobBuf, uint8_t* buf, unsigned int* bufLen) const {
+  unsigned int _peek(void* oobBuf, void* buf, unsigned int* bufLen) const {
 
     unsigned int ptr = _front;
 
@@ -191,7 +191,7 @@ private:
 
     // Get the OOB data
     for (unsigned int i = 0; i < _oobBufLen; i++) {
-      oobBuf[i] = _buf[ptr];
+      ((uint8_t*)oobBuf)[i] = _buf[ptr];
       ptr = _incAndWrap(ptr);
       entry_size--;
     }
@@ -204,7 +204,7 @@ private:
       // Notice that when we exceed the maximum space we 
       // just start quietly ignoring the IB data.
       if (i < available_space) {
-        buf[i] = _buf[ptr];
+        ((uint8_t*)buf)[i] = _buf[ptr];
         (*bufLen)++;
       }
       ptr = _incAndWrap(ptr);
