@@ -1,11 +1,18 @@
 #include "../WARS-Birdhouse/CircularBuffer.h"
 #include "../WARS-Birdhouse/packets.h"
+#include "../WARS-Birdhouse/OutboundPacket.h"
 
 #include <iostream>
 #include <assert.h>
 #include <string.h>
 
 using namespace std;
+
+void test_OutboundPacket() {
+    OutboundPacket op;
+    assert(sizeof(Header) == 36);
+    assert(sizeof(op.packet) == 128);
+}
 
 void test_buffer() {
 
@@ -172,5 +179,6 @@ void test_header() {
 int main(int argc, const char** argv) {
     test_buffer();
     test_header();
+    test_OutboundPacket();
 }
 

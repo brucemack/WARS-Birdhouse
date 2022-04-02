@@ -95,11 +95,9 @@ struct Header {
      */
     void createResponseFor(const Header& req_header,
         const char* myCall, nodeaddr_t myAddr,
-        uint8_t packetType, ) {
-
+        uint8_t packetType) {
     }
 
-    
     bool isAckRequired() {
         return !(type == 1 || type == 2) && (destAddr != BROADCAST_ADDR);
     }
