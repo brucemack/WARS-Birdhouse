@@ -13,7 +13,6 @@ extern Stream& logger;
 static const char* msg_bad_message = "ERR: Bad message";
 static const char* msg_no_route = "ERR: No route";
 static const int32_t SEND_TIMEOUT = 10 * 1000;
-static const uint8_t SW_VERSION = 1;
 
 MessageProcessor::MessageProcessor(
     Clock& clock, 
@@ -140,8 +139,9 @@ void MessageProcessor::_process(int16_t rssi,
       resp.header.setupResponseFor(packet.header, _myCall, _myAddr, 
         TYPE_GETSED_RESP, _getUniqueId(), firstHop);
 
+      // Populate the payload
       SadRespPayload respPayload;
-      respPayload.version = SW_VERSION;
+      respPayload.version = _instrumentation.getSoftwareVersion();
       respPayload.batteryMv = _instrumentation.getBatteryVoltage();
       respPayload.panelMv = _instrumentation.getPanelVoltage();
       respPayload.uptimeSeconds = (_clock.time() - _startTime) / 1000;
@@ -168,65 +168,68 @@ void MessageProcessor::_process(int16_t rssi,
       }
     }
     
-    // Pong (for display)
-    else if (header.type == MessageType::TYPE_PONG) {
+    // Get Engineering Data Repsonse (for display)
+    else if (packet.header.getType() == TYPE_GETSED_RESP) {
       
-      if (len < sizeof(PongMessage)) {
-        Serial.println(msg_bad_message);
+      if (packetLen < sizeof(Header) + sizeof(SadRespPayload)) {
+        logger.println(msg_bad_message);
         return;
       }
 
-      // Re-read the message into the PongMessage format.  
-      PongMessage pong;
-      memcpy(&pong, buf, sizeof(PongMessage));
+      SadRespPayload respPayload;
+      memcpy((void*)&respPayload,packet.payload, sizeof(SadRespPayload));
+
       // Display
-      shell.print("{ \"counter\": ");
-      shell.print(pong.counter, DEC);
-      shell.print(", \"origSourceAddr\": ");
-      shell.print(pong.header.originalSourceAddr, DEC);
-      shell.print(", \"hops\": ");
-      shell.print(pong.header.hops, DEC);
-      shell.print(", \"version\": ");
-      shell.print(pong.version, DEC);
-      shell.print(", \"rssi\": ");
-      shell.print(pong.rssi, DEC);
-      shell.print(", \"batteryMv\": ");
-      shell.print(pong.batteryMv, DEC);
-      shell.print(", \"panelMv\": ");
-      shell.print(pong.panelMv, DEC);
-      shell.print(", \"uptimeSeconds\": ");
-      shell.print(pong.uptimeSeconds, DEC);
-      shell.print(", \"bootCount\": ");
-      shell.print(pong.bootCount, DEC);
-      shell.print(", \"sleepCount\": ");
-      shell.print(pong.sleepCount, DEC);
-      shell.println("}");
+      logger.print("{ \"version\": ");
+      logger.print(respPayload.version);
+      logger.print(", \"batteryMv\": ");
+      logger.print(respPayload.batteryMv);
+      logger.print(", \"panelMv\": ");
+      logger.print(respPayload.panelMv);
+      logger.print(", \"uptimeSeconds\": ");
+      logger.print(respPayload.uptimeSeconds);
+      logger.print(", \"bootCount\": ");
+      logger.print(respPayload.bootCount);
+      logger.print(", \"sleepCount\": ");
+      logger.print(respPayload.sleepCount);
+      logger.println("}");
     }
-    
-    // Blink the on-board LED
-    else if (header.type == MessageType::TYPE_BLINK) {
-      digitalWrite(LED_PIN, HIGH);
-      delay(250);
-      digitalWrite(LED_PIN, LOW);
+
+    else if (packet.header.getType() == TYPE_PING_RESP) {
+      // Display
+      logger.print("INF: Good response from ");
+      logger.print(packet.header.getOriginalSourceAddr());
+      logger.println();
     }
     
     // Reset
-    else if (header.type == MessageType::TYPE_RESET) {
-      shell.println(F("INF: Resetting ..."));
-      ESP.restart();
+    else if (packet.header.getType() == TYPE_PING_RESP) {
+      logger.println(F("INF: Resetting ..."));
+      _instrumentation.restart();
     }
     
     // Text (for display)
-    else if (header.type == MessageType::TYPE_TEXT) {
-      shell.print("MSG: ");
+    else if (packet.header.getType() == TYPE_TEXT) {
+      logger.print("MSG: ");
       // There is no null-termination, so we must use the message length here
-      for (int i = 0; i < len - sizeof(Header); i++) {
-        shell.write(buf[i + sizeof(Header)]);
+      for (int i = 0; i < packetLen - sizeof(Header); i++) {
+        logger.print(packet.payload[i + sizeof(Header)]);
       }
-      shell.println();
+      logger.println();
     }
 
     // Set route
+    else if (packet.header.getType() == TYPE_SETROUTE) {
+      if (packetLen < sizeof(Header) + sizeof(SetRouteReqPayload)) {
+        logger.println(msg_bad_message);
+        return;
+      }
+
+      SetRouteReqPayload payload;
+      memcpy((void*)&payload, packet.payload, sizeof(SetRouteReqPayload));
+      
+
+
     else if (header.type == MessageType::TYPE_SETROUTE) {
       if (len < sizeof(SetRouteMessage)) {
         shell.println(msg_bad_message);

@@ -11,17 +11,17 @@
 class Instrumentation {
 public:
 
-    virtual uint16_t getSoftwareVersion() = 0;
-    virtual uint16_t getDeviceClass() = 0;
-    virtual uint16_t getDeviceRevision() = 0;
-    virtual uint16_t getBatteryVoltage() = 0;
-    virtual int16_t getTemperature() = 0;
-    virtual int16_t getHumidity() = 0;
-    virtual uint16_t getPanelVoltage() = 0;
-    virtual uint16_t getBootCount() = 0;
-    virtual uint16_t getSleepCount() = 0;
-    virtual uint16_t getDeviceClass() = 0;
-    virtual uint16_t getDeviceRevision() = 0;
+    virtual uint16_t getSoftwareVersion() const = 0;
+    virtual uint16_t getDeviceClass() const = 0;
+    virtual uint16_t getDeviceRevision() const = 0;
+    virtual uint16_t getBatteryVoltage() const = 0;
+    virtual uint16_t getPanelVoltage() const = 0;
+    virtual int16_t getTemperature() const = 0;
+    virtual int16_t getHumidity() const = 0;
+    virtual uint16_t getBootCount() const = 0;
+    virtual uint16_t getSleepCount() const = 0;
+    
+    virtual void restart() = 0;
 };
 
 #endif

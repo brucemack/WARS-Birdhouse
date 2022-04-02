@@ -4,6 +4,8 @@
 #include "../WARS-Birdhouse/packets.h"
 #include "../WARS-Birdhouse/OutboundPacketManager.h"
 #include "../WARS-Birdhouse/Clock.h"
+#include "../WARS-Birdhouse/Instrumentation.h"
+#include "../WARS-Birdhouse/RoutingTable.h"
 
 #include <iostream>
 #include <assert.h>
@@ -22,6 +24,7 @@ public:
 
 static TestStream testStream;
 Stream& logger = testStream;
+static const uint8_t SW_VERSION = 1;
 
 // Dummy clock for unit test.
 
@@ -41,9 +44,44 @@ private:
     uint32_t _time;
 };
 
+// Dummy Instrumentation
+class TestInstrumentation : public Instrumentation {
+public:
+    uint16_t getSoftwareVersion() const { return 1; }
+    uint16_t getDeviceClass() const { return 2; }
+    uint16_t getDeviceRevision() const { return 1; }
+    uint16_t getBatteryVoltage() const { return 3800; }
+    uint16_t getPanelVoltage() const { return 4000; }
+    int16_t getTemperature() const { return 23; }
+    int16_t getHumidity() const { return  87; }
+    uint16_t getBootCount() const { return 1; }
+    uint16_t getSleepCount() const { return 1; }
+    void restart() { cout << "RESTART" << endl; }
+};
+
+// Dummy routing table for node 1 (KC1FSZ)
+
+class TestRoutingTable1 : public RoutingTable {
+public:
+    
+    virtual nodeaddr_t nextHop(nodeaddr_t finalDestAddr) {
+        if (finalDestAddr == 7) {
+            return 3;
+        } else {
+            return RoutingTable::NO_ROUTE;
+        }
+    }
+
+    virtual void setRoute(nodeaddr_t target, nodeaddr_t nextHop) {
+        cout << "setRoute " << target << "->" << nextHop << endl;
+    }
+};
+
 void test_OutboundPacket() {
     
     TestClock clock;
+    TestInstrumentation instrumentation;
+    TestRoutingTable1 routingTable1;
     CircularBufferImpl<4096> txBuffer(0);
     OutboundPacketManager opm(clock, txBuffer);
     assert(opm.getFreeCount() == 8);
