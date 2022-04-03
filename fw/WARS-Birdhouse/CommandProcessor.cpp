@@ -14,11 +14,11 @@ static auto msg_bad_address = F("ERR: Bad address");
 static auto msg_bad_message = F("ERR: Bad message");
 
 extern Stream& logger;
-extern Configuration& configuration;
+extern Configuration& config;
 extern RoutingTable& routingTable;
 extern MessageProcessor& messageProcessor;
 
-int sendPing(int argc, char **argv) { 
+int sendPing(int argc, const char** argv) { 
  
     if (argc != 2) {
         logger.println(msg_arg_error);
@@ -32,22 +32,24 @@ int sendPing(int argc, char **argv) {
         return -1;
     }
 
+    logger.println("GO");
+
     // Make a ping request
     Packet packet;
     packet.header.setType(TYPE_PING_REQ);
     packet.header.setId(messageProcessor.getUniqueId());
-    packet.header.setSourceAddr(configuration.getAddr());
+    packet.header.setSourceAddr(config.getAddr());
     packet.header.setDestAddr(nextHop);
-    packet.header.setOriginalSourceAddr(configuration.getAddr());
+    packet.header.setOriginalSourceAddr(config.getAddr());
     packet.header.setFinalDestAddr(finalDestAddr);
-    packet.header.setSourceCall(configuration.getCall());
-    packet.header.setOriginalSourceCall(configuration.getCall());
+    packet.header.setSourceCall(config.getCall());
+    packet.header.setOriginalSourceCall(config.getCall());
     unsigned int packetLen = sizeof(Header);
     // Send it
     messageProcessor.transmitIfPossible(packet, packetLen);
     return 0;
 }
-
+/*
 int sendReset(int argc, char **argv) { 
 
   if (argc != 2) {
@@ -267,10 +269,12 @@ int doPrint(int argc, char **argv) {
   shell.print(argv[1]);
   shell.println("]");
 }
+*/
 
 /**
  * Used to put a comment into the console log
  */
+/*
 int doRem(int argc, char **argv) { 
 
   if (argc != 2) {
@@ -278,7 +282,7 @@ int doRem(int argc, char **argv) {
     return -1;
   }
 }
-
+*/
 /** This function handles a request to send a text message to another node
  *  in the network.  There is no guarantee that the message will actually
  *  get to the destination.  
@@ -288,6 +292,7 @@ int doRem(int argc, char **argv) {
  *  1: The destination node number
  *  2: The text of the message, limited to 80 characters.
  */
+/*
 int sendText(int argc, char **argv) { 
  
   if (argc != 3) {
@@ -429,11 +434,13 @@ int sendGetRoute(int argc, char **argv) {
       
   return 0;
 }
-
+*/
 /**
  * Clears out diagnostic counters
  */
+/*
 int doResetCounters(int argc, char **argv) { 
   preferences.putUShort("bootcount", 0);
   preferences.putUShort("sleepcount", 0);
 }
+*/
