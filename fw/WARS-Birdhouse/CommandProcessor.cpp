@@ -8,6 +8,8 @@
 #include "CommandProcessor.h"
 #include "Configuration.h"
 
+#include <iostream>
+
 static auto msg_arg_error = F("ERR: Argument error");
 static auto msg_no_route = F("ERR: No route available");
 static auto msg_bad_address = F("ERR: Bad address");
@@ -32,8 +34,6 @@ int sendPing(int argc, const char** argv) {
         return -1;
     }
 
-    logger.println("GO");
-
     // Make a ping request
     Packet packet;
     packet.header.setType(TYPE_PING_REQ);
@@ -46,8 +46,14 @@ int sendPing(int argc, const char** argv) {
     packet.header.setOriginalSourceCall(config.getCall());
     unsigned int packetLen = sizeof(Header);
     // Send it
-    messageProcessor.transmitIfPossible(packet, packetLen);
-    return 0;
+    bool good = messageProcessor.transmitIfPossible(packet, packetLen);
+    if (!good) {
+      logger.println("ERR: TX full");
+      return -1;
+    } else {
+      logger.println("INF: TX good");
+      return 0;
+    }
 }
 /*
 int sendReset(int argc, char **argv) { 
