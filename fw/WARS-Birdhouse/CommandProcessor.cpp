@@ -51,48 +51,48 @@ int sendPing(int argc, const char** argv) {
       logger.println("ERR: TX full");
       return -1;
     } else {
-      logger.println("INF: TX good");
+      return 0;
+    }
+}
+
+int sendReset(int argc, char **argv) { 
+
+    if (argc != 3) {
+      logger.println(msg_arg_error);
+      return -1;
+    }
+
+    nodeaddr_t finalDestAddr = parseAddr(argv[1]);
+    nodeaddr_t nextHop = routingTable.nextHop(finalDestAddr);
+    if (nextHop == RoutingTable::NO_ROUTE) {
+        logger.println(F("ERR: No route"));
+        return -1;
+    }
+
+    ResetReqPayload resetReqPayload;
+    resetReqPayload.passcode = atoi(argv[2]);
+
+    Packet packet;
+    packet.header.setType(TYPE_RESET);
+    packet.header.setId(messageProcessor.getUniqueId());
+    packet.header.setSourceAddr(config.getAddr());
+    packet.header.setDestAddr(nextHop);
+    packet.header.setOriginalSourceAddr(config.getAddr());
+    packet.header.setFinalDestAddr(finalDestAddr);
+    packet.header.setSourceCall(config.getCall());
+    packet.header.setOriginalSourceCall(config.getCall());
+    unsigned int packetLen = sizeof(Header) + sizeof(ResetReqPayload);
+    
+    // Send it
+    bool good = messageProcessor.transmitIfPossible(packet, packetLen);
+    if (!good) {
+      logger.println("ERR: TX full");
+      return -1;
+    } else {
       return 0;
     }
 }
 /*
-int sendReset(int argc, char **argv) { 
-
-  if (argc != 2) {
-    shell.println(msg_arg_error);
-    return -1;
-  }
-
-  counter++;
-  uint8_t target = atoi(argv[1]);
-
-  if (target > 0) {
-
-    uint8_t nextHop = Routes[target];
-    if (nextHop != 0) {
-
-      shell.print(F("Resetting node "));
-      shell.println(target);
-    
-      ResetMessage msg;
-      msg.header.destAddr = nextHop;
-      msg.header.sourceAddr = MY_ADDR;
-      msg.header.id = counter;
-      msg.header.type = MessageType::TYPE_RESET;
-      msg.header.finalDestAddr = target;
-      msg.header.originalSourceAddr = MY_ADDR;
-
-      tx_buffer.push((uint8_t*)&msg, sizeof(ResetMessage));
-    
-      return 0;
-    } else {
-      shell.println(F("No route"));
-    }
-  } else {
-    return -1;
-  }
-}
-
 int sendBlink(int argc, char **argv) { 
 
   if (argc != 2) {

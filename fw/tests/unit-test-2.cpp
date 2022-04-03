@@ -30,6 +30,10 @@ public:
 class TestClock : public Clock {
 public:
 
+    TestClock() {
+        _time = 10 * 1000;
+    }
+
     uint32_t time() const {
         return _time;
     };
@@ -120,6 +124,8 @@ void movePacket(CircularBuffer& from, CircularBuffer& to) {
     }
 }
 
+// ===== TEST CASES ================================================
+
 static TestStream testStream;
 Stream& logger = testStream;
 
@@ -147,9 +153,9 @@ void test_CommandProcessor() {
 
     const char* a0 = "ping";
     const char* a1 = "7";
-    const char *args[2] = { a0, a1 };
+    const char *a_args[2] = { a0, a1 };
 
-    sendPing(2, args);
+    sendPing(2, a_args);
 
     messageProcessor.pump();
 

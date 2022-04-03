@@ -226,7 +226,13 @@ void MessageProcessor::_process(int16_t rssi,
         logger.println("ERR: Full, no resp");
       }
     }
-    
+
+    // Reboot
+    else if (packet.header.getType() == TYPE_RESET) {
+      logger.println("INF: Reset");
+      _instrumentation.restart();
+    }    
+
     // Get Engineering Data Response (for display)
     else if (packet.header.getType() == TYPE_GETSED_RESP) {
       

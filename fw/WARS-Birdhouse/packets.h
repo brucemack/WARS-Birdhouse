@@ -272,6 +272,7 @@ struct SadRespPayload {
 };
 
 struct SetRouteReqPayload {
+  uint32_t passcode;
   nodeaddr_t targetAddr;
   nodeaddr_t nextHopAddr;  
 };
@@ -285,6 +286,10 @@ struct GetRouteRespPayload {
   nodeaddr_t nextHopAddr;  
   uint16_t rxPacketCount;  
   uint16_t txPacketCount;  
+};
+
+struct ResetReqPayload {
+  uint32_t passcode;
 };
 
 #endif
