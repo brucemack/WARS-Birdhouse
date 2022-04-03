@@ -151,9 +151,16 @@ void test_MessageProcessor() {
         packet1.header.setOriginalSourceCall("WA3ITR");
         packet1.header.setFinalDestCall("KC1FSZ");
         unsigned int packet1Len = sizeof(Header);
-        int16_t rssi = 100;
-        rxBuffer1.push(&rssi, (const char*)&packet1, packet1Len);
+        // Inject into node 3
+        mp3.transmitIfPossible(packet1, packet1Len);
     }
+
+    // Make things happen on node 3
+    assert(txBuffer3.isEmpty());
+    mp3.pump();
+    assert(!txBuffer3.isEmpty());
+    // Move message onto the node 1 RX queue
+    movePacket(txBuffer3, rxBuffer1);
 
     // Make things happen on node 1
     assert(txBuffer1.isEmpty());
@@ -168,7 +175,6 @@ void test_MessageProcessor() {
     assert(txBuffer1.isEmpty());
 
     // Make things happen on node 3.
-    cout << "----- Working on 3 ------" << endl;
     mp3.pump();
 
     // Transfer the TX.3->RX.7
@@ -180,7 +186,6 @@ void test_MessageProcessor() {
     assert(txBuffer3.isEmpty());
 
     // Make things happen on node 7.
-    cout << "----- Working on 7 ------" << endl;
     mp7.pump();
 
     // There should be one message (ACK on type 4)
@@ -190,7 +195,6 @@ void test_MessageProcessor() {
     assert(txBuffer7.isEmpty());
 
     // Watch node 3 attempt to retry
-    cout << "----- Working on 3 ------" << endl;
     mp3.pump();
     assert(txBuffer3.isEmpty());
 

@@ -77,6 +77,11 @@ unsigned int MessageProcessor::_getUniqueId() {
   return _idCounter++;
 }
 
+bool MessageProcessor::transmitIfPossible(const Packet& packet, 
+    unsigned int packetLen) {
+  return _opm.scheduleTransmitIfPossible(packet, packetLen);
+}
+
 void MessageProcessor::_process(int16_t rssi, 
   const Packet& packet, unsigned int packetLen) { 
 
@@ -122,7 +127,7 @@ void MessageProcessor::_process(int16_t rssi,
   if (packet.header.isAckRequired()) {
     Packet ack;
     ack.header.setupAckFor(packet.header, _myCall, _myAddr);
-    bool good = _opm.scheduleTransmitIfPossible(ack, sizeof(Header));
+    bool good = transmitIfPossible(ack, sizeof(Header));
     if (!good) {
       logger.println("ERR: Full, no ACK");
     }
@@ -144,7 +149,7 @@ void MessageProcessor::_process(int16_t rssi,
       outPacket.header.setSourceAddr(_myAddr);
       // Arrange for sending.
       // NOTE: WE USE THE SAME LENGTH THAT WE GOT ON THE RX
-      bool good = _opm.scheduleTransmitIfPossible(outPacket, packetLen);
+      bool good = transmitIfPossible(outPacket, packetLen);
       if (!good) {
         logger.println("ERR: Full, no forward");
       } else {
@@ -184,7 +189,7 @@ void MessageProcessor::_process(int16_t rssi,
       Packet resp;
       resp.header.setupResponseFor(packet.header, _myCall, _myAddr, 
         TYPE_PING_RESP, _getUniqueId(), firstHop);
-      bool good = _opm.scheduleTransmitIfPossible(resp, sizeof(Header));
+      bool good = transmitIfPossible(resp, sizeof(Header));
       if (!good) {
         logger.println("ERR: Full, no resp");
       }
@@ -219,7 +224,7 @@ void MessageProcessor::_process(int16_t rssi,
 
       memcpy(resp.payload,(void*)&respPayload,sizeof(SadRespPayload));
 
-      bool good = _opm.scheduleTransmitIfPossible(resp, sizeof(Header) + sizeof(SadRespPayload));
+      bool good = transmitIfPossible(resp, sizeof(Header) + sizeof(SadRespPayload));
       if (!good) {
         logger.println("ERR: Full, no resp");
       }
@@ -325,7 +330,7 @@ void MessageProcessor::_process(int16_t rssi,
 
       memcpy(resp.payload,(void*)&respPayload, sizeof(respPayload));
 
-      bool good = _opm.scheduleTransmitIfPossible(resp, sizeof(Header) + sizeof(respPayload));
+      bool good = transmitIfPossible(resp, sizeof(Header) + sizeof(respPayload));
       if (!good) {
         logger.println("ERR: Full, no resp");
       }

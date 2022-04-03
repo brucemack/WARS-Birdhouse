@@ -44,6 +44,9 @@ public:
      */
     void pump();
 
+    bool transmitIfPossible(const Packet& packet, 
+        unsigned int packetLen);
+
 private:
 
     void _process(int16_t rssi, const Packet& packet, unsigned int packetLen);
