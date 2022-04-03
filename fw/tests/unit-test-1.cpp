@@ -158,7 +158,6 @@ void test_MessageProcessor() {
     // Make things happen on node 1
     assert(txBuffer1.isEmpty());
     mp1.pump();
-    mp1.pump();
     assert(!txBuffer1.isEmpty());
 
     // Transfer the TX.1->RX.3
@@ -171,7 +170,6 @@ void test_MessageProcessor() {
     // Make things happen on node 3.
     cout << "----- Working on 3 ------" << endl;
     mp3.pump();
-    mp3.pump();
 
     // Transfer the TX.3->RX.7
     // There should be two messages (the type 1 back to 
@@ -183,7 +181,6 @@ void test_MessageProcessor() {
 
     // Make things happen on node 7.
     cout << "----- Working on 7 ------" << endl;
-    mp7.pump();
     mp7.pump();
 
     // There should be one message (ACK on type 4)
@@ -201,7 +198,16 @@ void test_MessageProcessor() {
     // since we got lost the ACK
     clock.advanceSeconds(3);
     mp3.pump();
+    // See the re-transmit
     assert(!txBuffer3.isEmpty());
+    // Discard it 
+    txBuffer3.popAndDiscard();
+
+    // Move forward past the timeout 
+    clock.advanceSeconds(10);
+    mp3.pump();
+    // No more re-transmit
+    assert(txBuffer3.isEmpty());
 }
 
 void test_OutboundPacket() {

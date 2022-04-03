@@ -56,14 +56,20 @@ MessageProcessor::MessageProcessor(
 }
 
 void MessageProcessor::pump() {
-    int16_t rssi = 0;
-    Packet packet;
-    unsigned int packetLen = sizeof(Packet);
-    bool notEmpty = _rxBuffer.popIfNotEmpty((void*)&rssi, 
-      (void*)&packet, &packetLen);
-    if (notEmpty) {
-        _process(rssi, packet, packetLen);
+    // We keep processing until the receive buffer
+    // has been drained.
+    while (true) {
+      int16_t rssi = 0;
+      Packet packet;
+      unsigned int packetLen = sizeof(Packet);
+      bool available = _rxBuffer.popIfNotEmpty((void*)&rssi, 
+        (void*)&packet, &packetLen);
+      if (!available) {
+        break;
+      }
+      _process(rssi, packet, packetLen);
     }
+    // Move any resulting packets onto the TX queue
     _opm.pump();
 }
 
