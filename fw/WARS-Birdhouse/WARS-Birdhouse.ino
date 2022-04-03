@@ -38,11 +38,20 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include <esp_task_wdt.h>
 #include <Preferences.h>
 #include <SimpleSerialShell.h>
-#include "CircularBuffer.h"
 #include "spi_utils.h"
 #include <arduino-timer.h>
 
-#define SW_VERSION 29
+#include "CircularBuffer.h"
+#include "Clock.h"
+#include "Configuration.h"
+#include "packets.h"
+#include "OutboundPacketManager.h"
+#include "Instrumentation.h"
+#include "RoutingTable.h"
+#include "MessageProcessor.h"
+#include "CommandProcessor.h"
+
+#define SW_VERSION 30
 
 // This is the pin that is available on the D1 Mini module:
 #define RST_PIN   26
@@ -72,9 +81,6 @@ static const float STATION_FREQUENCY = 906.5;
 
 static Preferences preferences;
 
-// NODE SPECIFIC STUFF
-static uint8_t MY_ADDR = 1;
-static uint8_t MY_CALL[8] = "KC1FSZ  ";
 // Routing table (node 1)
 static uint8_t Routes[256];
 
@@ -82,45 +88,135 @@ static int32_t get_time_seconds() {
   return esp_timer_get_time() / 1000000L;
 }
 
-// Returns the battery level in mV
-// The voltage is sampled via a 1:2 voltage divider 
-uint16_t checkBattery() {
-  const float scale = (3.3 / 4096.0) * 2.0;
-  float level = (float)analogRead(BATTERY_LEVEL_PIN) * scale;
-  return level * 1000.0;
-}
+// ===== Interface Classes ===========================================
 
-// Returns the panel level in mV
-// The voltage is sampled via a 1:6 voltage divider 
-uint16_t checkPanel() {
-  const float scale = (3.3 / 4096.0) * 6.0;
-  float level = (float)analogRead(PANEL_LEVEL_PIN) * scale;
-  return level * 1000.0;
-}
+class ClockImpl : public Clock {
+public:
+
+    uint32_t time() const {
+        return millis();
+    };
+};
+
+class ConfigurationImpl : public Configuration {
+public:
+
+    ConfigurationImpl() {
+      _refreshCache();
+    }
+
+    nodeaddr_t getAddr() const {
+      return _addrCache;
+    }
+
+    const char* getCall() const {
+      // NOTE: WE RETURN A POINTER TO THE UNDERLYING STRING
+      return _callCache;
+    }
+
+    void setAddr(nodeaddr_t a) { 
+        preferences.setUChar("addr", (uint8_t)a);
+        _refreshCache();
+    }
+
+    void setCall(const char* call) { 
+        // Write a standard size of 8 bytes
+        char area[9];
+        for (unsigned int i = 0; i < 9; i++)
+            area[i] = 0;
+        strncpy(area, call, 8);
+        preferences.putBytes("call", area, 8);
+        _refreshCache();
+    }
+
+private: 
+
+    /**
+     * @brief Loads configuration data from NV RAM.  We 
+     * cache things to improve performance.
+     */
+    void _refreshCache() {
+        _addrCache = preferences.getUChar("addr", 1);  
+        // Blank out the call area before loading
+        for (unsigned int i = 0; i < 9; i++) 
+          _callCache[i] = 0;
+        // We read back 8 bytes at most
+        size_t maxLen = 8;
+        preferences.getBytes("call", _callCache, &maxLen);
+    }
+
+    // This is where the node address is cached.
+    nodeaddr_t _addrCache;
+
+    // This is where the callsign is cached so that we can 
+    // get away with returning a const char* reference to it.
+    char _callCache[9];
+};
+
+class InstrumentationImpl : public Instrumentation {
+public:
+
+    uint16_t getSoftwareVersion() const { return SW_VERSION; }
+    uint16_t getDeviceClass() const { return 2; }
+    uint16_t getDeviceRevision() const { return 1; }
+
+    uint16_t getBatteryVoltage() const { 
+        // Returns the battery level in mV
+        // The voltage is sampled via a 1:2 voltage divider 
+        const float scale = (3.3 / 4096.0) * 2.0;
+        float level = (float)analogRead(BATTERY_LEVEL_PIN) * scale;
+        return level * 1000.0;
+    }
+
+    uint16_t getPanelVoltage() const { 
+        // The voltage is sampled via a 1:6 voltage divider 
+        const float scale = (3.3 / 4096.0) * 6.0;
+        float level = (float)analogRead(PANEL_LEVEL_PIN) * scale;
+        return level * 1000.0;
+    }
+
+    uint16_t getBootCount() const { return 1; }
+    uint16_t getSleepCount() const { return 1; }
+    int16_t getTemperature() const { return 0; }
+    int16_t getHumidity() const { return  0; }
+
+    void restart() { 
+    }
+};
+
+// Connect the logger stream to the SimpleSerialShell
+Stream& logger = shell;
+
+ClockImpl systemClock;
+ConfigurationImpl systemConfig;
+InstrumentationImpl systemInstrumentation;
+
+static TestRoutingTable testRoutingTable;
+CircularBufferImpl<4096> testTxBuffer(0);
+CircularBufferImpl<4096> testRxBuffer(2);
+static MessageProcessor testMessageProcessor(systemClock, testRxBuffer, testTxBuffer,
+    testRoutingTable, testInstrumentation, testConfig,
+    10 * 1000, 2 * 1000);
+
+// Exposed base interfaces to the rest of the program
+Configuration& config = testConfig;
+RoutingTable& routingTable = testRoutingTable;
+MessageProcessor& messageProcessor = testMessageProcessor;
+
+
+
 
 // The states of the state machine
-enum State { IDLE, LISTENING, TRANSMITTING, TRANSMITTING_ACK, LISTENING_FOR_ACK };
+enum State { IDLE, LISTENING, TRANSMITTING };
 
 // The overall state
 static State state = State::IDLE;
-// The state we need to go into after a transmit is successful
-static State stateAfterTransmit = State::LISTENING;
-// This is the message ID that we are waiting to have acknowledged.
-// NOTE: Only relevant in LISTENING_FOR_ACK state.
-static uint16_t listenAckId = 0;
-// This is the time we started waiting for the ACK. Used for timeout tracking.
-// NOTE: Only relevant in LISTENING_FOR_ACK state.
-static uint32_t listenAckStart = 0;
-// The number of times we've retried the transmit
-static uint16_t transmitRetry = 0;
-// The number of ACKs to skip (used for testing)
-static uint16_t skipAckCount = 0;
 
 // The circular buffer used for outgoing data
-static CircularBuffer<4096> tx_buffer(0);
+static CircularBuffer<256> txBuffer(0);
 // The circular buffer used for incoming data.
 // The OOB space is being reserved for the RSSI value
-static CircularBuffer<4096> rx_buffer(2);
+static CircularBuffer<1024> rxBuffer(2);
 
 // ----- Interrupt Service -------
 
