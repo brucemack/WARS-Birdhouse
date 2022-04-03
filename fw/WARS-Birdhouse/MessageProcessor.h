@@ -20,6 +20,7 @@
 #ifndef _MessageProcessor_h
 #define _MessageProcessor_h
 
+#include "Configuration.h"
 #include "OutboundPacketManager.h"
 #include "CircularBuffer.h"
 #include "Clock.h"
@@ -35,7 +36,7 @@ public:
 
     MessageProcessor(Clock& clock, CircularBuffer& rxBuffer, CircularBuffer& txBuffer,
         RoutingTable& routingTable, Instrumentation& instrumentation,
-        nodeaddr_t myAddr, const char* myCall,
+        Configuration& config,
         uint32_t txTimeoutMs, uint32_t txRetryMs);
 
     /**
@@ -47,20 +48,21 @@ public:
     bool transmitIfPossible(const Packet& packet, 
         unsigned int packetLen);
 
+    /**
+     * @brief Generates a unique message ID
+     */
+    unsigned int getUniqueId();
+
 private:
 
     void _process(int16_t rssi, const Packet& packet, unsigned int packetLen);
 
-    unsigned int _getUniqueId();
-
+    Configuration& _config;
     const Clock& _clock;
     CircularBuffer& _rxBuffer;
     CircularBuffer& _txBuffer;
     RoutingTable& _routingTable;
-    Instrumentation& _instrumentation;
-    nodeaddr_t _myAddr;
-    char _myCall[9];
-    
+    Instrumentation& _instrumentation;    
     OutboundPacketManager _opm;
     unsigned int _idCounter;
     uint32_t _startTime;

@@ -24,4 +24,6 @@
 
 typedef uint16_t nodeaddr_t;
 
+nodeaddr_t parseAddr(const char* textAddr);
+
 #endif

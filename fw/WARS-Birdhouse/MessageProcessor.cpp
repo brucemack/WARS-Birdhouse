@@ -38,8 +38,7 @@ MessageProcessor::MessageProcessor(
     CircularBuffer& txBuffer,
     RoutingTable& routingTable,  
     Instrumentation& instrumentation,
-    nodeaddr_t myAddr, 
-    const char* myCall,
+    Configuration& config,
     uint32_t txTimeoutMs, 
     uint32_t txRetryMs) 
     : _clock(clock),
@@ -47,12 +46,10 @@ MessageProcessor::MessageProcessor(
       _txBuffer(txBuffer),
       _routingTable(routingTable),
       _instrumentation(instrumentation),
-      _myAddr(myAddr),
+      _config(config),
       _opm(clock, txBuffer, txTimeoutMs, txRetryMs),
       _idCounter(1),
       _startTime(clock.time()) {
-        // TODO: REVIEW THIS CLOSELY
-      strncpy(_myCall, myCall, 8);
 }
 
 void MessageProcessor::pump() {
@@ -73,7 +70,7 @@ void MessageProcessor::pump() {
     _opm.pump();
 }
 
-unsigned int MessageProcessor::_getUniqueId() {
+unsigned int MessageProcessor::getUniqueId() {
   return _idCounter++;
 }
 
@@ -96,7 +93,7 @@ void MessageProcessor::_process(int16_t rssi,
   // and they are able to hear traffic targed at other
   // nodes.
   if (packet.header.getDestAddr() != BROADCAST_ADDR &&
-      packet.header.getDestAddr() != _myAddr) {
+      packet.header.getDestAddr() != _config.getAddr()) {
       return;
   }
 
@@ -126,7 +123,7 @@ void MessageProcessor::_process(int16_t rssi,
   // generate one before proceeding with the local processing.
   if (packet.header.isAckRequired()) {
     Packet ack;
-    ack.header.setupAckFor(packet.header, _myCall, _myAddr);
+    ack.header.setupAckFor(packet.header, _config);
     bool good = transmitIfPossible(ack, sizeof(Header));
     if (!good) {
       logger.println("ERR: Full, no ACK");
@@ -134,7 +131,7 @@ void MessageProcessor::_process(int16_t rssi,
   }
 
   // Look for messages that need to be forwarded on to another node
-  if (packet.header.getFinalDestAddr() != _myAddr) {
+  if (packet.header.getFinalDestAddr() != _config.getAddr()) {
     // This is a forward route (i.e. twoards the final destination)
     nodeaddr_t nextHop = _routingTable.nextHop(
       packet.header.getFinalDestAddr());
@@ -144,9 +141,9 @@ void MessageProcessor::_process(int16_t rssi,
       // Tweak the header and overlay. 
       // All messages need a unique ID so that the ACK mechanism
       // will work properly.
-      outPacket.header.setId(_getUniqueId()); 
+      outPacket.header.setId(getUniqueId()); 
       outPacket.header.setDestAddr(nextHop);
-      outPacket.header.setSourceAddr(_myAddr);
+      outPacket.header.setSourceAddr(_config.getAddr());
       // Arrange for sending.
       // NOTE: WE USE THE SAME LENGTH THAT WE GOT ON THE RX
       bool good = transmitIfPossible(outPacket, packetLen);
@@ -187,8 +184,8 @@ void MessageProcessor::_process(int16_t rssi,
     if (packet.header.getType() == TYPE_PING_REQ) {
       // Create a pong and send back to the originator of the ping
       Packet resp;
-      resp.header.setupResponseFor(packet.header, _myCall, _myAddr, 
-        TYPE_PING_RESP, _getUniqueId(), firstHop);
+      resp.header.setupResponseFor(packet.header, _config, 
+        TYPE_PING_RESP, getUniqueId(), firstHop);
       bool good = transmitIfPossible(resp, sizeof(Header));
       if (!good) {
         logger.println("ERR: Full, no resp");
@@ -199,8 +196,8 @@ void MessageProcessor::_process(int16_t rssi,
     else if (packet.header.getType() == TYPE_GETSED_REQ) {
 
       Packet resp;
-      resp.header.setupResponseFor(packet.header, _myCall, _myAddr, 
-        TYPE_GETSED_RESP, _getUniqueId(), firstHop);
+      resp.header.setupResponseFor(packet.header, _config, 
+        TYPE_GETSED_RESP, getUniqueId(), firstHop);
 
       // Populate the payload
       SadRespPayload respPayload;
@@ -316,8 +313,8 @@ void MessageProcessor::_process(int16_t rssi,
 
       // Build a response
       Packet resp;
-      resp.header.setupResponseFor(packet.header, _myCall, _myAddr, 
-        TYPE_GETROUTE_RESP, _getUniqueId(), firstHop);
+      resp.header.setupResponseFor(packet.header, _config, 
+        TYPE_GETROUTE_RESP, getUniqueId(), firstHop);
 
       // Populate the response payload    
       GetRouteRespPayload respPayload;

@@ -21,7 +21,9 @@
 #define _packets_h
 
 #include <string.h>
+
 #include "Utils.h"
+#include "Configuration.h"
 
 static const uint8_t PACKET_VERSION = 2;
 static const nodeaddr_t BROADCAST_ADDR = 0xffff;
@@ -88,18 +90,17 @@ struct Header {
      * @param myCall 
      * @param myAddr 
      */
-    void setupAckFor(const Header& rx_packet, 
-        const char* myCall, uint16_t myAddr) {
+    void setupAckFor(const Header& rx_packet, const Configuration& config) {
         version = PACKET_VERSION;
         type = TYPE_ACK;
         id = rx_packet.id;
         // Address stuff
-        sourceAddr = myAddr;
+        sourceAddr = config.getAddr();
         destAddr = rx_packet.sourceAddr;
         // Echo back the original stuff
         originalSourceAddr = rx_packet.originalSourceAddr;
         finalDestAddr = rx_packet.finalDestAddr;
-        loadCall(sourceCall, myCall);
+        loadCall(sourceCall, config.getCall());
         // Echo back the original stuff
         memcpy(finalDestCall, rx_packet.finalDestCall, 8);
         memcpy(originalSourceCall, rx_packet.originalSourceCall, 8);
@@ -115,22 +116,21 @@ struct Header {
      * @param myAddr 
      * @param packetType 
      */
-    void setupResponseFor(const Header& reqHeader,
-        const char* myCall, nodeaddr_t myAddr,
+    void setupResponseFor(const Header& reqHeader, const Configuration& config,
         uint8_t respType, uint16_t respId, nodeaddr_t respDestAddr) {
         
         version = PACKET_VERSION;
         type = respType;
         id = respId;
         // Address stuff
-        sourceAddr = myAddr;
+        sourceAddr = config.getAddr();
         destAddr = respDestAddr;
-        originalSourceAddr = myAddr;
+        originalSourceAddr = config.getAddr();
         // SWAP 
         finalDestAddr = reqHeader.originalSourceAddr;
         // Call stuff
-        loadCall(sourceCall, myCall);
-        loadCall(originalSourceCall, myCall);
+        loadCall(sourceCall, config.getCall());
+        loadCall(originalSourceCall, config.getCall());
         // SWAP
         memcpy(finalDestCall, reqHeader.originalSourceCall, 8);
     }

@@ -7,6 +7,7 @@
 #include "../WARS-Birdhouse/Instrumentation.h"
 #include "../WARS-Birdhouse/RoutingTable.h"
 #include "../WARS-Birdhouse/MessageProcessor.h"
+#include "../WARS-Birdhouse/Configuration.h"
 
 #include <iostream>
 #include <assert.h>
@@ -86,6 +87,29 @@ private:
     nodeaddr_t _table[64];
 };
 
+// Dummy configuration
+class TestConfiguration : public Configuration {
+public:
+
+    TestConfiguration(nodeaddr_t myAddr, const char* myCall) 
+    : _myAddr(myAddr), 
+      _myCall(myCall) {
+    }
+
+    nodeaddr_t getAddr() const {
+        return _myAddr;
+    }
+
+    const char* getCall() const {
+        return _myCall;
+    }
+
+private:
+
+    nodeaddr_t _myAddr;
+    const char* _myCall;
+};
+
 void movePacket(CircularBuffer& from, CircularBuffer& to) {
     unsigned int packetLen = 256;
     uint8_t packet[256];
@@ -103,6 +127,7 @@ void test_MessageProcessor() {
     TestClock clock;
 
     // Node #1
+    TestConfiguration config1(1, "KC1FSZ");
     TestInstrumentation instrumentation1;
     TestRoutingTable routingTable1;
     routingTable1.setRoute(3, 3);
@@ -110,10 +135,11 @@ void test_MessageProcessor() {
     CircularBufferImpl<4096> txBuffer1(0);
     CircularBufferImpl<4096> rxBuffer1(2);
     MessageProcessor mp1(clock, rxBuffer1, txBuffer1,
-        routingTable1, instrumentation1, 1, "KC1FSZ",
+        routingTable1, instrumentation1, config1,
         10 * 1000, 2 * 1000);
 
     // Node #3 (intermediate)
+    TestConfiguration config3(3, "W1TKZ");
     TestInstrumentation instrumentation3;
     TestRoutingTable routingTable3;
     routingTable3.setRoute(1, 1);
@@ -121,10 +147,11 @@ void test_MessageProcessor() {
     CircularBufferImpl<4096> txBuffer3(0);
     CircularBufferImpl<4096> rxBuffer3(2);
     MessageProcessor mp3(clock, rxBuffer3, txBuffer3,
-        routingTable3, instrumentation3, 3, "W1TKZ",
+        routingTable3, instrumentation3, config3,
         10 * 1000, 2 * 1000);
 
     // Node #7 (desktop)
+    TestConfiguration config7(7, "WA3ITR");
     TestInstrumentation instrumentation7;
     TestRoutingTable routingTable7;
     routingTable7.setRoute(1, 3);
@@ -132,7 +159,7 @@ void test_MessageProcessor() {
     CircularBufferImpl<4096> txBuffer7(0);
     CircularBufferImpl<4096> rxBuffer7(2);
     MessageProcessor mp7(clock, rxBuffer7, txBuffer7,
-        routingTable7, instrumentation7, 7, "WA3ITR",
+        routingTable7, instrumentation7, config7,
         10 * 1000, 2 * 1000);
 
     clock.setTime(60 * 1000);
@@ -216,6 +243,7 @@ void test_MessageProcessor() {
 
 void test_OutboundPacket() {
     
+    TestConfiguration config3(3, "W1TKZ");
     TestClock clock;
     TestInstrumentation instrumentation;
     TestRoutingTable routingTable1;
@@ -256,7 +284,7 @@ void test_OutboundPacket() {
 
     // Create an ACK that we can use 
     Packet ackPacket0;
-    ackPacket0.header.setupAckFor(packet0.header, "W1TKZ", 3);
+    ackPacket0.header.setupAckFor(packet0.header, config3);
     assert(ackPacket0.header.getId() == 1);
     assert(ackPacket0.header.getSourceAddr() == 3);
     assert(ackPacket0.header.getDestAddr() == 1);
@@ -520,9 +548,9 @@ void test_buffer() {
     }
 }
 
-static const char* MY_CALL = "KC1FSZ";
-
 void test_header() {
+
+    TestConfiguration config1(1, "KC1FSZ");
 
     // What we are receiving
     Header header;
@@ -532,12 +560,12 @@ void test_header() {
     header.setDestAddr(1);
     header.setOriginalSourceAddr(2);
     header.setFinalDestAddr(1);
-    header.setSourceCall(MY_CALL);
+    header.setSourceCall(config1.getCall());
     header.setFinalDestCall("XX1XXX");
     header.setOriginalSourceCall("YY1YYY");
 
     Header ack_header;
-    ack_header.setupAckFor(header, MY_CALL, 1); 
+    ack_header.setupAckFor(header, config1); 
     // Type
     assert(ack_header.type == 1);
     // Source/dest
@@ -545,7 +573,7 @@ void test_header() {
     assert(ack_header.destAddr == 2);
     char callArea[9];
     ack_header.getSourceCall(callArea);
-    assert(strcmp(callArea, MY_CALL) == 0);
+    assert(strcmp(callArea, config1.getCall()) == 0);
     ack_header.getOriginalSourceCall(callArea);
     assert(strcmp(callArea, "YY1YYY") == 0);
 }
@@ -556,4 +584,3 @@ int main(int argc, const char** argv) {
     test_OutboundPacket();
     test_MessageProcessor();
 }
-
