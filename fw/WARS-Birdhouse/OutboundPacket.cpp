@@ -37,7 +37,7 @@ bool OutboundPacket::isAllocated() const {
     return _isAllocated;
 }
 
-void OutboundPacket::allocate(const Packet& packet, unsigned int packetLen,
+void OutboundPacket::scheduleTransmit(const Packet& packet, unsigned int packetLen,
     uint32_t giveUpTime) {
     _isAllocated = true;
     ::memcpy((void*)&_packet, (const void*)&packet, packetLen);

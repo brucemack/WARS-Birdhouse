@@ -28,28 +28,31 @@
 class OutboundPacketManager {
 public:
 
-        OutboundPacketManager(const Clock& clock, CircularBuffer& txBuffer);
+    OutboundPacketManager(const Clock& clock, CircularBuffer& txBuffer,
+        uint32_t txTimeoutMs, uint32_t txRetryMs);
 
-        bool allocateIfPossible(const Packet& packet, unsigned int packetLen,
-                uint32_t giveUpTime);
+    bool scheduleTransmitIfPossible(const Packet& packet, 
+        unsigned int packetLen);
 
-        void processAck(const Packet& ackPacket);
+    void processAck(const Packet& ackPacket);
 
-        void pump();
+    void pump();
 
-        /**
-         * @brief Gets the number of free packets that remain.
-         * 
-         * @return unsigned int 
-         */
-        unsigned int getFreeCount() const;
+    /**
+     * @brief Gets the number of free packets that remain.
+     * 
+     * @return unsigned int 
+     */
+    unsigned int getFreeCount() const;
 
 private:
 
-        static const unsigned int _packetCount = 8;
-        const Clock& _clock;
-        CircularBuffer& _txBuffer;
-        OutboundPacket _packets[_packetCount];
+    static const unsigned int _packetCount = 8;
+    const Clock& _clock;
+    CircularBuffer& _txBuffer;
+    OutboundPacket _packets[_packetCount];
+    uint32_t _txTimeoutMs;
+    uint32_t _txRetryMs;
 };
 
 #endif

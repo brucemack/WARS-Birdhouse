@@ -37,7 +37,7 @@ public:
 
     bool isAllocated() const;
 
-    void allocate(const Packet& packet, unsigned int packetLen,
+    void scheduleTransmit(const Packet& packet, unsigned int packetLen,
         uint32_t giveUpTime);
 
     /**

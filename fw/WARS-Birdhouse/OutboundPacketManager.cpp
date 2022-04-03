@@ -19,17 +19,19 @@
  */
 #include "OutboundPacketManager.h"
 
-OutboundPacketManager::OutboundPacketManager(const Clock& clock, CircularBuffer& txBuffer) 
+OutboundPacketManager::OutboundPacketManager(const Clock& clock, CircularBuffer& txBuffer,
+    uint32_t txTimeoutMs, uint32_t txRetryMs) 
     : _clock(clock), 
-      _txBuffer(txBuffer) {
+      _txBuffer(txBuffer),
+      _txTimeoutMs(txTimeoutMs),
+      _txRetryMs(txRetryMs) {
 }
 
-bool OutboundPacketManager::allocateIfPossible(const Packet& packet, unsigned int packetLen,
-    uint32_t giveUpTime) {
+bool OutboundPacketManager::scheduleTransmitIfPossible(const Packet& packet, unsigned int packetLen) {
     // Look for an unallocated packet a grab it - first come, first served.
     for (unsigned int i = 0; i < _packetCount; i++) {
         if (!_packets[i].isAllocated()) {
-            _packets[i].allocate(packet, packetLen, giveUpTime);
+            _packets[i].scheduleTransmit(packet, packetLen, _clock.time() + _txTimeoutMs);
             return true;
         }
     }

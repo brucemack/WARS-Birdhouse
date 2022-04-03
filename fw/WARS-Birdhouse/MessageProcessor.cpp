@@ -31,7 +31,6 @@ extern Stream& logger;
 
 static const char* msg_bad_message = "ERR: Bad message";
 static const char* msg_no_route = "ERR: No route";
-static const int32_t SEND_TIMEOUT = 10 * 1000;
 
 MessageProcessor::MessageProcessor(
     Clock& clock, 
@@ -40,14 +39,16 @@ MessageProcessor::MessageProcessor(
     RoutingTable& routingTable,  
     Instrumentation& instrumentation,
     nodeaddr_t myAddr, 
-    const char* myCall) 
+    const char* myCall,
+    uint32_t txTimeoutMs, 
+    uint32_t txRetryMs) 
     : _clock(clock),
       _rxBuffer(rxBuffer),
       _txBuffer(txBuffer),
       _routingTable(routingTable),
       _instrumentation(instrumentation),
       _myAddr(myAddr),
-      _opm(clock, txBuffer),
+      _opm(clock, txBuffer, txTimeoutMs, txRetryMs),
       _idCounter(1),
       _startTime(clock.time()) {
         // TODO: REVIEW THIS CLOSELY
@@ -115,8 +116,7 @@ void MessageProcessor::_process(int16_t rssi,
   if (packet.header.isAckRequired()) {
     Packet ack;
     ack.header.setupAckFor(packet.header, _myCall, _myAddr);
-    bool good = _opm.allocateIfPossible(ack, sizeof(Header), 
-      _clock.time() + SEND_TIMEOUT);
+    bool good = _opm.scheduleTransmitIfPossible(ack, sizeof(Header));
     if (!good) {
       logger.println("ERR: Full, no ACK");
     }
@@ -138,8 +138,7 @@ void MessageProcessor::_process(int16_t rssi,
       outPacket.header.setSourceAddr(_myAddr);
       // Arrange for sending.
       // NOTE: WE USE THE SAME LENGTH THAT WE GOT ON THE RX
-      bool good = _opm.allocateIfPossible(outPacket, packetLen, 
-        _clock.time() + SEND_TIMEOUT);
+      bool good = _opm.scheduleTransmitIfPossible(outPacket, packetLen);
       if (!good) {
         logger.println("ERR: Full, no forward");
       } else {
@@ -179,8 +178,7 @@ void MessageProcessor::_process(int16_t rssi,
       Packet resp;
       resp.header.setupResponseFor(packet.header, _myCall, _myAddr, 
         TYPE_PING_RESP, _getUniqueId(), firstHop);
-      bool good = _opm.allocateIfPossible(resp, sizeof(Header), 
-        _clock.time() + SEND_TIMEOUT);
+      bool good = _opm.scheduleTransmitIfPossible(resp, sizeof(Header));
       if (!good) {
         logger.println("ERR: Full, no resp");
       }
@@ -215,14 +213,13 @@ void MessageProcessor::_process(int16_t rssi,
 
       memcpy(resp.payload,(void*)&respPayload,sizeof(SadRespPayload));
 
-      bool good = _opm.allocateIfPossible(resp, sizeof(Header) + sizeof(SadRespPayload), 
-        _clock.time() + SEND_TIMEOUT);
+      bool good = _opm.scheduleTransmitIfPossible(resp, sizeof(Header) + sizeof(SadRespPayload));
       if (!good) {
         logger.println("ERR: Full, no resp");
       }
     }
     
-    // Get Engineering Data Repsonse (for display)
+    // Get Engineering Data Response (for display)
     else if (packet.header.getType() == TYPE_GETSED_RESP) {
       
       if (packetLen < sizeof(Header) + sizeof(SadRespPayload)) {
@@ -322,8 +319,7 @@ void MessageProcessor::_process(int16_t rssi,
 
       memcpy(resp.payload,(void*)&respPayload, sizeof(respPayload));
 
-      bool good = _opm.allocateIfPossible(resp, sizeof(Header) + sizeof(respPayload), 
-        _clock.time() + SEND_TIMEOUT);
+      bool good = _opm.scheduleTransmitIfPossible(resp, sizeof(Header) + sizeof(respPayload));
       if (!good) {
         logger.println("ERR: Full, no resp");
       }

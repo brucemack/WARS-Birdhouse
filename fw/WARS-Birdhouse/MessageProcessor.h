@@ -26,13 +26,22 @@
 #include "Instrumentation.h"
 #include "RoutingTable.h"
 
+/**
+ * @brief An instance of this class is responsible for pulling 
+ * packets off the node's receive queue and processing them.
+ */
 class MessageProcessor {
 public:
 
     MessageProcessor(Clock& clock, CircularBuffer& rxBuffer, CircularBuffer& txBuffer,
         RoutingTable& routingTable, Instrumentation& instrumentation,
-        nodeaddr_t myAddr, const char* myCall);
+        nodeaddr_t myAddr, const char* myCall,
+        uint32_t txTimeoutMs, uint32_t txRetryMs);
 
+    /**
+     * @brief Call this method from the event loop.  This causes
+     * things to happen.
+     */
     void pump();
 
 private:

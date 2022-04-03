@@ -106,7 +106,8 @@ void test_MessageProcessor() {
     CircularBufferImpl<4096> txBuffer1(0);
     CircularBufferImpl<4096> rxBuffer1(2);
     MessageProcessor mp1(clock, rxBuffer1, txBuffer1,
-        routingTable1, instrumentation1, 1, "KC1FSZ");
+        routingTable1, instrumentation1, 1, "KC1FSZ",
+        10 * 1000, 2 * 1000);
 
     // Node #3 (intermediate)
     TestInstrumentation instrumentation3;
@@ -116,7 +117,8 @@ void test_MessageProcessor() {
     CircularBufferImpl<4096> txBuffer3(0);
     CircularBufferImpl<4096> rxBuffer3(2);
     MessageProcessor mp3(clock, rxBuffer3, txBuffer3,
-        routingTable3, instrumentation3, 3, "W1TKZ");
+        routingTable3, instrumentation3, 3, "W1TKZ",
+        10 * 1000, 2 * 1000);
 
     // Node #7 (desktop)
     TestInstrumentation instrumentation7;
@@ -126,7 +128,8 @@ void test_MessageProcessor() {
     CircularBufferImpl<4096> txBuffer7(0);
     CircularBufferImpl<4096> rxBuffer7(2);
     MessageProcessor mp7(clock, rxBuffer7, txBuffer7,
-        routingTable7, instrumentation7, 7, "WA3ITR");
+        routingTable7, instrumentation7, 7, "WA3ITR",
+        10 * 1000, 2 * 1000);
 
     clock.setTime(60 * 1000);
 
@@ -192,7 +195,7 @@ void test_OutboundPacket() {
     TestInstrumentation instrumentation;
     TestRoutingTable routingTable1;
     CircularBufferImpl<4096> txBuffer(0);
-    OutboundPacketManager opm(clock, txBuffer);
+    OutboundPacketManager opm(clock, txBuffer, 10 * 1000, 2 * 1000);
     assert(opm.getFreeCount() == 8);
 
     clock.setTime(10 * 1000);
@@ -212,7 +215,7 @@ void test_OutboundPacket() {
     unsigned int packet0Len = sizeof(Header) + 1;
 
     // Queue something 
-    assert(opm.allocateIfPossible(packet0, packet0Len, 12 * 1000));
+    assert(opm.scheduleTransmitIfPossible(packet0, packet0Len));
     assert(opm.getFreeCount() == 7);
 
     // Move things
@@ -271,7 +274,7 @@ void test_OutboundPacket() {
     assert(txBuffer.isEmpty());
 
     // Queue something for delivery 
-    assert(opm.allocateIfPossible(packet1, packet1Len, 30 * 1000));
+    assert(opm.scheduleTransmitIfPossible(packet1, packet1Len));
     assert(opm.getFreeCount() == 7);
 
     // Move things
@@ -328,7 +331,7 @@ void test_OutboundPacket() {
     packet3.payload[0] = '3';
     unsigned int packet3Len = sizeof(Header) + 1;
     // Queue something for delivery 
-    assert(opm.allocateIfPossible(packet3, packet3Len, clock.time() + 10000));
+    assert(opm.scheduleTransmitIfPossible(packet3, packet3Len));
 
     Packet packet4;
     packet4.header.setType(TYPE_ACK);
@@ -343,7 +346,7 @@ void test_OutboundPacket() {
     packet4.payload[0] = '4';
     unsigned int packet4Len = sizeof(Header) + 1;
     // Queue something for delivery 
-    assert(opm.allocateIfPossible(packet4, packet4Len, clock.time() + 10000));
+    assert(opm.scheduleTransmitIfPossible(packet4, packet4Len));
 
     assert(txBuffer.isEmpty());
 
