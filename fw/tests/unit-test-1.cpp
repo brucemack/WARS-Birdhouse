@@ -41,6 +41,10 @@ public:
         _time = t;
     }
 
+    void advanceSeconds(uint32_t seconds) {
+        _time += (seconds * 1000);
+    }
+
 private:
 
     uint32_t _time;
@@ -182,11 +186,22 @@ void test_MessageProcessor() {
     mp7.pump();
     mp7.pump();
 
-    // Transfer the TX.7->RX.3
     // There should be one message (ACK on type 4)
     assert(!txBuffer7.isEmpty());
-    movePacket(txBuffer7, rxBuffer3);
+    // Throw that message away in order to test the retry
+    txBuffer7.popAndDiscard();
     assert(txBuffer7.isEmpty());
+
+    // Watch node 3 attempt to retry
+    cout << "----- Working on 3 ------" << endl;
+    mp3.pump();
+    assert(txBuffer3.isEmpty());
+
+    // There should be a re-transmit of the type 4 from 3->7
+    // since we got lost the ACK
+    clock.advanceSeconds(3);
+    mp3.pump();
+    assert(!txBuffer3.isEmpty());
 }
 
 void test_OutboundPacket() {
