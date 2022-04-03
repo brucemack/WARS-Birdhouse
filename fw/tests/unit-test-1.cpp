@@ -21,6 +21,7 @@ public:
     void print(const char* m) { cout << m; }
     void print(uint16_t m) { cout << m; }
     void println() { cout << endl; }
+    void println(const char* m) { cout << m << endl; }
 };
 
 static TestStream testStream;
@@ -61,21 +62,24 @@ public:
 };
 
 // Dummy routing table for node 1 (KC1FSZ)
-
-class TestRoutingTable1 : public RoutingTable {
+class TestRoutingTable : public RoutingTable {
 public:
     
+    TestRoutingTable() {
+        for (unsigned int i = 0; i < 64; i++)
+            _table[i] = RoutingTable::NO_ROUTE;
+    }
+
     virtual nodeaddr_t nextHop(nodeaddr_t finalDestAddr) {
-        if (finalDestAddr == 7) {
-            return 3;
-        } else {
-            return RoutingTable::NO_ROUTE;
-        }
+        return _table[finalDestAddr];
     }
 
     virtual void setRoute(nodeaddr_t target, nodeaddr_t nextHop) {
-        cout << "setRoute " << target << "->" << nextHop << endl;
+        _table[target] = nextHop;
     }
+private:
+
+    nodeaddr_t _table[64];
 };
 
 void movePacket(CircularBuffer& from, CircularBuffer& to) {
@@ -90,11 +94,14 @@ void movePacket(CircularBuffer& from, CircularBuffer& to) {
 
 void test_MessageProcessor() {
 
+    cout << "test_MessageProcessor" << endl;
+
     TestClock clock;
 
     // Node #1
     TestInstrumentation instrumentation1;
-    TestRoutingTable1 routingTable1;
+    TestRoutingTable routingTable1;
+    routingTable1.setRoute(3, 3);
     routingTable1.setRoute(7, 3);
     CircularBufferImpl<4096> txBuffer1(0);
     CircularBufferImpl<4096> rxBuffer1(2);
@@ -103,7 +110,8 @@ void test_MessageProcessor() {
 
     // Node #3 (intermediate)
     TestInstrumentation instrumentation3;
-    TestRoutingTable1 routingTable3;
+    TestRoutingTable routingTable3;
+    routingTable3.setRoute(1, 1);
     routingTable3.setRoute(7, 7);
     CircularBufferImpl<4096> txBuffer3(0);
     CircularBufferImpl<4096> rxBuffer3(2);
@@ -112,7 +120,9 @@ void test_MessageProcessor() {
 
     // Node #7 (desktop)
     TestInstrumentation instrumentation7;
-    TestRoutingTable1 routingTable7;
+    TestRoutingTable routingTable7;
+    routingTable7.setRoute(1, 3);
+    routingTable7.setRoute(3, 3);
     CircularBufferImpl<4096> txBuffer7(0);
     CircularBufferImpl<4096> rxBuffer7(2);
     MessageProcessor mp7(clock, rxBuffer7, txBuffer7,
@@ -141,21 +151,46 @@ void test_MessageProcessor() {
     // Make things happen on node 1
     assert(txBuffer1.isEmpty());
     mp1.pump();
+    mp1.pump();
     assert(!txBuffer1.isEmpty());
 
-    // Transfer the TX.1->TX.3
+    // Transfer the TX.1->RX.3
+    // The first is the ACK, the second is the PING_RESP
     movePacket(txBuffer1, rxBuffer3);
+    assert(!txBuffer1.isEmpty());
+    movePacket(txBuffer1, rxBuffer3);
+    assert(txBuffer1.isEmpty());
 
-    // Make things happen on node 3
+    // Make things happen on node 3.
+    cout << "----- Working on 3 ------" << endl;
     mp3.pump();
+    mp3.pump();
+
+    // Transfer the TX.3->RX.7
+    // There should be two messages (the type 1 back to 
+    // node 1 and the type 4 being forwarded to 7)
     assert(!txBuffer3.isEmpty());
+    movePacket(txBuffer3, rxBuffer7);
+    movePacket(txBuffer3, rxBuffer7);
+    assert(txBuffer3.isEmpty());
+
+    // Make things happen on node 7.
+    cout << "----- Working on 7 ------" << endl;
+    mp7.pump();
+    mp7.pump();
+
+    // Transfer the TX.7->RX.3
+    // There should be one message (ACK on type 4)
+    assert(!txBuffer7.isEmpty());
+    movePacket(txBuffer7, rxBuffer3);
+    assert(txBuffer7.isEmpty());
 }
 
 void test_OutboundPacket() {
     
     TestClock clock;
     TestInstrumentation instrumentation;
-    TestRoutingTable1 routingTable1;
+    TestRoutingTable routingTable1;
     CircularBufferImpl<4096> txBuffer(0);
     OutboundPacketManager opm(clock, txBuffer);
     assert(opm.getFreeCount() == 8);

@@ -39,7 +39,8 @@ void MessageProcessor::pump() {
     int16_t rssi = 0;
     Packet packet;
     unsigned int packetLen = sizeof(Packet);
-    bool notEmpty = _rxBuffer.popIfNotEmpty((void*)&rssi, (void*)&packet, &packetLen);
+    bool notEmpty = _rxBuffer.popIfNotEmpty((void*)&rssi, 
+      (void*)&packet, &packetLen);
     if (notEmpty) {
         _process(rssi, packet, packetLen);
     }
@@ -59,24 +60,48 @@ void MessageProcessor::_process(int16_t rssi,
     return;
   }
 
+  // Ignore messages that aren't targeted at this node.
+  // This can happen when nodes are close to each other 
+  // and they are able to hear traffic targed at other
+  // nodes.
+  if (packet.header.getDestAddr() != BROADCAST_ADDR &&
+      packet.header.getDestAddr() != _myAddr) {
+      return;
+  }
+
   logger.print(F("INF: Got type: "));
   logger.print(packet.header.type);
   logger.print(", id: ");
   logger.print(packet.header.id);
   logger.print(", from: ");
   logger.print(packet.header.sourceAddr);
+  logger.print(", to: ");
+  logger.print(packet.header.destAddr);
   logger.print(", originalSource: ");
   logger.print(packet.header.originalSourceAddr);
   logger.print(", finalDest: ");
   logger.print(packet.header.finalDestAddr);
-  logger.print(", RSSI: ");
+  logger.print(", RSSi: ");
   logger.print(rssi);
   logger.println();
 
-  // Generate an ACK for the message we just received
+  // If we got an ACK then process it directly 
+  if (packet.header.isAck()) {
+    _opm.processAck(packet);
+    return;
+  }
 
-
-
+  // If the message we just received requires and ACK then 
+  // generate one before proceeding with the local processing.
+  if (packet.header.isAckRequired()) {
+    Packet ack;
+    ack.header.setupAckFor(packet.header, _myCall, _myAddr);
+    bool good = _opm.allocateIfPossible(ack, sizeof(Header), 
+      _clock.time() + SEND_TIMEOUT);
+    if (!good) {
+      logger.println("ERR: Full, no ACK");
+    }
+  }
 
   // Look for messages that need to be forwarded on to another node
   if (packet.header.getFinalDestAddr() != _myAddr) {

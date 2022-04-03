@@ -116,6 +116,10 @@ struct Header {
         memcpy(finalDestCall, reqHeader.originalSourceCall, 8);
     }
 
+    bool isAck() const {
+        return (type == TYPE_ACK);
+    }
+
     bool isAckRequired() const {
         return !(type == TYPE_ACK || type == TYPE_STATION_ID) && 
           (destAddr != BROADCAST_ADDR);

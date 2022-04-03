@@ -44,9 +44,6 @@ void OutboundPacket::transmitIfReady(const Clock& clock, CircularBuffer& txBuffe
     // If we make it here than we are ready to transmit
     bool good = txBuffer.push(0, &_packet, _packetLen);
     if (good) {
-        logger.print("INF: Queued ");
-        logger.print(_packet.header.id);
-        logger.println();
         if (_packet.header.isAckRequired()) {
             // If an acknowledgement is required then record the 
             // necessary information to manage the retries.
@@ -65,9 +62,6 @@ void OutboundPacket::processAckIfRelevant(const Packet& ackPacket) {
     if (_isAllocated &&
         ackPacket.header.sourceAddr == _packet.header.destAddr &&
         ackPacket.header.id == _packet.header.id) {
-        logger.print("INF: ACK on ");
-        logger.print(_packet.header.id);
-        logger.println();
         _reset();
     }
 }
