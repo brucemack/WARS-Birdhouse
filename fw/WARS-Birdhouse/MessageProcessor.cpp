@@ -73,6 +73,11 @@ void MessageProcessor::_process(int16_t rssi,
   logger.print(rssi);
   logger.println();
 
+  // Generate an ACK for the message we just received
+
+
+
+
   // Look for messages that need to be forwarded on to another node
   if (packet.header.getFinalDestAddr() != _myAddr) {
     // This is a forward route (i.e. twoards the final destination)
@@ -93,6 +98,10 @@ void MessageProcessor::_process(int16_t rssi,
         _clock.time() + SEND_TIMEOUT);
       if (!good) {
         logger.println("ERR: Full, no forward");
+      } else {
+        logger.print("INF: Forward to ");
+        logger.print(nextHop);
+        logger.println();
       }
     }
     else {

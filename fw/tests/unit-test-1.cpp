@@ -78,21 +78,49 @@ public:
     }
 };
 
-void transfer() {
+void movePacket(CircularBuffer& from, CircularBuffer& to) {
+    unsigned int packetLen = 256;
+    uint8_t packet[256];
+    bool got = from.popIfNotEmpty(0, packet, &packetLen);
+    if (got) {
+        int16_t rssi = 100;
+        to.push(&rssi, packet, packetLen);
+    }
 }
 
 void test_MessageProcessor() {
 
+    TestClock clock;
+
     // Node #1
-    TestClock clock1;
     TestInstrumentation instrumentation1;
     TestRoutingTable1 routingTable1;
+    routingTable1.setRoute(7, 3);
     CircularBufferImpl<4096> txBuffer1(0);
     CircularBufferImpl<4096> rxBuffer1(2);
-    MessageProcessor mp1(clock1, rxBuffer1, txBuffer1,
+    MessageProcessor mp1(clock, rxBuffer1, txBuffer1,
         routingTable1, instrumentation1, 1, "KC1FSZ");
 
-    // Send in ping message
+    // Node #3 (intermediate)
+    TestInstrumentation instrumentation3;
+    TestRoutingTable1 routingTable3;
+    routingTable3.setRoute(7, 7);
+    CircularBufferImpl<4096> txBuffer3(0);
+    CircularBufferImpl<4096> rxBuffer3(2);
+    MessageProcessor mp3(clock, rxBuffer3, txBuffer3,
+        routingTable3, instrumentation3, 3, "W1TKZ");
+
+    // Node #7 (desktop)
+    TestInstrumentation instrumentation7;
+    TestRoutingTable1 routingTable7;
+    CircularBufferImpl<4096> txBuffer7(0);
+    CircularBufferImpl<4096> rxBuffer7(2);
+    MessageProcessor mp7(clock, rxBuffer7, txBuffer7,
+        routingTable7, instrumentation7, 7, "WA3ITR");
+
+    clock.setTime(60 * 1000);
+
+    // Send in a ping message directly to node 1
     {
         // Make a packet to send
         Packet packet1;
@@ -110,10 +138,17 @@ void test_MessageProcessor() {
         rxBuffer1.push(&rssi, (const char*)&packet1, packet1Len);
     }
 
-    // Make things happen
+    // Make things happen on node 1
     assert(txBuffer1.isEmpty());
     mp1.pump();
     assert(!txBuffer1.isEmpty());
+
+    // Transfer the TX.1->TX.3
+    movePacket(txBuffer1, rxBuffer3);
+
+    // Make things happen on node 3
+    mp3.pump();
+    assert(!txBuffer3.isEmpty());
 }
 
 void test_OutboundPacket() {
