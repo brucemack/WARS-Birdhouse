@@ -104,14 +104,14 @@ public:
         return _myAddr;
     }
 
-    const char* getCall() const {
+    CallSign getCall() const {
         return _myCall;
     }
 
 private:
 
     nodeaddr_t _myAddr;
-    const char* _myCall;
+    const CallSign _myCall;
 };
 
 void movePacket(CircularBuffer& from, CircularBuffer& to) {
