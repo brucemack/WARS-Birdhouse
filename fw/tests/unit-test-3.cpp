@@ -51,6 +51,7 @@ void test_3() {
     config.setCall(CallSign("KC1FSZ"));
     config.setAddr(7);
 
+    CallSign my1 = config.getCall();
     assert(my1.equals(CallSign("KC1FSZ")));
     assert(config.getAddr() == 7);
 }

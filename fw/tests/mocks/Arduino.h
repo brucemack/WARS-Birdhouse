@@ -15,6 +15,7 @@ public:
     virtual void print(uint8_t, int) {}
     virtual void print(uint16_t, int) {}
     virtual void print(uint16_t) {};
+    virtual void print(uint32_t) {};
     virtual void print(int) {};
     virtual void println(const char*) {};
     virtual void println(unsigned int) {};

@@ -100,7 +100,9 @@ struct Header {
         // Echo back the original stuff
         originalSourceAddr = rx_packet.originalSourceAddr;
         finalDestAddr = rx_packet.finalDestAddr;
-        loadCall(sourceCall, config.getCall());
+        CallSign myCall = config.getCall();
+        myCall.writeTo(sourceCall);
+
         // Echo back the original stuff
         memcpy(finalDestCall, rx_packet.finalDestCall, 8);
         memcpy(originalSourceCall, rx_packet.originalSourceCall, 8);
@@ -129,8 +131,9 @@ struct Header {
         // SWAP 
         finalDestAddr = reqHeader.originalSourceAddr;
         // Call stuff
-        loadCall(sourceCall, config.getCall());
-        loadCall(originalSourceCall, config.getCall());
+        CallSign myCall = config.getCall();
+        myCall.writeTo(sourceCall);
+        myCall.writeTo(originalSourceCall);
         // SWAP
         memcpy(finalDestCall, reqHeader.originalSourceCall, 8);
     }
@@ -197,53 +200,32 @@ struct Header {
         finalDestAddr = addr;
     }
 
-    void setSourceCall(const char* call) {
-        loadCall(sourceCall, call);
+    void setSourceCall(const CallSign& call) {
+        call.writeTo(sourceCall);
     }
 
-    void getSourceCall(char* call) {
-        unloadCall(call, sourceCall);
+    CallSign getSourceCall() {
+        CallSign result;
+        result.readFrom(sourceCall);
+        return result;
     }
 
-    void setOriginalSourceCall(const char* call) {
-        loadCall(originalSourceCall, call);
+    void setOriginalSourceCall(const CallSign& call) {
+        call.writeTo(originalSourceCall);
     }
 
-    void getOriginalSourceCall(char* call) {
-        unloadCall(call, originalSourceCall);
+    CallSign getOriginalSourceCall() {
+        CallSign result;
+        result.readFrom(originalSourceCall);
+        return result;
     }
 
-    void setFinalDestCall(const char* call) {
-        loadCall(finalDestCall, call);
+    void setFinalDestCall(const CallSign& call) {
+        call.writeTo(finalDestCall);
     }
 
     bool isRelevant(nodeaddr_t myAddr) const {
         return destAddr == myAddr || destAddr == BROADCAST_ADDR;
-    }
-
-    /**
-     * @brief Copies a null-terminated string into a non-null
-     * terminated buffer which is space-padded.
-     * 
-     * @param dest 
-     * @param sourceWithNull 
-     */
-    static void loadCall(char* dest, const char* sourceWithNull) {
-        // Blank out target
-        for (unsigned int i = 0; i < 8; i++)
-            dest[i] = ' ';
-        // Copy until we see a null
-        for (unsigned int i = 0; i < 8 && sourceWithNull[i] != 0; i++)
-            dest[i] = sourceWithNull[i];
-    }
-
-    static void unloadCall(char* destWithNull, const char* source) {
-        // Null out target
-        for (unsigned int i = 0; i < 9; i++)
-            destWithNull[i] = 0;
-        // Copy until we see a pad space
-        for (unsigned int i = 0; i < 8 && source[i] != ' '; i++) 
-            destWithNull[i] = source[i];
     }
 };
 

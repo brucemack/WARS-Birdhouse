@@ -28,8 +28,8 @@ public:
     virtual CallSign getCall() const = 0;
     virtual nodeaddr_t getAddr() const = 0;
 
-    virtual void setAddr(nodeaddr_t a) = 0;
-    virtual void setCall(const CallSign& call) = 0;
+    virtual void setAddr(nodeaddr_t a) {};
+    virtual void setCall(const CallSign& call) {};
 };
 
 #endif

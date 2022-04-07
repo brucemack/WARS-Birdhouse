@@ -21,6 +21,7 @@ public:
 
     void print(const char* m) { cout << m; }
     void print(uint16_t m) { cout << m; }
+    void print(uint32_t m) { cout << m; }
     void println() { cout << endl; }
     void println(const char* m) { cout << m << endl; }
 };
@@ -100,14 +101,14 @@ public:
         return _myAddr;
     }
 
-    const char* getCall() const {
+    CallSign getCall() const {
         return _myCall;
     }
 
 private:
 
     nodeaddr_t _myAddr;
-    const char* _myCall;
+    const CallSign _myCall;
 };
 
 void movePacket(CircularBuffer& from, CircularBuffer& to) {
@@ -288,10 +289,9 @@ void test_OutboundPacket() {
     assert(ackPacket0.header.getId() == 1);
     assert(ackPacket0.header.getSourceAddr() == 3);
     assert(ackPacket0.header.getDestAddr() == 1);
-    char call[9];
-    ackPacket0.header.getSourceCall(call);
+    CallSign call = ackPacket0.header.getSourceCall();
     // Make sure the ACK packet uses his own call
-    assert(strcmp(call, "W1TKZ") == 0);
+    assert(call.isEqual("W1TKZ"));
     // Check type
     assert(ackPacket0.header.getType() == TYPE_ACK);
 
@@ -571,11 +571,11 @@ void test_header() {
     // Source/dest
     assert(ack_header.sourceAddr == 1);
     assert(ack_header.destAddr == 2);
-    char callArea[9];
-    ack_header.getSourceCall(callArea);
-    assert(strcmp(callArea, config1.getCall()) == 0);
-    ack_header.getOriginalSourceCall(callArea);
-    assert(strcmp(callArea, "YY1YYY") == 0);
+
+    CallSign call = header.getSourceCall();
+    assert(call.equals(config1.getCall()));
+    call = ack_header.getOriginalSourceCall();
+    assert(call.isEqual("YY1YYY"));
 }
 
 int main(int argc, const char** argv) {
