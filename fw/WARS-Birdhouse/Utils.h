@@ -21,9 +21,47 @@
 #define _Utils_h
 
 #include <stdint.h>
+#ifdef ARDUINO
+#include <Arduino.h>
+#endif
 
 typedef uint16_t nodeaddr_t;
 
 nodeaddr_t parseAddr(const char* textAddr);
+
+class CallSign {
+public:
+
+    CallSign();
+    CallSign(const char* call);
+    CallSign(const CallSign& other);
+
+    /**
+     * @brief Writes the call sign into an 8 byte buffer,
+     * padding with spaces if necessary to full.  There
+     * is no null-termination provided.
+     */
+    void writeTo(void* buffer8) const;
+
+    /**
+     * @brief Reads the call sign from an 8 byte buffer.
+     * There is no null-termination. 
+     */
+    void readFrom(const void* buffer8);
+
+    /**
+     * @brief Prints the call into the stream.  No padding
+     * is used.
+     * 
+     * @param stream 
+     */
+    void printTo(Stream& stream) const;
+
+private:
+
+    void _clear();
+
+    char _call[8];
+};
 
 #endif

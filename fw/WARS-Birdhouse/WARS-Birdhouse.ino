@@ -184,6 +184,50 @@ public:
     }
 };
 
+class RoutingTableImpl : public RoutingTable {
+public:
+    
+    RoutingTableImpl() {
+        for (unsigned int i = 0; i < 64; i++)
+            _table[i] = RoutingTable::NO_ROUTE;
+    }
+
+    nodeaddr_t nextHop(nodeaddr_t finalDestAddr) {
+        if (finalDestAddr == 0) {
+            return 0;
+        } else if (finalDestAddr >= 0xfff0) {
+            return finalDestAddr;
+        } else {
+            return _table[finalDestAddr];
+        }
+    }
+
+    void setRoute(nodeaddr_t target, nodeaddr_t nextHop) {
+        _table[target] = nextHop;
+    }
+
+private:
+
+    void _load() {
+        uint8_t routes[256]
+      x  // Get the initial routing table loaded from NVRAM
+  for (int i = 0; i < 256; i++) {
+    Routes[i] = 0;
+  }
+  preferences.getBytes("routes", Routes, 256);
+
+    }
+
+    void _save() {
+
+    }
+
+    static const unsigned int _tableSize = 64;
+    nodeaddr_t _table[64];
+};
+
+
+
 // Connect the logger stream to the SimpleSerialShell
 Stream& logger = shell;
 

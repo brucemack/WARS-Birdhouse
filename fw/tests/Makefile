@@ -15,3 +15,9 @@ test2:
 	../WARS-Birdhouse/CommandProcessor.cpp \
 	../WARS-Birdhouse/Utils.cpp
 	./unit-test-2 
+
+test3:
+	g++ -ggdb -DARDUINO -I./mocks -o unit-test-3 unit-test-3.cpp \
+	../WARS-Birdhouse/Utils.cpp
+	./unit-test-3
+
