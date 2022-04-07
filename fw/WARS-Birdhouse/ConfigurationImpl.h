@@ -17,19 +17,30 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef _Configuration_h
-#define _Configuration_h
+#ifndef _ConfigurationImpl_h
+#define _ConfigurationImpl_h
 
-#include "Utils.h"
+#include "StationConfig.h"
+#include "Configuration.h"
 
-class Configuration {
+class ConfigurationImpl : public Configuration {
 public:
 
-    virtual CallSign getCall() const = 0;
-    virtual nodeaddr_t getAddr() const = 0;
+    ConfigurationImpl();
 
-    virtual void setAddr(nodeaddr_t a) = 0;
-    virtual void setCall(const CallSign& call) = 0;
+    CallSign getCall() const;
+    nodeaddr_t getAddr() const;
+
+    void setAddr(nodeaddr_t a);
+    void setCall(const CallSign& call);
+
+private:
+
+    void _load();
+    void _save();
+
+    // A RAM-cached version of the configuration
+    StationConfig _configCache;
 };
 
 #endif

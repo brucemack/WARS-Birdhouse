@@ -1,4 +1,5 @@
 #include "../WARS-Birdhouse/Utils.h"
+#include "../WARS-Birdhouse/ConfigurationImpl.h"
 
 #include <EEPROM.h>
 #include <iostream>
@@ -42,8 +43,21 @@ void test_2() {
     assert(1 == EEPROM.read(8));
 }
 
+void test_3() {
+
+    TestStream stream;
+
+    ConfigurationImpl config;
+    config.setCall(CallSign("KC1FSZ"));
+    config.setAddr(7);
+
+    assert(my1.equals(CallSign("KC1FSZ")));
+    assert(config.getAddr() == 7);
+}
+
 int main(int argc, const char** argv) {
     test_1();
     test_2();
+    test_3();
     return 0;
 }

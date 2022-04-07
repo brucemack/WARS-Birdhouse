@@ -6,8 +6,8 @@
 class EEPROMClass {
 public:
 
-    uint8_t read(int addr);
-    void write(int addr, uint8_t data);
+    uint8_t read(unsigned int addr);
+    void write(unsigned int addr, uint8_t data);
 };
 
 extern EEPROMClass EEPROM;
