@@ -23,7 +23,7 @@ CallSign::CallSign(const CallSign& other) {
 
 void CallSign::_clear() {
     for (unsigned int i = 0; i < 8; i++)
-        _call[i] = ' ';
+        _call[i] = 0;
 }
 
 void CallSign::writeTo(void* buffer8) const {
@@ -43,11 +43,16 @@ void CallSign::readFrom(const void* buffer8) {
  * @param stream 
  */
 void CallSign::printTo(Stream& stream) const {
-    for (unsigned int i = 0; i < 8 && _call[i] != ' '; i++) {
-        //stream.print((int)_call[i]);
-        //stream.print(" ");
+    for (unsigned int i = 0; i < 8 && _call[i] != 0; i++) {
         stream.print(_call[i]);
-        //stream.println();
     }
 }
 
+bool CallSign::isEqual(const char* call) const {
+    CallSign other(call);
+    return equals(other);
+}
+
+bool CallSign::equals(const CallSign& other) const {
+    return memcmp(_call, other._call, 8) == 0;
+}

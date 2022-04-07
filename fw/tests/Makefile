@@ -18,6 +18,7 @@ test2:
 
 test3:
 	g++ -ggdb -DARDUINO -I./mocks -o unit-test-3 unit-test-3.cpp \
-	../WARS-Birdhouse/Utils.cpp
+	../WARS-Birdhouse/Utils.cpp \
+	./mocks/Arduino.cpp	
 	./unit-test-3
 

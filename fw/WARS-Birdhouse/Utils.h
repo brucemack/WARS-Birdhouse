@@ -33,7 +33,13 @@ class CallSign {
 public:
 
     CallSign();
+
+    /**
+     * @brief Construct a new Call Sign object from a null-terminated
+     * string.
+     */
     CallSign(const char* call);
+    
     CallSign(const CallSign& other);
 
     /**
@@ -56,6 +62,18 @@ public:
      * @param stream 
      */
     void printTo(Stream& stream) const;
+
+    /**
+     * @brief Compares the callsign to a null-terminated
+     * string.
+     * 
+     * @param call 
+     * @return true 
+     * @return false 
+     */
+    bool isEqual(const char* call) const;
+
+    bool equals(const CallSign& other) const;
 
 private:
 
