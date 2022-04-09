@@ -53,6 +53,11 @@ public:
      */
     unsigned int getUniqueId();
 
+    /**
+     * @brief Resets all diagnostic counters
+     */
+    void resetCounter();
+
 private:
 
     void _process(int16_t rssi, const Packet& packet, unsigned int packetLen);

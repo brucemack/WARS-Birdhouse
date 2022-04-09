@@ -43,6 +43,11 @@ public:
     virtual void sleep(uint32_t ms) = 0;
     virtual void restart() = 0;
     virtual void restartRadio() = 0;
+
+    /**
+     * @brief Resets diagnostic counters
+     */
+    virtual void resetCounters() {};
 };
 
 #endif

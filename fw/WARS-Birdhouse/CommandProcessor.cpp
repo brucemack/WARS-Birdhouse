@@ -14,6 +14,7 @@ static auto msg_arg_error = F("ERR: Argument error");
 static auto msg_no_route = F("ERR: No route available");
 static auto msg_bad_address = F("ERR: Bad address");
 static auto msg_bad_message = F("ERR: Bad message");
+static auto msg_tx_busy = F("ERR: TX busy");
 
 extern Stream& logger;
 extern Configuration& systemConfig;
@@ -231,59 +232,56 @@ int doRem(int argc, char **argv) {
  *  1: The destination node number
  *  2: The text of the message, limited to 80 characters.
  */
-/*
 int sendText(int argc, char **argv) { 
  
-  if (argc != 3) {
-    shell.println(msg_arg_error);
-    return -1;
-  }
-  
-  uint8_t target = atoi(argv[1]);
-  if (target == 0 || target == 255) {
-      shell.println(F("ERR: Bad address"));
-      return -1;
-  }
+    if (argc != 3) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
 
-  // Since we might not be directly connected to the 
-  // destination node we use the routing table to
-  // figure out the "next hop."
-  uint8_t nextHop = Routes[target];
-  if (nextHop == 0) {
-    shell.println(F("ERR: No route"));
-    return -1;
-  }
+    nodeaddr_t finalDest = parseAddr(argv[1]);
+    if (finalDest == 0) {
+        logger.println(msg_bad_address);
+        return -1;
+    }
 
-  uint16_t textLen = strlen(argv[2]);
-  if (textLen > 80) {
-    shell.println(F("ERR: Length error"));
-    return -1;
-  }
+    // Since we might not be directly connected to the 
+    // destination node we use the routing table to
+    // figure out the "next hop."
+    nodeaddr_t nextHop = systemRoutingTable.nextHop(finalDest);
+    if (nextHop == RoutingTable::NO_ROUTE) {
+        logger.println(msg_no_route);
+        return -1;
+    }
 
-  // Assign a unique ID to the message
-  counter++;
-  uint8_t tx_buf[256];
+    uint16_t textLen = strlen(argv[2]);
+    if (textLen > 80) {
+        logger.println(F("ERR: Length error"));
+        return -1;
+    }
 
-  // Fill out the standard header
-  Header header;
-  header.destAddr = nextHop;
-  header.sourceAddr = MY_ADDR;
-  header.id = counter;
-  header.type = MessageType::TYPE_TEXT;
-  header.finalDestAddr = target;
-  header.originalSourceAddr = MY_ADDR;
-
-  // Stream the header and message text into a continguous buffer
-  memcpy(tx_buf, &header, sizeof(Header));
-  memcpy(tx_buf + sizeof(Header), argv[2], textLen);
-
-  // Push the header/message onto the TX queue for background
-  // processing.
-  tx_buffer.push(tx_buf, sizeof(Header) + textLen);
-      
-  return 0;
+    // Make a ping request
+    Packet packet;
+    packet.header.setType(TYPE_TEXT);
+    packet.header.setId(systemMessageProcessor.getUniqueId());
+    packet.header.setSourceAddr(systemConfig.getAddr());
+    packet.header.setDestAddr(nextHop);
+    packet.header.setOriginalSourceAddr(systemConfig.getAddr());
+    packet.header.setFinalDestAddr(finalDest);
+    packet.header.setSourceCall(systemConfig.getCall());
+    packet.header.setOriginalSourceCall(systemConfig.getCall());
+    // Put the text into the payload
+    memcpy(packet.payload, argv[2], textLen);
+    unsigned int packetLen = sizeof(Header) + textLen;
+    // Send it
+    bool good = systemMessageProcessor.transmitIfPossible(packet, packetLen);
+    if (!good) {
+        logger.println(msg_tx_busy);
+        return -1;
+    }
+    return 0;
 }
-
+/*
 int sendSetRoute(int argc, char **argv) { 
  
   if (argc != 4) {
