@@ -2,7 +2,7 @@ WARS LoRa Birdhouse Project
 ===========================
 
 Looking for a different way to tweet?  This project explores the potential of using low-cost/low-bandwidth LoRa radios to build simple mesh networks that can pass text messages around town.  Networks of this type could be useful for emergency communications or 
-other applications that can take advantage of the fully-autonomous nature of the repeater stations. This 
+other applications that can take advantage of the fully-autonomous nature of the birdhouse repeater stations. This 
 project is being undertaken by members of the Wellesley Amateur Radio Society (W1TKZ, grid FN42).  The design is 
 made available for amateur (non-commercial) purposes in the spirit of experimentation and knowledge sharing
 amongst the ham community.  At the very least, we're creating homes for some lucky birds in our area.
@@ -24,7 +24,7 @@ under development.
 LoRa range experiments have been widely documented.  Your milage will vary considerably depending on terrain, 
 station hight, etc. Testing shows that 1 km link ranges are reasonable in suburban areas. 
 
-Birdhouse packaging was chosen in order to blend into the surroundings more easily.
+Birdhouse packaging was chosen in order to blend into the surroundings more easily.  
 
 Low-power, solar design allows the birdhouses to be 100% autonomous.  This makes it relatively easy to install a repeater station in any location that has good sun exposure and good visibility to other stations. 
 
