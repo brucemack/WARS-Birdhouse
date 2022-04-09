@@ -6,6 +6,7 @@
 #include "../WARS-Birdhouse/Clock.h"
 #include "../WARS-Birdhouse/Instrumentation.h"
 #include "../WARS-Birdhouse/RoutingTable.h"
+#include "../WARS-Birdhouse/RoutingTableImpl.h"
 #include "../WARS-Birdhouse/MessageProcessor.h"
 #include "../WARS-Birdhouse/Configuration.h"
 
@@ -69,6 +70,7 @@ public:
     void sleep(uint32_t ms) { cout << "SLEEP " << ms << endl; }
 };
 
+/*
 // Dummy routing table for node 1 (KC1FSZ)
 class TestRoutingTable : public RoutingTable {
 public:
@@ -101,6 +103,7 @@ private:
 
     nodeaddr_t _table[64];
 };
+*/
 
 // Dummy configuration
 class TestConfiguration : public Configuration {
@@ -148,7 +151,7 @@ void test_MessageProcessor() {
     // Node #1
     TestConfiguration config1(1, "KC1FSZ");
     TestInstrumentation instrumentation1;
-    TestRoutingTable routingTable1;
+    RoutingTableImpl routingTable1;
     routingTable1.setRoute(3, 3);
     routingTable1.setRoute(7, 3);
     CircularBufferImpl<4096> txBuffer1(0);
@@ -160,7 +163,7 @@ void test_MessageProcessor() {
     // Node #3 (intermediate)
     TestConfiguration config3(3, "W1TKZ");
     TestInstrumentation instrumentation3;
-    TestRoutingTable routingTable3;
+    RoutingTableImpl routingTable3;
     routingTable3.setRoute(1, 1);
     routingTable3.setRoute(7, 7);
     CircularBufferImpl<4096> txBuffer3(0);
@@ -172,7 +175,8 @@ void test_MessageProcessor() {
     // Node #7 (desktop)
     TestConfiguration config7(7, "WA3ITR");
     TestInstrumentation instrumentation7;
-    TestRoutingTable routingTable7;
+    //TestRoutingTable routingTable7;
+    RoutingTableImpl routingTable7;
     routingTable7.setRoute(1, 3);
     routingTable7.setRoute(3, 3);
     CircularBufferImpl<4096> txBuffer7(0);
@@ -265,7 +269,7 @@ void test_OutboundPacket() {
     TestConfiguration config3(3, "W1TKZ");
     TestClock clock;
     TestInstrumentation instrumentation;
-    TestRoutingTable routingTable1;
+    RoutingTableImpl routingTable1;
     CircularBufferImpl<4096> txBuffer(0);
     OutboundPacketManager opm(clock, txBuffer, 10 * 1000, 2 * 1000);
     assert(opm.getFreeCount() == 8);

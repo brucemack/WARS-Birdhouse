@@ -6,6 +6,7 @@
 #include "../WARS-Birdhouse/Clock.h"
 #include "../WARS-Birdhouse/Instrumentation.h"
 #include "../WARS-Birdhouse/RoutingTable.h"
+#include "../WARS-Birdhouse/RoutingTableImpl.h"
 #include "../WARS-Birdhouse/MessageProcessor.h"
 #include "../WARS-Birdhouse/CommandProcessor.h"
 #include "../WARS-Birdhouse/Configuration.h"
@@ -67,7 +68,7 @@ public:
     void restartRadio() { cout << "RESTART" << endl; }
     void sleep(uint32_t ms) { cout << "SLEEP " << ms << endl; }
 };
-
+/*
 class TestRoutingTable : public RoutingTable {
 public:
     
@@ -100,7 +101,7 @@ private:
 
     nodeaddr_t _table[64];
 };
-
+*/
 class TestConfiguration : public Configuration {
 public:
 
@@ -146,7 +147,8 @@ TestClock systemClock;
 // Node #1
 TestConfiguration testConfig(1, "KC1FSZ");
 TestInstrumentation testInstrumentation;
-static TestRoutingTable testRoutingTable;
+//static TestRoutingTable testRoutingTable;
+static RoutingTableImpl testRoutingTable;
 CircularBufferImpl<4096> testTxBuffer(0);
 CircularBufferImpl<4096> testRxBuffer(2);
 static MessageProcessor testMessageProcessor(systemClock, testRxBuffer, testTxBuffer,
@@ -209,6 +211,64 @@ void test_CommandProcessor() {
 
         // Check the routing table
         assert(systemRoutingTable.nextHop(8) == 3);
+    }
+
+    // SET ROUTE REMOTE
+    {
+        const char* a0 = "setrouteremote";
+        const char* a1 = "7";
+        const char* a2 = "1";
+        const char* a3 = "4";
+        const char *a_args[4] = { a0, a1, a2, a3 };
+
+        sendSetRoute(4, a_args);
+
+        systemMessageProcessor.pump();
+
+        // Make sure we see the outbound message
+        assert(!testTxBuffer.isEmpty());
+
+        // Pull off the message and examine it
+        Packet packet;
+        unsigned int packetLen = sizeof(packet);
+        testTxBuffer.pop(0, (void*)&packet, &packetLen);
+        assert(packet.header.getType() == TYPE_SETROUTE);
+        assert(packet.header.destAddr == 3);
+        assert(packet.header.sourceAddr == 1);
+
+        // Look at payload
+        SetRouteReqPayload payload;
+        memcpy((void*)&payload, packet.payload, sizeof(payload));
+        assert(payload.targetAddr == 1);
+        assert(payload.nextHopAddr == 4);
+    }
+
+    // SEND TEXT
+    {
+        const char* a0 = "text";
+        const char* a1 = "7";
+        const char* a2 = "Hello World!";
+        const char *a_args[3] = { a0, a1, a2 };
+
+        sendText(3, a_args);
+
+        systemMessageProcessor.pump();
+
+        // Make sure we see the outbound message
+        assert(!testTxBuffer.isEmpty());
+
+        // Pull off the message and examine it
+        Packet packet;
+        unsigned int packetLen = sizeof(packet);
+        testTxBuffer.pop(0, (void*)&packet, &packetLen);
+
+        assert(packet.header.getType() == TYPE_TEXT);
+        assert(packet.header.destAddr == 3);
+        assert(packet.header.sourceAddr == 1);
+        assert(packetLen == 12 + sizeof(Header));
+
+        // Look at payload
+        assert(memcmp(packet.payload, "Hello World!", 12) == 0);
     }
 }
 

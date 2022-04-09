@@ -17,22 +17,30 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#ifndef _CommandProcessor_h
-#define _CommandProcessor_h
+#ifndef _RoutingTableImpl_h
+#define _RoutingTableImpl_h
 
-int sendPing(int argc, const char** argv);
-int info(int argc, const char **argv);
-int sleep(int argc, const char **argv);
-int setBatteryLimit(int argc, const char **argv);
-int doPrint(int argc, const char **argv);
-int boot(int argc, const char **argv);
-int bootRadio(int argc, const char **argv);
-int sendReset(int argc, const char **argv);
-int doResetCounters(int argc, const char **argv);
+#include "RoutingTable.h"
 
-int setRoute(int argc, const char **argv);
-int clearRoutes(int argc, const char **argv);
-int sendSetRoute(int argc, const char **argv);
-int sendText(int argc, const char **argv);
+class RoutingTableImpl : public RoutingTable {
+public:
+    
+    RoutingTableImpl();
+    nodeaddr_t nextHop(nodeaddr_t finalDestAddr);
+    void setRoute(nodeaddr_t target, nodeaddr_t nextHop);
+    void clearRoutes();
+
+private:
+
+    /**
+     * @brief Initializes the route table from what is stored in 
+     * NVRAM.
+     */
+    void _load();
+    void _save();
+
+    static const unsigned int _tableSize = 64;
+    nodeaddr_t _table[64];
+};
 
 #endif

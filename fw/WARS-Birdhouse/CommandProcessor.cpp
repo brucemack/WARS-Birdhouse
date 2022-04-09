@@ -1,3 +1,22 @@
+/* 
+ * LoRa Birdhouse Mesh Network Project
+ * Wellesley Amateur Radio Society
+ * 
+ * Copyright (C) 2022 Bruce MacKinnon
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #ifdef ARDUINO
 #include <Arduino.h>
 #endif
@@ -57,7 +76,7 @@ int sendPing(int argc, const char** argv) {
     }
 }
 
-int sendReset(int argc, char **argv) { 
+int sendReset(int argc, const char **argv) { 
 
     if (argc != 3) {
       logger.println(msg_arg_error);
@@ -95,13 +114,13 @@ int sendReset(int argc, char **argv) {
     }
 }
 
-int boot(int argc, char **argv) { 
+int boot(int argc, const char **argv) { 
     logger.println("INF: Rebooting");
     systemInstrumentation.restart();
     return 0;
 }
 
-int bootRadio(int argc, char **argv) { 
+int bootRadio(int argc, const char **argv) { 
     logger.println("INF: Rebooting radio");
     systemInstrumentation.restartRadio();
     return 0;
@@ -178,7 +197,7 @@ int setBatteryLimit(int argc, const char **argv) {
     systemConfig.setBatteryLimit(atoi(argv[1]));
 }
 
-int doPrint(int argc, char **argv) { 
+int doPrint(int argc, const char **argv) { 
 
     if (argc != 2) {
         logger.println(msg_arg_error);
@@ -209,7 +228,7 @@ int doRem(int argc, char **argv) {
  *  1: The destination node number
  *  2: The text of the message, limited to 80 characters.
  */
-int sendText(int argc, char **argv) { 
+int sendText(int argc, const char **argv) { 
  
     if (argc != 3) {
         logger.println(msg_arg_error);
@@ -284,7 +303,7 @@ int clearRoutes(int argc, const char **argv) {
     systemRoutingTable.clearRoutes();
 }
 
-int sendSetRoute(int argc, char **argv) { 
+int sendSetRoute(int argc, const char **argv) { 
  
     if (argc != 4) {
         logger.println(msg_arg_error);
@@ -388,7 +407,7 @@ int sendGetRoute(int argc, char **argv) {
     return 0;
 }
 
-int doResetCounters(int argc, char **argv) { 
+int doResetCounters(int argc, const char **argv) { 
     systemInstrumentation.resetCounters();
     systemMessageProcessor.resetCounters();
 }
