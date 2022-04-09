@@ -121,11 +121,11 @@ Here is a summary of the physical layer packet format from the Semtech documenta
 
 The payload above contains a 36-byte header followed by a variable length packet format.  Particulars:
 
-* 36-byte fixed size 
-* Version (PV) is 2 (at the moment)
+* 36-byte fixed size. 
+* Version (PV) is 2 (at the moment).
 * Packet type (PT) describes the nature/handling of the message.  More on types below.
 * Packet ID (PID) is used for acknowledgement and duplicate packet elimination.  16-bit integer (little endian).
-* Call signs are in ASCII format, padded with spaces as needed
+* Call signs are in ASCII format, padded with spaces as needed.
 * Source/destination addresses are 16-bit integer (little endian).  More on addresses below.
 
 ![packet](images/packet-header-2.png)
