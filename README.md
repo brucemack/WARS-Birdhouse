@@ -13,6 +13,8 @@ found [on my QRZ page](https://www.qrz.com/db/kc1fsz).
 
 Will this bird fly?  Let's find out!  
 
+![Birdhouse](images/outside.jpg)
+
 Design Overview
 ================
 
