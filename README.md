@@ -94,7 +94,7 @@ Do I Need To Be A Ham To Use The Network?
 
 Yes. The radio module we are using is not Part 15 certified 
 so it must be run using Part 97 (amateur) rules.  We are currently doing research on a non-ham ISM Part 15 version of the network 
-to make it easy for non-licensed users to join the fun.  If anyone has expertise in this area please add a comment to the discussion this topic in GitHub.
+to make it easy for non-licensed users to join the fun.  If anyone has expertise in this area please add a comment to [the discussion this topic in GitHub](https://github.com/brucemack/WARS-Birdhouse/discussions/2).
 
 Per FCC rules, Part 15 and Part 97 networks will not talk to each other.
 
