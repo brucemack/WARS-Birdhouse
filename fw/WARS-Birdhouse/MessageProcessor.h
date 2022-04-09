@@ -56,7 +56,7 @@ public:
     /**
      * @brief Resets all diagnostic counters
      */
-    void resetCounter();
+    void resetCounters();
 
 private:
 

@@ -34,7 +34,7 @@ public:
     /**
      * @brief Removes all routes from the table.
      */
-    virtual void clearRoutes();
+    virtual void clearRoutes() = 0;
 };
 
 #endif

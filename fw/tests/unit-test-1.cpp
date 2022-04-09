@@ -65,6 +65,8 @@ public:
     uint16_t getBootCount() const { return 1; }
     uint16_t getSleepCount() const { return 1; }
     void restart() { cout << "RESTART" << endl; }
+    void restartRadio() { cout << "RESTART" << endl; }
+    void sleep(uint32_t ms) { cout << "SLEEP " << ms << endl; }
 };
 
 // Dummy routing table for node 1 (KC1FSZ)
@@ -72,6 +74,10 @@ class TestRoutingTable : public RoutingTable {
 public:
     
     TestRoutingTable() {
+        clearRoutes();
+    }
+
+    void clearRoutes() {
         for (unsigned int i = 0; i < 64; i++)
             _table[i] = RoutingTable::NO_ROUTE;
     }
@@ -103,6 +109,10 @@ public:
 
     CallSign getCall() const {
         return _myCall;
+    }
+
+    uint16_t getBatteryLimit() const {
+        return 3400;
     }
 
 private:

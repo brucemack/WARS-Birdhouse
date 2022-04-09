@@ -366,3 +366,7 @@ void MessageProcessor::_process(int16_t rssi,
     }
   }
 }
+
+void MessageProcessor::resetCounters() {
+  // #### TODO
+}

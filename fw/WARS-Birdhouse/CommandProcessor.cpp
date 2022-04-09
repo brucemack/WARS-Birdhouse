@@ -107,7 +107,7 @@ int bootRadio(int argc, char **argv) {
     return 0;
 }
 
-int info(int argc, char **argv) { 
+int info(int argc, const char **argv) { 
     logger.print(F("{ \"node\": "));
     logger.print(systemConfig.getAddr());
     logger.print(F(", \"version\": "));
@@ -123,8 +123,10 @@ int info(int argc, char **argv) {
     logger.print(F(", \"sleepCount\": "));
     logger.print(systemInstrumentation.getSleepCount());
     logger.print(F(", \"routes\": ["));
+
+    // Display the routing table
     bool first = true;
-    for (int i = 0; i < 256; i++) {
+    for (unsigned int i = 0; i < 256; i++) {
       if (systemRoutingTable.nextHop(i) != RoutingTable::NO_ROUTE) {
         if (!first) 
           logger.print(", ");
@@ -142,7 +144,7 @@ int info(int argc, char **argv) {
 }
 
 // Used for testing the watch dog 
-static int sleep(int argc, char **argv) { 
+int sleep(int argc, const char **argv) { 
 
   if (argc != 2) {
     logger.println(msg_arg_error);
@@ -191,7 +193,7 @@ int clearRoutes(int argc, char **argv) {
     systemRoutingTable.clearRoutes();
 }
 
-int setBatteryLimit(int argc, char **argv) { 
+int setBatteryLimit(int argc, const char **argv) { 
 
     if (argc != 2) {
         logger.println(msg_arg_error);
@@ -260,7 +262,7 @@ int sendText(int argc, char **argv) {
         return -1;
     }
 
-    // Make a ping request
+    // Build the request packet
     Packet packet;
     packet.header.setType(TYPE_TEXT);
     packet.header.setId(systemMessageProcessor.getUniqueId());
@@ -270,7 +272,7 @@ int sendText(int argc, char **argv) {
     packet.header.setFinalDestAddr(finalDest);
     packet.header.setSourceCall(systemConfig.getCall());
     packet.header.setOriginalSourceCall(systemConfig.getCall());
-    // Put the text into the payload
+    // Put the text into the payload secion of the packet
     memcpy(packet.payload, argv[2], textLen);
     unsigned int packetLen = sizeof(Header) + textLen;
     // Send it
@@ -281,103 +283,112 @@ int sendText(int argc, char **argv) {
     }
     return 0;
 }
-/*
+
 int sendSetRoute(int argc, char **argv) { 
  
-  if (argc != 4) {
-    shell.println(msg_arg_error);
-    return -1;
-  }
-  
-  uint8_t target = atoi(argv[1]);
-  if (target == 0 || target == 255) {
-      shell.println(msg_bad_address);
-      return -1;
-  }
+    if (argc != 4) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
 
-  uint8_t a1 = atoi(argv[2]);
-  uint8_t a2 = atoi(argv[3]);
+    nodeaddr_t finalDest = parseAddr(argv[1]);
+    nodeaddr_t a1 = parseAddr(argv[2]);
+    nodeaddr_t a2 = parseAddr(argv[3]);
+    // NOTE: The next hop address is allowed to be zero (used to 
+    // disable a route).
+    if (finalDest == 0 || a1 == 0) {
+        logger.println(msg_bad_address);
+        return -1;
+    }
 
-  // Since we might not be directly connected to the 
-  // destination node we use the routing table to
-  // figure out the "next hop."
-  uint8_t nextHop = Routes[target];
-  if (nextHop == 0) {
-    shell.println(msg_no_route);
-    return -1;
-  }
+    // Since we might not be directly connected to the 
+    // destination node we use the routing table to
+    // figure out the "next hop."
+    nodeaddr_t nextHop = systemRoutingTable.nextHop(finalDest);
+    if (nextHop == RoutingTable::NO_ROUTE) {
+        logger.println(msg_no_route);
+        return -1;
+    }
 
-  // Assign a unique ID to the message
-  counter++;
-
-  // Fill out the standard header
-  SetRouteMessage msg;
-  msg.header.destAddr = nextHop;
-  msg.header.sourceAddr = MY_ADDR;
-  msg.header.id = counter;
-  msg.header.type = MessageType::TYPE_SETROUTE;
-  msg.header.finalDestAddr = target;
-  msg.header.originalSourceAddr = MY_ADDR;
-  msg.targetAddr = a1;
-  msg.nextHopAddr = a2;
-
-  // Push the header/message onto the TX queue for background
-  // processing.
-  tx_buffer.push((const uint8_t*)&msg, sizeof(SetRouteMessage));
-      
-  return 0;
+    // Build the request packet
+    Packet packet;
+    packet.header.setType(TYPE_SETROUTE);
+    packet.header.setId(systemMessageProcessor.getUniqueId());
+    packet.header.setSourceAddr(systemConfig.getAddr());
+    packet.header.setDestAddr(nextHop);
+    packet.header.setOriginalSourceAddr(systemConfig.getAddr());
+    packet.header.setFinalDestAddr(finalDest);
+    packet.header.setSourceCall(systemConfig.getCall());
+    packet.header.setOriginalSourceCall(systemConfig.getCall());
+    // Fill in the payload
+    SetRouteReqPayload payload;
+    // #### TODO
+    payload.passcode = 0;
+    payload.targetAddr = a1;
+    payload.nextHopAddr = a2; 
+    // Put the text into the payload secion of the packet
+    memcpy(packet.payload, (const void*)&payload, sizeof(payload));
+    unsigned int packetLen = sizeof(Header) + sizeof(payload);
+    // Send it
+    bool good = systemMessageProcessor.transmitIfPossible(packet, packetLen);
+    if (!good) {
+        logger.println(msg_tx_busy);
+        return -1;
+    }
+    return 0;
 }
 
 int sendGetRoute(int argc, char **argv) { 
  
-  if (argc != 3) {
-    shell.println(msg_arg_error);
-    return -1;
-  }
-  
-  uint8_t target = atoi(argv[1]);
-  if (target == 0 || target == 255) {
-      shell.println(msg_bad_address);
-      return -1;
-  }
+    if (argc != 3) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
 
-  uint8_t a1 = atoi(argv[2]);
+    nodeaddr_t finalDest = parseAddr(argv[1]);
+    nodeaddr_t a1 = parseAddr(argv[2]);
+    // NOTE: The next hop address is allowed to be zero (used to 
+    // disable a route).
+    if (finalDest == 0 || a1 == 0) {
+        logger.println(msg_bad_address);
+        return -1;
+    }
 
-  // Since we might not be directly connected to the 
-  // destination node we use the routing table to
-  // figure out the "next hop."
-  uint8_t nextHop = Routes[target];
-  if (nextHop == 0) {
-    shell.println(msg_no_route);
-    return -1;
-  }
+    // Since we might not be directly connected to the 
+    // destination node we use the routing table to
+    // figure out the "next hop."
+    nodeaddr_t nextHop = systemRoutingTable.nextHop(finalDest);
+    if (nextHop == RoutingTable::NO_ROUTE) {
+        logger.println(msg_no_route);
+        return -1;
+    }
 
-  // Assign a unique ID to the message
-  counter++;
-
-  // Fill out the standard header
-  GetRouteMessage msg;
-  msg.header.destAddr = nextHop;
-  msg.header.sourceAddr = MY_ADDR;
-  msg.header.id = counter;
-  msg.header.type = MessageType::TYPE_GETROUTE;
-  msg.header.finalDestAddr = target;
-  msg.header.originalSourceAddr = MY_ADDR;
-  msg.targetAddr = a1;
-
-  // Push the header/message onto the TX queue for background
-  // processing.
-  tx_buffer.push((const uint8_t*)&msg, sizeof(GetRouteMessage));
-      
-  return 0;
+    // Build the request packet
+    Packet packet;
+    packet.header.setType(TYPE_GETROUTE_REQ);
+    packet.header.setId(systemMessageProcessor.getUniqueId());
+    packet.header.setSourceAddr(systemConfig.getAddr());
+    packet.header.setDestAddr(nextHop);
+    packet.header.setOriginalSourceAddr(systemConfig.getAddr());
+    packet.header.setFinalDestAddr(finalDest);
+    packet.header.setSourceCall(systemConfig.getCall());
+    packet.header.setOriginalSourceCall(systemConfig.getCall());
+    // Fill in the payload
+    GetRouteReqPayload payload;
+    payload.targetAddr = a1;
+    // Load the payload section of the packet
+    memcpy(packet.payload, (const void*)&payload, sizeof(payload));
+    unsigned int packetLen = sizeof(Header) + sizeof(payload);
+    // Send it
+    bool good = systemMessageProcessor.transmitIfPossible(packet, packetLen);
+    if (!good) {
+        logger.println(msg_tx_busy);
+        return -1;
+    }
+    return 0;
 }
-*/
-/**
- * Clears out diagnostic counters
- */
-/*
+
 int doResetCounters(int argc, char **argv) { 
-  preferences.putUShort("bootcount", 0);
-  preferences.putUShort("sleepcount", 0);
+    systemInstrumentation.resetCounters();
+    systemMessageProcessor.resetCounters();
 }
-*/

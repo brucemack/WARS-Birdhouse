@@ -22,6 +22,7 @@ class TestStream : public Stream {
 public:
 
     void print(const char* m) { cout << m; }
+    void print(unsigned int m) { cout << m; }
     void print(uint16_t m) { cout << m; }
     void println() { cout << endl; }
     void println(const char* m) { cout << m << endl; }
@@ -63,14 +64,15 @@ public:
     uint16_t getBootCount() const { return 1; }
     uint16_t getSleepCount() const { return 1; }
     void restart() { cout << "RESTART" << endl; }
+    void restartRadio() { cout << "RESTART" << endl; }
+    void sleep(uint32_t ms) { cout << "SLEEP " << ms << endl; }
 };
 
 class TestRoutingTable : public RoutingTable {
 public:
     
     TestRoutingTable() {
-        for (unsigned int i = 0; i < 64; i++)
-            _table[i] = RoutingTable::NO_ROUTE;
+        clearRoutes();
     }
 
     nodeaddr_t nextHop(nodeaddr_t finalDestAddr) {
@@ -78,6 +80,8 @@ public:
             return 0;
         } else if (finalDestAddr >= 0xfff0) {
             return finalDestAddr;
+        } else if (finalDestAddr >= 64) {
+            return NO_ROUTE;
         } else {
             return _table[finalDestAddr];
         }
@@ -85,6 +89,11 @@ public:
 
     void setRoute(nodeaddr_t target, nodeaddr_t nextHop) {
         _table[target] = nextHop;
+    }
+
+    void clearRoutes() {
+        for (unsigned int i = 0; i < 64; i++)
+            _table[i] = RoutingTable::NO_ROUTE;
     }
 
 private:
@@ -106,6 +115,10 @@ public:
 
     CallSign getCall() const {
         return _myCall;
+    }
+
+    uint16_t getBatteryLimit() const {
+        return 3400;
     }
 
 private:
@@ -152,16 +165,33 @@ void test_CommandProcessor() {
     systemRoutingTable.setRoute(3, 3);
     systemRoutingTable.setRoute(7, 3);
 
-    const char* a0 = "ping";
-    const char* a1 = "7";
-    const char *a_args[2] = { a0, a1 };
+    // PING
+    {
+        const char* a0 = "ping";
+        const char* a1 = "7";
+        const char *a_args[2] = { a0, a1 };
 
-    sendPing(2, a_args);
+        sendPing(2, a_args);
 
-    systemMessageProcessor.pump();
+        systemMessageProcessor.pump();
 
-    // Make sure we see the outbound message
-    assert(!testTxBuffer.isEmpty());
+        // Make sure we see the outbound message
+        assert(!testTxBuffer.isEmpty());
+        testTxBuffer.popAndDiscard();
+    }
+
+    // INFO
+    {
+        const char* a0 = "info";
+        const char *a_args[2] = { a0 };
+
+        info(1, a_args);
+
+        systemMessageProcessor.pump();
+
+        // Make sure we dont see outbound message
+        assert(testTxBuffer.isEmpty());
+    }
 }
 
 int main(int arg, const char** argv) {
