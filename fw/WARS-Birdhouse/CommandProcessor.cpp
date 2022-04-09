@@ -168,31 +168,6 @@ int setAddr(int argc, char **argv) {
   systemConfig.setAddr(atoi(argv[1]));
 }
 
-int setRoute(int argc, char **argv) { 
-
-    if (argc != 3) {
-        logger.println(msg_arg_error);
-        return -1;
-    }
-
-    nodeaddr_t t = parseAddr(argv[1]);
-    if (t == 0) {
-        logger.println(msg_bad_address);
-        return -1;
-    }
-    nodeaddr_t r = parseAddr(argv[2]);
-    if (r == 0) {
-        logger.println(msg_bad_address);
-        return -1;
-    }
-
-    systemRoutingTable.setRoute(t, r);
-}
-
-int clearRoutes(int argc, char **argv) { 
-    systemRoutingTable.clearRoutes();
-}
-
 int setBatteryLimit(int argc, const char **argv) { 
 
     if (argc != 2) {
@@ -282,6 +257,31 @@ int sendText(int argc, char **argv) {
         return -1;
     }
     return 0;
+}
+
+int setRoute(int argc, const char **argv) { 
+
+    if (argc != 3) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
+
+    nodeaddr_t t = parseAddr(argv[1]);
+    if (t == 0) {
+        logger.println(msg_bad_address);
+        return -1;
+    }
+    nodeaddr_t r = parseAddr(argv[2]);
+    if (r == 0) {
+        logger.println(msg_bad_address);
+        return -1;
+    }
+
+    systemRoutingTable.setRoute(t, r);
+}
+
+int clearRoutes(int argc, const char **argv) { 
+    systemRoutingTable.clearRoutes();
 }
 
 int sendSetRoute(int argc, char **argv) { 

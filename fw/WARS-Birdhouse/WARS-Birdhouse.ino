@@ -168,22 +168,24 @@ public:
             return 0;
         } else if (finalDestAddr >= 0xfff0) {
             return finalDestAddr;
+        } else if (finalDestAddr >= _tableSize) {
+            return NO_ROUTE;
         } else {
             return _table[finalDestAddr];
         }
     }
 
     void setRoute(nodeaddr_t target, nodeaddr_t nextHop) {
-      if (target > 0 && target < _tableSize) {
-          _table[target] = nextHop;
-          _save();
-      }
-
-        void clearRoutes() {
-            for (unsigned int i = 0; i < _tableSize; i++)
-              _table[i] = 0;
+        if (target > 0 && target < _tableSize) {
+            _table[target] = nextHop;
             _save();
         }
+    }
+
+    void clearRoutes() {
+        for (unsigned int i = 0; i < _tableSize; i++)
+            _table[i] = 0;
+        _save();
     }
 
 private:

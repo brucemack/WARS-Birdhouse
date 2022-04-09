@@ -83,7 +83,15 @@ public:
     }
 
     virtual nodeaddr_t nextHop(nodeaddr_t finalDestAddr) {
-        return _table[finalDestAddr];
+        if (finalDestAddr == 0) {
+            return 0;
+        } else if (finalDestAddr >= 0xfff0) {
+            return finalDestAddr;
+        } else if (finalDestAddr >= 64) {
+            return NO_ROUTE;
+        } else {
+            return _table[finalDestAddr];
+        }
     }
 
     virtual void setRoute(nodeaddr_t target, nodeaddr_t nextHop) {

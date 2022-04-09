@@ -192,6 +192,24 @@ void test_CommandProcessor() {
         // Make sure we dont see outbound message
         assert(testTxBuffer.isEmpty());
     }
+
+    // SET ROUTE
+    {
+        const char* a0 = "setroute";
+        const char* a1 = "8";
+        const char* a2 = "3";
+        const char *a_args[3] = { a0, a1, a2 };
+
+        setRoute(3, a_args);
+
+        systemMessageProcessor.pump();
+
+        // Make sure we dont see the outbound message
+        assert(testTxBuffer.isEmpty());
+
+        // Check the routing table
+        assert(systemRoutingTable.nextHop(8) == 3);
+    }
 }
 
 int main(int arg, const char** argv) {
