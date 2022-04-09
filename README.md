@@ -89,11 +89,14 @@ If you live in a strategic location at high elevation and you would like a fully
 
 Please contact the network administrator to be assigned a node address on the network.
 
-Do I Need to be a Ham To Use the System?
-========================================
+Do I Need To Be A Ham To Use The Network?
+=========================================
 
-Yes. The radio module we are using is not Part-15 certified 
-so it must be run using Part-97 rules.  We are currently doing research on a non-ham ISM Part 15 version of the project.  
+Yes. The radio module we are using is not Part 15 certified 
+so it must be run using Part 97 (amateur) rules.  We are currently doing research on a non-ham ISM Part 15 version of the network 
+to make it easy for non-licensed users to join the fun.  
+
+Per FCC rules, Part 15 and Part 97 networks will not talk to each other.
 
 Protocol Documentation
 ======================
