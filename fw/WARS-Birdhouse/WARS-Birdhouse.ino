@@ -46,7 +46,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include "packets.h"
 #include "OutboundPacketManager.h"
 #include "Instrumentation.h"
-#include "RoutingTable.h"
+#include "RoutingTableImpl.h"
 #include "MessageProcessor.h"
 #include "CommandProcessor.h"
 
@@ -151,76 +151,6 @@ public:
     }
 };
 
-class RoutingTableImpl : public RoutingTable {
-public:
-    
-    RoutingTableImpl() {
-        for (unsigned int i = 0; i < _tableSize; i++)
-            _table[i] = RoutingTable::NO_ROUTE;
-    }
-
-    void init() {
-        _load();
-    }
-
-    nodeaddr_t nextHop(nodeaddr_t finalDestAddr) {
-        if (finalDestAddr == 0) {
-            return 0;
-        } else if (finalDestAddr >= 0xfff0) {
-            return finalDestAddr;
-        } else if (finalDestAddr >= _tableSize) {
-            return NO_ROUTE;
-        } else {
-            return _table[finalDestAddr];
-        }
-    }
-
-    void setRoute(nodeaddr_t target, nodeaddr_t nextHop) {
-        if (target > 0 && target < _tableSize) {
-            _table[target] = nextHop;
-            _save();
-        }
-    }
-
-    void clearRoutes() {
-        for (unsigned int i = 0; i < _tableSize; i++)
-            _table[i] = 0;
-        _save();
-    }
-
-private:
-
-    /**
-     * @brief Initializes the route table from what is stored in 
-     * NVRAM.
-     */
-    void _load() {
-        // USING 256 BYTES FOR COMPATIBILITY
-        uint8_t routes[256];
-        preferences.getBytes("routes", routes, 256);
-        // Transfer 
-        for (unsigned int i = 0; i < _tableSize; i++) 
-          _table[i] = routes[i];
-    }
-
-    void _save() {
-        // USING 256 BYTES FOR COMPATIBILITY
-        uint8_t routes[256];
-        for (unsigned int i = 0; i < 256; i++) {
-          if (i > 0 && i < _tableSize) {
-            routes[i] = _table[i]
-          } else {
-            routes[i] = 0;
-          }
-        }
-        // Save the address in the NVRAM
-        preferences.putBytes("routes", routes, 256);
-    }
-
-    static const unsigned int _tableSize = 64;
-    nodeaddr_t _table[64];
-};
-
 // Connect the logger stream to the SimpleSerialShell
 Stream& logger = shell;
 
@@ -294,121 +224,14 @@ void event_RxDone() {
 
   // Handle based on state.  If we're not listening for anything then 
   // ignore what was just read.
-  if (state != State::LISTENING && state != State::LISTENING_FOR_ACK) {
+  if (state != State::LISTENING) {
     Serial.println(F("ERR: Message received when not listening"));
     return;
   }
 
-  // Make sure the message is valid (right length, version, etc.)
-  if (len < sizeof(Header)) {
-    Serial.print(F("ERR: Message invalid length "));
-    Serial.println(len);
-    return;
-  }
-
-  // Pull in the header into a structure so we can look at it
-  Header rx_header(rx_buf);
-
-  // Ignore messsages targeted for other stations
-  if (!rx_header.isRelevant(MY_ADDR)) {
-    // TODO: COUNTER
-    //Serial.println(F("INF: Ignored message for another node"));
-    return;
-  }
-
-  // Check to see if this is an ack that we are waiting for
-  if (rx_header.type == MessageType::TYPE_ACK) {
-    // When we get an ACK, figure out if it is the one we are waiting for
-    if (state == State::LISTENING_FOR_ACK && rx_header.id == listenAckId) {
-      // Flush the message that we sent previously (it's been confirmed now)
-      tx_buffer.popAndDiscard();
-      // Get back into normal listening mode
-      state = State::LISTENING;
-      listenAckId = 0;
-      listenAckStart = 0;
-      transmitRetry = 0;
-    } else {
-      Serial.print(F("INF: Ignoring ACK for "));
-      Serial.println(rx_header.id);
-    }
-  } 
-  // Any other message will be forwarded to the application
-  else {
-
-    // Put the RSSI (OOB) and the entire packet (not just the header)
-    // into the circular queue
-    rx_buffer.push((const uint8_t*)&lastRssi, rx_buf, len);
-
-    // Check to see if an ACK is required for this packet.  If so, 
-    // create the ACK and transmit it.
-    if (rx_header.isAckRequired()) {
-      // A testing feature that will skip ACKs
-      if (skipAckCount != 0) {
-        skipAckCount--;
-        Serial.println(F("INF: Skipping an ACK (test)"));
-      }
-      else {
-        Header ack_header;
-        ack_header.createAckFor(rx_header, MY_CALL, MY_ADDR);
-        // Go into stand-by so we know that nothing else is coming in
-        set_mode_STDBY();
-        // Move the data into the radio FIFO
-        write_message((uint8_t*)&ack_header, sizeof(Header));
-        // Keep track of what we were listening for before starting this transmission
-        stateAfterTransmit = state;
-        // Go into transmit mode
-        state = State::TRANSMITTING_ACK;
-        enable_interrupt_TxDone();
-        set_mode_TX();
-      }
-    }
-  }
-}
-
-static void event_tick_LISTENING_FOR_ACK() {
-
-  // If we are listening for an ACK then don't send/resend until the timeout 
-  // has passed.
-  if (get_time_seconds() - listenAckStart < 5) {
-    return;
-  }
-
-  // If we have retried a few times then give up and discard the message.
-  if (transmitRetry > 3) {
-    Serial.println(F("WRN: Giving up on "));
-    Serial.println(listenAckId);
-    // Flush the message
-    tx_buffer.popAndDiscard();
-    // Give up and get back into the normal listen state
-    state = State::LISTENING;
-    stateAfterTransmit = State::LISTENING;
-    listenAckId = 0;
-    listenAckStart = 0;
-    transmitRetry = 0;
-    return;
-  }
-
-  // If a retry is still possible then generate it.
-  // Go into stand-by so we know that nothing else is coming in
-  set_mode_STDBY();
-
-  // Peek the data off the TX queue into the transmit buffer.  We use peek so
-  // that re-transmits can be supported if necessary.
-  unsigned int tx_buf_len = 256;
-  uint8_t tx_buf[tx_buf_len];
-  tx_buffer.peek(0, tx_buf, &tx_buf_len);
-
-  // Move the data into the radio FIFO
-  write_message(tx_buf, tx_buf_len);
-
-  // Go into transmit mode
-  state = State::TRANSMITTING;
-  enable_interrupt_TxDone();
-  set_mode_TX();
-
-  stateAfterTransmit = State::LISTENING_FOR_ACK;
-  listenAckStart = get_time_seconds();
-  transmitRetry++;
+  // Put the RSSI (OOB) and the entire packet (not just the header)
+  // into the circular queue
+  rx_buffer.push((const uint8_t*)&lastRssi, rx_buf, len);
 }
 
 static void event_tick_LISTENING() {
@@ -423,11 +246,10 @@ static void event_tick_LISTENING() {
   // Go into stand-by so we know that nothing else is coming in
   set_mode_STDBY();
 
-  // Peek the data off the TX queue into the transmit buffer.  We use peek so
-  // that re-transmits can be supported if necessary.
+  // Pop the data off the TX queue into the transmit buffer.  
   unsigned int tx_buf_len = 256;
   uint8_t tx_buf[tx_buf_len];
-  tx_buffer.peek(0, tx_buf, &tx_buf_len);
+  tx_buffer.pop(0, tx_buf, &tx_buf_len);
 
   // Move the data into the radio FIFO
   write_message(tx_buf, tx_buf_len);
@@ -435,25 +257,6 @@ static void event_tick_LISTENING() {
   state = State::TRANSMITTING;
   enable_interrupt_TxDone();
   set_mode_TX();
-
-  // Take a look at the header so we can determine whether an ACK is 
-  // going to be required for this message.
-  // TODO: SEE IF WE CAN SOLVE THIS USING A CAST RATHER THAN A COPY!
-  Header tx_header(tx_buf);
-  if (tx_header.isAckRequired()) {
-    // After transmission we will need to wait for the ACK
-    stateAfterTransmit = State::LISTENING_FOR_ACK;
-    listenAckId = tx_header.id;
-    listenAckStart = get_time_seconds();
-  } else {
-    // Pop the message off now - no ACK involved
-    tx_buffer.popAndDiscard();
-    // Transition directly into the listen mode
-    stateAfterTransmit = State::LISTENING;
-    listenAckId = 0;
-    listenAckStart = 0;
-  }    
-  transmitRetry = 0;
 }
 
 // Call periodically to look for timeouts or other pending activity.  This will happen
@@ -461,8 +264,6 @@ static void event_tick_LISTENING() {
 void event_tick() {
   if (state == State::LISTENING) {
     event_tick_LISTENING();
-  } else if (state == State::LISTENING_FOR_ACK) {
-    event_tick_LISTENING_FOR_ACK();
   }
 }
 
@@ -832,7 +633,7 @@ void setup() {
   shell.addCommand(F("setaddr <addr>"), setAddr);
   shell.addCommand(F("setroute <target addr> <next hop addr>"), setRoute);
   shell.addCommand(F("clearroutes"), clearRoutes);
-  shell.addCommand(F("setblimit <limit_mv>"), setBlimit);
+  shell.addCommand(F("setblimit <limit_mv>"), setBatteryLimit);
   shell.addCommand(F("print <text>"), doPrint);
   shell.addCommand(F("rem <text>"), doRem);
   shell.addCommand(F("setrouteremote <addr> <target addr> <next hop addr>"), sendSetRoute);

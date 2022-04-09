@@ -68,40 +68,7 @@ public:
     void restartRadio() { cout << "RESTART" << endl; }
     void sleep(uint32_t ms) { cout << "SLEEP " << ms << endl; }
 };
-/*
-class TestRoutingTable : public RoutingTable {
-public:
-    
-    TestRoutingTable() {
-        clearRoutes();
-    }
 
-    nodeaddr_t nextHop(nodeaddr_t finalDestAddr) {
-        if (finalDestAddr == 0) {
-            return 0;
-        } else if (finalDestAddr >= 0xfff0) {
-            return finalDestAddr;
-        } else if (finalDestAddr >= 64) {
-            return NO_ROUTE;
-        } else {
-            return _table[finalDestAddr];
-        }
-    }
-
-    void setRoute(nodeaddr_t target, nodeaddr_t nextHop) {
-        _table[target] = nextHop;
-    }
-
-    void clearRoutes() {
-        for (unsigned int i = 0; i < 64; i++)
-            _table[i] = RoutingTable::NO_ROUTE;
-    }
-
-private:
-
-    nodeaddr_t _table[64];
-};
-*/
 class TestConfiguration : public Configuration {
 public:
 
@@ -147,7 +114,6 @@ TestClock systemClock;
 // Node #1
 TestConfiguration testConfig(1, "KC1FSZ");
 TestInstrumentation testInstrumentation;
-//static TestRoutingTable testRoutingTable;
 static RoutingTableImpl testRoutingTable;
 CircularBufferImpl<4096> testTxBuffer(0);
 CircularBufferImpl<4096> testRxBuffer(2);
