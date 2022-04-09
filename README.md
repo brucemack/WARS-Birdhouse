@@ -89,6 +89,12 @@ If you live in a strategic location at high elevation and you would like a fully
 
 Please contact the network administrator to be assigned a node address on the network.
 
+Do I Need to be a Ham To Use the System?
+========================================
+
+Yes. The radio module we are using is not Part-15 certified 
+so it must be run using Part-97 rules.  We are currently doing research on a non-ham ISM Part 15 version.
+
 Protocol Documentation
 ======================
 
