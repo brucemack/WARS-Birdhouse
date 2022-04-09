@@ -93,7 +93,7 @@ Do I Need to be a Ham To Use the System?
 ========================================
 
 Yes. The radio module we are using is not Part-15 certified 
-so it must be run using Part-97 rules.  We are currently doing research on a non-ham ISM Part 15 version.
+so it must be run using Part-97 rules.  We are currently doing research on a non-ham ISM Part 15 version of the project.  
 
 Protocol Documentation
 ======================
