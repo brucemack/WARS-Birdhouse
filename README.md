@@ -102,7 +102,7 @@ Protocol Documentation
 ======================
 
 The network runs on the 33cm (902-928 MHz) amateur band.  We are running on 906.5 MHz, which lies
-in the digital portion of the ARRL band plan for 33cm.  According to the New England Spectrum Management Council (NESMC, https://www.nesmc.org/) 902 MHz band plan, this frequency is in the "mixed use" section of the band, and does not need coordination.
+in the digital portion of the ARRL band plan for 33cm.  According to the New England Spectrum Management Council (NESMC, https://www.nesmc.org/) 902 MHz band plan, this frequency is in the "mixed use" section of the band.  Our frequency has been registered in the NESMC database to ensure proper coordination with other uses of this band.
 
 The LoRa message format is documented here in compliance with FCC regulations.  There is no encryption 
 used anywhere in the design.  The information contained here is all that a listener would need to interpret the messages.
