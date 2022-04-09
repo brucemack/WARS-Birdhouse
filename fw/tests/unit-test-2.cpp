@@ -127,7 +127,6 @@ void movePacket(CircularBuffer& from, CircularBuffer& to) {
 // ===== TEST CASES ================================================
 
 static TestStream testStream;
-Stream& logger = testStream;
 
 TestClock systemClock;
 
@@ -142,14 +141,16 @@ static MessageProcessor testMessageProcessor(systemClock, testRxBuffer, testTxBu
     10 * 1000, 2 * 1000);
 
 // Exposed base interfaces to the rest of the program
-Configuration& config = testConfig;
-RoutingTable& routingTable = testRoutingTable;
-MessageProcessor& messageProcessor = testMessageProcessor;
+Stream& logger = testStream;
+Configuration& systemConfig = testConfig;
+Instrumentation& systemInstrumentation = testInstrumentation;
+RoutingTable& systemRoutingTable = testRoutingTable;
+MessageProcessor& systemMessageProcessor = testMessageProcessor;
 
 void test_CommandProcessor() {
     
-    routingTable.setRoute(3, 3);
-    routingTable.setRoute(7, 3);
+    systemRoutingTable.setRoute(3, 3);
+    systemRoutingTable.setRoute(7, 3);
 
     const char* a0 = "ping";
     const char* a1 = "7";
@@ -157,7 +158,7 @@ void test_CommandProcessor() {
 
     sendPing(2, a_args);
 
-    messageProcessor.pump();
+    systemMessageProcessor.pump();
 
     // Make sure we see the outbound message
     assert(!testTxBuffer.isEmpty());
@@ -166,6 +167,3 @@ void test_CommandProcessor() {
 int main(int arg, const char** argv) {
     test_CommandProcessor();
 }
-
-
-

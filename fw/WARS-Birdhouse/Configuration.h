@@ -26,10 +26,13 @@ class Configuration {
 public:
 
     virtual CallSign getCall() const = 0;
-    virtual nodeaddr_t getAddr() const = 0;
-
-    virtual void setAddr(nodeaddr_t a) {};
     virtual void setCall(const CallSign& call) {};
+
+    virtual nodeaddr_t getAddr() const = 0;
+    virtual void setAddr(nodeaddr_t a) {};
+
+    virtual uint16_t getBatteryLimit() const = 0;
+    virtual void setBatteryLimit(uint16_t l) {};
 };
 
 #endif

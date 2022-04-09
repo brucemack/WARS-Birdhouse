@@ -30,6 +30,11 @@ public:
     virtual nodeaddr_t nextHop(nodeaddr_t finalDestAddr) = 0;
 
     virtual void setRoute(nodeaddr_t target, nodeaddr_t nextHop) = 0;
+
+    /**
+     * @brief Removes all routes from the table.
+     */
+    virtual void clearRoutes();
 };
 
 #endif

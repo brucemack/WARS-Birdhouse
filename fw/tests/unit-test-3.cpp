@@ -50,10 +50,12 @@ void test_3() {
     ConfigurationImpl config;
     config.setCall(CallSign("KC1FSZ"));
     config.setAddr(7);
+    config.setBatteryLimit(3800);
 
     CallSign my1 = config.getCall();
     assert(my1.equals(CallSign("KC1FSZ")));
     assert(config.getAddr() == 7);
+    assert(config.getBatteryLimit() == 3800);
 }
 
 int main(int argc, const char** argv) {

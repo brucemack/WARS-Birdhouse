@@ -36,14 +36,13 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 
 #include "WiFi.h"
 #include <esp_task_wdt.h>
-#include <Preferences.h>
 #include <SimpleSerialShell.h>
 #include "spi_utils.h"
 #include <arduino-timer.h>
 
 #include "CircularBuffer.h"
 #include "Clock.h"
-#include "Configuration.h"
+#include "ConfigurationImpl.h"
 #include "packets.h"
 #include "OutboundPacketManager.h"
 #include "Instrumentation.h"
@@ -79,11 +78,6 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 
 static const float STATION_FREQUENCY = 906.5;
 
-static Preferences preferences;
-
-// Routing table (node 1)
-static uint8_t Routes[256];
-
 static int32_t get_time_seconds() {
   return esp_timer_get_time() / 1000000L;
 }
@@ -96,61 +90,6 @@ public:
     uint32_t time() const {
         return millis();
     };
-};
-
-class ConfigurationImpl : public Configuration {
-public:
-
-    ConfigurationImpl() {
-      _refreshCache();
-    }
-
-    nodeaddr_t getAddr() const {
-      return _addrCache;
-    }
-
-    const char* getCall() const {
-      // NOTE: WE RETURN A POINTER TO THE UNDERLYING STRING
-      return _callCache;
-    }
-
-    void setAddr(nodeaddr_t a) { 
-        preferences.setUChar("addr", (uint8_t)a);
-        _refreshCache();
-    }
-
-    void setCall(const char* call) { 
-        // Write a standard size of 8 bytes
-        char area[9];
-        for (unsigned int i = 0; i < 9; i++)
-            area[i] = 0;
-        strncpy(area, call, 8);
-        preferences.putBytes("call", area, 8);
-        _refreshCache();
-    }
-
-private: 
-
-    /**
-     * @brief Loads configuration data from NV RAM.  We 
-     * cache things to improve performance.
-     */
-    void _refreshCache() {
-        _addrCache = preferences.getUChar("addr", 1);  
-        // Blank out the call area before loading
-        for (unsigned int i = 0; i < 9; i++) 
-          _callCache[i] = 0;
-        // We read back 8 bytes at most
-        size_t maxLen = 8;
-        preferences.getBytes("call", _callCache, &maxLen);
-    }
-
-    // This is where the node address is cached.
-    nodeaddr_t _addrCache;
-
-    // This is where the callsign is cached so that we can 
-    // get away with returning a const char* reference to it.
-    char _callCache[9];
 };
 
 class InstrumentationImpl : public Instrumentation {
@@ -175,12 +114,40 @@ public:
         return level * 1000.0;
     }
 
+    // ### TODO
     uint16_t getBootCount() const { return 1; }
+    // ### TODO
     uint16_t getSleepCount() const { return 1; }
+
     int16_t getTemperature() const { return 0; }
     int16_t getHumidity() const { return  0; }
 
     void restart() { 
+        ESP.restart();
+    }
+
+    void restartRadio() {
+
+      // Reset the radio 
+      reset_radio();
+      delay(250);
+
+      // Initialize the radio
+      if (init_radio() != 0) {
+        logger.println("ERR: Problem with radio init");
+        return -1;
+      }
+      else {
+        // Start listening for messages
+        state = State::LISTENING;
+        enable_interrupt_RxDone();
+        set_mode_RXCONTINUOUS();
+        return 0;
+      } 
+    }
+
+    void sleep(uint32_t ms) {
+      sleep(ms);
     }
 };
 
@@ -188,8 +155,12 @@ class RoutingTableImpl : public RoutingTable {
 public:
     
     RoutingTableImpl() {
-        for (unsigned int i = 0; i < 64; i++)
+        for (unsigned int i = 0; i < _tableSize; i++)
             _table[i] = RoutingTable::NO_ROUTE;
+    }
+
+    void init() {
+        _load();
     }
 
     nodeaddr_t nextHop(nodeaddr_t finalDestAddr) {
@@ -203,30 +174,50 @@ public:
     }
 
     void setRoute(nodeaddr_t target, nodeaddr_t nextHop) {
-        _table[target] = nextHop;
+      if (target > 0 && target < _tableSize) {
+          _table[target] = nextHop;
+          _save();
+      }
+
+        void clearRoutes() {
+            for (unsigned int i = 0; i < _tableSize; i++)
+              _table[i] = 0;
+            _save();
+        }
     }
 
 private:
 
+    /**
+     * @brief Initializes the route table from what is stored in 
+     * NVRAM.
+     */
     void _load() {
-        uint8_t routes[256]
-      x  // Get the initial routing table loaded from NVRAM
-  for (int i = 0; i < 256; i++) {
-    Routes[i] = 0;
-  }
-  preferences.getBytes("routes", Routes, 256);
-
+        // USING 256 BYTES FOR COMPATIBILITY
+        uint8_t routes[256];
+        preferences.getBytes("routes", routes, 256);
+        // Transfer 
+        for (unsigned int i = 0; i < _tableSize; i++) 
+          _table[i] = routes[i];
     }
 
     void _save() {
-
+        // USING 256 BYTES FOR COMPATIBILITY
+        uint8_t routes[256];
+        for (unsigned int i = 0; i < 256; i++) {
+          if (i > 0 && i < _tableSize) {
+            routes[i] = _table[i]
+          } else {
+            routes[i] = 0;
+          }
+        }
+        // Save the address in the NVRAM
+        preferences.putBytes("routes", routes, 256);
     }
 
     static const unsigned int _tableSize = 64;
     nodeaddr_t _table[64];
 };
-
-
 
 // Connect the logger stream to the SimpleSerialShell
 Stream& logger = shell;
@@ -234,33 +225,23 @@ Stream& logger = shell;
 ClockImpl systemClock;
 ConfigurationImpl systemConfig;
 InstrumentationImpl systemInstrumentation;
-
-static TestRoutingTable testRoutingTable;
-CircularBufferImpl<4096> testTxBuffer(0);
-CircularBufferImpl<4096> testRxBuffer(2);
-static MessageProcessor testMessageProcessor(systemClock, testRxBuffer, testTxBuffer,
-    testRoutingTable, testInstrumentation, testConfig,
-    10 * 1000, 2 * 1000);
+RoutingTableImpl systemRoutingTable;
+CircularBufferImpl<4096> txBuffer(0);
+CircularBufferImpl<4096> rxBuffer(2);
+static MessageProcessor systemMessageProcessor(systemClock, 
+  rxBuffer, txBuffer, systemRoutingTable, systemInstrumentation, 
+  systemConfig, 10 * 1000, 2 * 1000);
 
 // Exposed base interfaces to the rest of the program
 Configuration& config = testConfig;
-RoutingTable& routingTable = testRoutingTable;
-MessageProcessor& messageProcessor = testMessageProcessor;
-
-
-
+RoutingTable& routingTable = systemRoutingTable;
+MessageProcessor& messageProcessor = systemMessageProcessor;
 
 // The states of the state machine
 enum State { IDLE, LISTENING, TRANSMITTING };
 
 // The overall state
 static State state = State::IDLE;
-
-// The circular buffer used for outgoing data
-static CircularBuffer<256> txBuffer(0);
-// The circular buffer used for incoming data.
-// The OOB space is being reserved for the RSSI value
-static CircularBuffer<1024> rxBuffer(2);
 
 // ----- Interrupt Service -------
 
@@ -276,13 +257,13 @@ void IRAM_ATTR isr() {
 void event_TxDone() { 
 
   // Waiting for an message transmit to finish successfull
-  if (state != State::TRANSMITTING && state != State::TRANSMITTING_ACK) {
+  if (state != State::TRANSMITTING) {
     Serial.println(F("ERR: TxDone received in unexpected state"));
     return;
   }
 
   // Revert back to whatever we were listening for. 
-  state = stateAfterTransmit;
+  state = State::LISTENING;
   // Ask for interrupt when receiving
   enable_interrupt_RxDone();
   // Go into RXCONTINUOUS so we can hear the response

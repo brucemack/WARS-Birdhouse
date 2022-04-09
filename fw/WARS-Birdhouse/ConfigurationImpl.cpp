@@ -31,17 +31,26 @@ CallSign ConfigurationImpl::getCall() const {
     return cs;
 }
 
-nodeaddr_t ConfigurationImpl::getAddr() const {
-    return _configCache.myAddr;
-}
-
 void ConfigurationImpl::setCall(const CallSign& call) {
     call.writeTo(_configCache.myCall);
     _save();
 }
 
+nodeaddr_t ConfigurationImpl::getAddr() const {
+    return _configCache.myAddr;
+}
+
 void ConfigurationImpl::setAddr(nodeaddr_t a) {
     _configCache.myAddr = a;
+    _save();
+}
+
+uint16_t ConfigurationImpl::getBatteryLimit() const {
+    return _configCache.batteryLimitMv;
+}
+
+void ConfigurationImpl::setBatteryLimit(uint16_t l) {
+    _configCache.batteryLimitMv = l;
     _save();
 }
 

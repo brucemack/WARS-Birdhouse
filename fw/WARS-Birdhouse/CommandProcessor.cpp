@@ -16,9 +16,10 @@ static auto msg_bad_address = F("ERR: Bad address");
 static auto msg_bad_message = F("ERR: Bad message");
 
 extern Stream& logger;
-extern Configuration& config;
-extern RoutingTable& routingTable;
-extern MessageProcessor& messageProcessor;
+extern Configuration& systemConfig;
+extern Instrumentation& systemInstrumentation;
+extern RoutingTable& systemRoutingTable;
+extern MessageProcessor& systemMessageProcessor;
 
 int sendPing(int argc, const char** argv) { 
  
@@ -28,7 +29,7 @@ int sendPing(int argc, const char** argv) {
     }
 
     nodeaddr_t finalDestAddr = parseAddr(argv[1]);
-    nodeaddr_t nextHop = routingTable.nextHop(finalDestAddr);
+    nodeaddr_t nextHop = systemRoutingTable.nextHop(finalDestAddr);
     if (nextHop == RoutingTable::NO_ROUTE) {
         logger.println(F("ERR: No route"));
         return -1;
@@ -37,16 +38,16 @@ int sendPing(int argc, const char** argv) {
     // Make a ping request
     Packet packet;
     packet.header.setType(TYPE_PING_REQ);
-    packet.header.setId(messageProcessor.getUniqueId());
-    packet.header.setSourceAddr(config.getAddr());
+    packet.header.setId(systemMessageProcessor.getUniqueId());
+    packet.header.setSourceAddr(systemConfig.getAddr());
     packet.header.setDestAddr(nextHop);
-    packet.header.setOriginalSourceAddr(config.getAddr());
+    packet.header.setOriginalSourceAddr(systemConfig.getAddr());
     packet.header.setFinalDestAddr(finalDestAddr);
-    packet.header.setSourceCall(config.getCall());
-    packet.header.setOriginalSourceCall(config.getCall());
+    packet.header.setSourceCall(systemConfig.getCall());
+    packet.header.setOriginalSourceCall(systemConfig.getCall());
     unsigned int packetLen = sizeof(Header);
     // Send it
-    bool good = messageProcessor.transmitIfPossible(packet, packetLen);
+    bool good = systemMessageProcessor.transmitIfPossible(packet, packetLen);
     if (!good) {
       logger.println("ERR: TX full");
       return -1;
@@ -63,7 +64,7 @@ int sendReset(int argc, char **argv) {
     }
 
     nodeaddr_t finalDestAddr = parseAddr(argv[1]);
-    nodeaddr_t nextHop = routingTable.nextHop(finalDestAddr);
+    nodeaddr_t nextHop = systemRoutingTable.nextHop(finalDestAddr);
     if (nextHop == RoutingTable::NO_ROUTE) {
         logger.println(F("ERR: No route"));
         return -1;
@@ -74,17 +75,17 @@ int sendReset(int argc, char **argv) {
 
     Packet packet;
     packet.header.setType(TYPE_RESET);
-    packet.header.setId(messageProcessor.getUniqueId());
-    packet.header.setSourceAddr(config.getAddr());
+    packet.header.setId(systemMessageProcessor.getUniqueId());
+    packet.header.setSourceAddr(systemConfig.getAddr());
     packet.header.setDestAddr(nextHop);
-    packet.header.setOriginalSourceAddr(config.getAddr());
+    packet.header.setOriginalSourceAddr(systemConfig.getAddr());
     packet.header.setFinalDestAddr(finalDestAddr);
-    packet.header.setSourceCall(config.getCall());
-    packet.header.setOriginalSourceCall(config.getCall());
+    packet.header.setSourceCall(systemConfig.getCall());
+    packet.header.setOriginalSourceCall(systemConfig.getCall());
     unsigned int packetLen = sizeof(Header) + sizeof(ResetReqPayload);
     
     // Send it
-    bool good = messageProcessor.transmitIfPossible(packet, packetLen);
+    bool good = systemMessageProcessor.transmitIfPossible(packet, packetLen);
     if (!good) {
       logger.println("ERR: TX full");
       return -1;
@@ -92,103 +93,50 @@ int sendReset(int argc, char **argv) {
       return 0;
     }
 }
-/*
-int sendBlink(int argc, char **argv) { 
-
-  if (argc != 2) {
-    shell.println(msg_arg_error);
-    return -1;
-  }
-
-  counter++;
-  uint8_t target = atoi(argv[1]);
-
-  if (target > 0 && target < 255) {
-
-    uint8_t nextHop = Routes[target];
-    if (nextHop != 0) {
-
-      BlinkMessage msg;
-      msg.header.destAddr = nextHop;
-      msg.header.sourceAddr = MY_ADDR;
-      msg.header.id = counter;
-      msg.header.type = MessageType::TYPE_BLINK;
-      msg.header.finalDestAddr = target;
-      msg.header.originalSourceAddr = MY_ADDR;
-
-      tx_buffer.push((uint8_t*)&msg, sizeof(BlinkMessage));
-    
-      return 0;
-    } else {
-      shell.println(F("ERR: No route"));
-    }
-  } else {
-    return -1;
-  }
-}
 
 int boot(int argc, char **argv) { 
-    shell.println("Asked to reboot ...");
-    ESP.restart();
+    logger.println("INF: Rebooting");
+    systemInstrumentation.restart();
     return 0;
 }
 
 int bootRadio(int argc, char **argv) { 
-
-  // Reset the radio 
-  reset_radio();
-  delay(250);
-
-  // Initialize the radio
-  if (init_radio() != 0) {
-    shell.println("Problem with initialization");
-    return -1;
-  }
-  else {
-    shell.println("Radio initialized");
-
-    // Start listening for messages
-    state = State::LISTENING;
-    enable_interrupt_RxDone();
-    set_mode_RXCONTINUOUS();
-
+    logger.println("INF: Rebooting radio");
+    systemInstrumentation.restartRadio();
     return 0;
-  }
 }
 
 int info(int argc, char **argv) { 
-    shell.print(F("{ \"node\": "));
-    shell.print(MY_ADDR);
-    shell.print(F(", \"version\": "));
-    shell.print(SW_VERSION);
-    shell.print(F(", \"MAC\": \""));
-    shell.print(chipId, HEX);
-    shell.print(F("\", \"blimit\": "));
-    shell.print(preferences.getUShort("blimit", 0));
-    shell.print(F(", \"batteryMv\": "));
-    shell.print(checkBattery());
-    shell.print(F(", \"panelMv\": "));
-    shell.print(checkPanel());
-    shell.print(F(", \"bootCount\": "));
-    shell.print(preferences.getUShort("bootcount", 0));
-    shell.print(F(", \"sleepCount\": "));
-    shell.print(preferences.getUShort("sleepcount", 0));
-    shell.print(F(", \"routes\": ["));
+    logger.print(F("{ \"node\": "));
+    logger.print(systemConfig.getAddr());
+    logger.print(F(", \"version\": "));
+    logger.print(systemInstrumentation.getSoftwareVersion());
+    logger.print(F("\", \"blimit\": "));
+    logger.print(systemConfig.getBatteryLimit());
+    logger.print(F(", \"batteryMv\": "));
+    logger.print(systemInstrumentation.getBatteryVoltage());
+    logger.print(F(", \"panelMv\": "));
+    logger.print(systemInstrumentation.getPanelVoltage());
+    logger.print(F(", \"bootCount\": "));
+    logger.print(systemInstrumentation.getBootCount());
+    logger.print(F(", \"sleepCount\": "));
+    logger.print(systemInstrumentation.getSleepCount());
+    logger.print(F(", \"routes\": ["));
     bool first = true;
     for (int i = 0; i < 256; i++) {
-      if (Routes[i] != 0) {
+      if (systemRoutingTable.nextHop(i) != RoutingTable::NO_ROUTE) {
         if (!first) 
-          shell.print(", ");
+          logger.print(", ");
         first = false;
-        shell.print("[");
-        shell.print(i);
-        shell.print(", ");
-        shell.print(Routes[i]);
-        shell.print("]");
+        logger.print("[");
+        logger.print(i);
+        logger.print(", ");
+        logger.print(systemRoutingTable.nextHop(i));
+        logger.print("]");
       }
     }
-    shell.print("]");
-    shell.println(F("}"));
+    logger.print("]");
+    logger.println(F("}"));
     return 0;
 }
 
@@ -196,99 +144,84 @@ int info(int argc, char **argv) {
 static int sleep(int argc, char **argv) { 
 
   if (argc != 2) {
-    shell.println(msg_arg_error);
+    logger.println(msg_arg_error);
     return -1;
   }
 
   uint16_t seconds = atoi(argv[1]);
-  shell.println("INF: Sleeping ...");
-  delay(seconds * 1000);
-  shell.println("INF: Done");
+  logger.println("INF: Sleeping ...");
+  systemInstrumentation.sleep(seconds * 1000);
+  logger.println("INF: Done");
   return 0;
-}
-
-int skipAcks(int argc, char **argv) { 
-
-  if (argc != 2) {
-    shell.println(msg_arg_error);
-    return -1;
-  }
-
-  skipAckCount = atoi(argv[1]);
 }
 
 int setAddr(int argc, char **argv) { 
 
   if (argc != 2) {
-    shell.println(msg_arg_error);
+    logger.println(msg_arg_error);
     return -1;
   }
 
-  // Save the address in the NVRAM
-  preferences.putUChar("addr", atoi(argv[1]));
-
-  // Get the address
-  MY_ADDR = preferences.getUChar("addr", 1);  
+  systemConfig.setAddr(atoi(argv[1]));
 }
 
 int setRoute(int argc, char **argv) { 
 
-  if (argc != 3) {
-    shell.println(msg_arg_error);
-    return -1;
-  }
+    if (argc != 3) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
 
-  uint8_t t = atoi(argv[1]);
-  uint8_t r = atoi(argv[2]);
-  Routes[t] = r;
+    nodeaddr_t t = parseAddr(argv[1]);
+    if (t == 0) {
+        logger.println(msg_bad_address);
+        return -1;
+    }
+    nodeaddr_t r = parseAddr(argv[2]);
+    if (r == 0) {
+        logger.println(msg_bad_address);
+        return -1;
+    }
 
-  // Save the address in the NVRAM
-  preferences.putBytes("routes", Routes, 256);
+    systemRoutingTable.setRoute(t, r);
 }
 
 int clearRoutes(int argc, char **argv) { 
-  for (int i = 0; i < 256; i++)
-    Routes[i] = 0;
-  // Save the address in the NVRAM
-  preferences.putBytes("routes", Routes, 256);
+    systemRoutingTable.clearRoutes();
 }
 
-int setBlimit(int argc, char **argv) { 
+int setBatteryLimit(int argc, char **argv) { 
 
-  if (argc != 2) {
-    shell.println(msg_arg_error);
-    return -1;
-  }
+    if (argc != 2) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
 
-  // Save the address in the NVRAM
-  preferences.putUShort("blimit", atoi(argv[1]));
+    systemConfig.setBatteryLimit(atoi(argv[1]));
 }
 
 int doPrint(int argc, char **argv) { 
 
-  if (argc != 2) {
-    shell.println(msg_arg_error);
-    return -1;
-  }
+    if (argc != 2) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
 
-  shell.print("[");
-  shell.print(argv[1]);
-  shell.println("]");
+    logger.print("[");
+    logger.print(argv[1]);
+    logger.println("]");
 }
-*/
 
 /**
  * Used to put a comment into the console log
  */
-/*
 int doRem(int argc, char **argv) { 
-
-  if (argc != 2) {
-    shell.println(msg_arg_error);
-    return -1;
-  }
+    if (argc != 2) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
 }
-*/
+
 /** This function handles a request to send a text message to another node
  *  in the network.  There is no guarantee that the message will actually
  *  get to the destination.  

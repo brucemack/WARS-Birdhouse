@@ -29,10 +29,13 @@ public:
     ConfigurationImpl();
 
     CallSign getCall() const;
-    nodeaddr_t getAddr() const;
-
-    void setAddr(nodeaddr_t a);
     void setCall(const CallSign& call);
+
+    nodeaddr_t getAddr() const;
+    void setAddr(nodeaddr_t a);
+
+    uint16_t getBatteryLimit() const;
+    void setBatteryLimit(uint16_t l);
 
 private:
 
