@@ -177,7 +177,7 @@ int sleep(int argc, const char **argv) {
   return 0;
 }
 
-int setAddr(int argc, char **argv) { 
+int setAddr(int argc, const char **argv) { 
 
     if (argc != 2) {
         logger.println(msg_arg_error);
@@ -185,6 +185,17 @@ int setAddr(int argc, char **argv) {
     }
 
     systemConfig.setAddr(atoi(argv[1]));
+    return 0;
+}
+
+int setCall(int argc, const char **argv) { 
+
+    if (argc != 2) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
+
+    systemConfig.setCall(CallSign(argv[1]));
     return 0;
 }
 
@@ -215,7 +226,7 @@ int doPrint(int argc, const char **argv) {
 /**
  * Used to put a comment into the console log
  */
-int doRem(int argc, char **argv) { 
+int doRem(int argc, const char **argv) { 
     if (argc != 2) {
         logger.println(msg_arg_error);
         return -1;
@@ -363,7 +374,7 @@ int sendSetRoute(int argc, const char **argv) {
     return 0;
 }
 
-int sendGetRoute(int argc, char **argv) { 
+int sendGetRoute(int argc, const char **argv) { 
  
     if (argc != 3) {
         logger.println(msg_arg_error);
@@ -418,3 +429,4 @@ int doResetCounters(int argc, const char **argv) {
     systemMessageProcessor.resetCounters();
     return 0;
 }
+

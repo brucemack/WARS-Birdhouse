@@ -24,15 +24,20 @@ int sendPing(int argc, const char** argv);
 int info(int argc, const char **argv);
 int sleep(int argc, const char **argv);
 int setBatteryLimit(int argc, const char **argv);
+int setAddr(int argc, const char **argv);
+int setCall(int argc, const char **argv);
 int doPrint(int argc, const char **argv);
 int boot(int argc, const char **argv);
 int bootRadio(int argc, const char **argv);
 int sendReset(int argc, const char **argv);
 int doResetCounters(int argc, const char **argv);
+int doRem(int argc, const char **argv);
+int sendText(int argc, const char **argv);
 
 int setRoute(int argc, const char **argv);
 int clearRoutes(int argc, const char **argv);
 int sendSetRoute(int argc, const char **argv);
-int sendText(int argc, const char **argv);
+int sendGetRoute(int argc, const char **argv);
+
 
 #endif

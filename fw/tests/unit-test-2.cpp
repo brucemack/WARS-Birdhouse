@@ -221,6 +221,7 @@ void test_CommandProcessor() {
         assert(packet.header.getType() == TYPE_SETROUTE);
         assert(packet.header.destAddr == 3);
         assert(packet.header.sourceAddr == 1);
+        assert(packet.header.getOriginalSourceCall().isEqual("KC1FSZ"));
 
         // Look at payload
         SetRouteReqPayload payload;

@@ -82,6 +82,8 @@ static int32_t get_time_seconds() {
   return esp_timer_get_time() / 1000000L;
 }
 
+int reset_radio();
+
 // ===== Interface Classes ===========================================
 
 class ClockImpl : public Clock {
@@ -114,11 +116,6 @@ public:
         return level * 1000.0;
     }
 
-    // ### TODO
-    uint16_t getBootCount() const { return 1; }
-    // ### TODO
-    uint16_t getSleepCount() const { return 1; }
-
     int16_t getTemperature() const { return 0; }
     int16_t getHumidity() const { return  0; }
 
@@ -127,23 +124,7 @@ public:
     }
 
     void restartRadio() {
-
-      // Reset the radio 
       reset_radio();
-      delay(250);
-
-      // Initialize the radio
-      if (init_radio() != 0) {
-        logger.println("ERR: Problem with radio init");
-        return -1;
-      }
-      else {
-        // Start listening for messages
-        state = State::LISTENING;
-        enable_interrupt_RxDone();
-        set_mode_RXCONTINUOUS();
-        return 0;
-      } 
     }
 
     void sleep(uint32_t ms) {
@@ -325,18 +306,43 @@ void write_message(uint8_t* data, uint8_t len) {
 
 int reset_radio() {
   
-  pinMode(RST_PIN, OUTPUT);
-  digitalWrite(RST_PIN, HIGH);
-  delay(5);
-  digitalWrite(RST_PIN, LOW);
-  delay(5);
-  digitalWrite(RST_PIN, HIGH);
-  // Float the reset pin
-  pinMode(RST_PIN, INPUT);
-  // Per datasheet, wait 5ms after reset
-  delay(5);
-  
-  return 0;  
+    pinMode(RST_PIN, OUTPUT);
+    digitalWrite(RST_PIN, HIGH);
+    delay(5);
+    digitalWrite(RST_PIN, LOW);
+    delay(5);
+    digitalWrite(RST_PIN, HIGH);
+    // Float the reset pin
+    pinMode(RST_PIN, INPUT);
+    // Per datasheet, wait 5ms after reset
+    delay(5);
+    // Not sure if this is really needed:
+    delay(250);
+
+    // Initialize the radio
+    if (init_radio() != 0) {
+      logger.println(F("ERR: Problem with radio initialization"));
+      return -1;
+    }
+
+    logger.printf(F("INF: Radio initialized"));
+
+    // Flash the LED as a diagnostic indicator 
+    digitalWrite(LED_PIN, HIGH);
+    delay(200);
+    digitalWrite(LED_PIN, LOW);
+    delay(200);
+    digitalWrite(LED_PIN, HIGH);
+    delay(200);
+    digitalWrite(LED_PIN, LOW);
+
+    // Start listening for messages
+    state = State::LISTENING;
+    enable_interrupt_RxDone();
+    // Put the radio on the receive mode
+    set_mode_RXCONTINUOUS();  
+
+    return 0;  
 }
 
 /**
@@ -466,11 +472,7 @@ int init_radio() {
 
 // ===== Application 
 
-static int counter = 0;
-static uint32_t chipId = 0;
-
 auto timer = timer_create_default();
-
 
 static bool isDelim(char d, const char* delims) {
   const char* ptr = delims;
@@ -550,15 +552,14 @@ char* tokenizer(char* str, const char* delims, char** saveptr) {
  * and tell the ESP32 to go into deep sleep.
  */
 static bool check_low_battery(void*) {
-  uint16_t lowBatteryLimitMv = preferences.getUShort("blimit", 0);
+  uint16_t lowBatteryLimitMv = systemConfig.getBatteryLimit();
   // Check the battery
-  uint16_t battery = checkBattery();
+  uint16_t battery = systemInstrumentation.getBatteryVoltage();
   // If the battery is low then deep sleep
   if (lowBatteryLimitMv != 0 && battery < lowBatteryLimitMv) {
     shell.println(F("INF: Low battery, entering deep sleep"));
     // Keep track of how many times this has happened
-    uint16_t sleepCount = preferences.getUShort("sleepcount", 0);  
-    preferences.putUShort("sleepcount", sleepCount + 1);   
+    systemConfig.setSleepCount(systemConfig.getSleepCount() + 1);
     // Put the radio into SLEEP mode to minimize power consumpion.  Per the 
     // datasheet the sleep current is 1uA.
     set_mode_SLEEP();
@@ -591,14 +592,6 @@ void setup() {
   Serial.print(F("Build: "));
   Serial.println(__DATE__);
 
-  // Extract the MAC address of the chip
-  for (int i = 0; i < 17; i = i + 8) {
-    chipId |= ((ESP.getEfuseMac() >> (40 - i)) & 0xff) << i;
-  }
-
-  Serial.print(F("MAC: "));
-  Serial.println(chipId, HEX);
-
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
   switch (wakeup_reason){
     case ESP_SLEEP_WAKEUP_EXT0: Serial.println("Wakeup caused by external signal using RTC_IO"); break;
@@ -608,8 +601,6 @@ void setup() {
     case ESP_SLEEP_WAKEUP_ULP: Serial.println("Wakeup caused by ULP program"); break;
     default: Serial.printf("Wakeup was not caused by deep sleep: %d\n",wakeup_reason); break;
   }
-
-  preferences.begin("my-app", false); 
 
   // Radio interrupt pin
   pinMode(DIO0_PIN, INPUT);
@@ -623,14 +614,13 @@ void setup() {
   shell.setTokenizer(tokenizer);
   shell.addCommand(F("ping <addr>"), sendPing);
   shell.addCommand(F("reset <addr>"), sendReset);
-  shell.addCommand(F("blink <addr>"), sendBlink);
   shell.addCommand(F("text <addr> <text>"), sendText);
   shell.addCommand(F("boot"), boot);
   shell.addCommand(F("bootradio"), bootRadio);
   shell.addCommand(F("info"), info);
   shell.addCommand(F("sleep <seconds>"), sleep);
-  shell.addCommand(F("skipacks"), skipAcks);
   shell.addCommand(F("setaddr <addr>"), setAddr);
+  shell.addCommand(F("setcall <call_sign>"), setCall);
   shell.addCommand(F("setroute <target addr> <next hop addr>"), setRoute);
   shell.addCommand(F("clearroutes"), clearRoutes);
   shell.addCommand(F("setblimit <limit_mv>"), setBatteryLimit);
@@ -641,29 +631,7 @@ void setup() {
   shell.addCommand(F("resetcounters"), doResetCounters);
 
   // Increment the boot count
-  uint16_t bootCount = preferences.getUShort("bootcount", 0);  
-  shell.print(F("Boot Count: "));
-  shell.println(bootCount);
-  preferences.putUShort("bootcount", bootCount + 1);
-
-  uint16_t sleepCount = preferences.getUShort("sleepcount", 0);  
-  shell.print(F("Sleep Count: "));
-  shell.println(sleepCount);
-
-  // Get the address loaded from NVRAM
-  MY_ADDR = preferences.getUChar("addr", 1);  
-  shell.print(F("Node Address: "));
-  shell.println(MY_ADDR);
-
-  uint16_t lowBatteryLimitMv = preferences.getUShort("blimit", 0);
-  shell.print(F("Battery Limit: "));
-  shell.println(lowBatteryLimitMv);
-
-  // Get the initial routing table loaded from NVRAM
-  for (int i = 0; i < 256; i++) {
-    Routes[i] = 0;
-  }
-  preferences.getBytes("routes", Routes, 256);
+  systemConfig.setBootCount(systemConfig.getBootCount() + 1);
 
   // Interrupt setup from radio
   // Allocating an external interrupt will always allocate it on the core that does the allocation.
@@ -695,26 +663,6 @@ void setup() {
   else {
     // Reset the radio 
     reset_radio();
-    delay(250);
- 
-    // Initialize the radio
-    if (init_radio() != 0) {
-      Serial.println(F("ERR: Problem with radio initialization"));
-    } else {
-      digitalWrite(LED_PIN, HIGH);
-      delay(200);
-      digitalWrite(LED_PIN, LOW);
-      delay(200);
-      digitalWrite(LED_PIN, HIGH);
-      delay(200);
-      digitalWrite(LED_PIN, LOW);
-  
-      // Start listening for messages
-      state = State::LISTENING;
-      enable_interrupt_RxDone();
-      // Put the radio on the receive mode
-      set_mode_RXCONTINUOUS();  
-    }
   }
   
   // Enable the battery check timer
@@ -773,4 +721,3 @@ static void check_for_interrupts() {
     }
   }
 }
-
