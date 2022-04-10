@@ -20,24 +20,23 @@
 #ifndef _CommandProcessor_h
 #define _CommandProcessor_h
 
-int sendPing(int argc, const char** argv);
-int info(int argc, const char **argv);
-int sleep(int argc, const char **argv);
-int setBatteryLimit(int argc, const char **argv);
-int setAddr(int argc, const char **argv);
-int setCall(int argc, const char **argv);
-int doPrint(int argc, const char **argv);
-int boot(int argc, const char **argv);
-int bootRadio(int argc, const char **argv);
-int sendReset(int argc, const char **argv);
-int doResetCounters(int argc, const char **argv);
-int doRem(int argc, const char **argv);
-int sendText(int argc, const char **argv);
+int sendPing(int argc, char** argv);
+int info(int argc, char **argv);
+int sleep(int argc, char **argv);
+int setBatteryLimit(int argc, char **argv);
+int setAddr(int argc, char **argv);
+int setCall(int argc, char **argv);
+int doPrint(int argc, char **argv);
+int boot(int argc, char **argv);
+int bootRadio(int argc, char **argv);
+int sendReset(int argc, char **argv);
+int doResetCounters(int argc, char **argv);
+int doRem(int argc, char **argv);
+int sendText(int argc, char **argv);
 
-int setRoute(int argc, const char **argv);
-int clearRoutes(int argc, const char **argv);
-int sendSetRoute(int argc, const char **argv);
-int sendGetRoute(int argc, const char **argv);
-
+int setRoute(int argc, char **argv);
+int clearRoutes(int argc, char **argv);
+int sendSetRoute(int argc, char **argv);
+int sendGetRoute(int argc, char **argv);
 
 #endif

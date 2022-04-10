@@ -41,7 +41,7 @@ extern Instrumentation& systemInstrumentation;
 extern RoutingTable& systemRoutingTable;
 extern MessageProcessor& systemMessageProcessor;
 
-int sendPing(int argc, const char** argv) { 
+int sendPing(int argc, char** argv) { 
  
     if (argc != 2) {
         logger.println(msg_arg_error);
@@ -76,7 +76,7 @@ int sendPing(int argc, const char** argv) {
     }
 }
 
-int sendReset(int argc, const char **argv) { 
+int sendReset(int argc, char **argv) { 
 
     if (argc != 3) {
       logger.println(msg_arg_error);
@@ -114,19 +114,19 @@ int sendReset(int argc, const char **argv) {
     }
 }
 
-int boot(int argc, const char **argv) { 
+int boot(int argc, char **argv) { 
     logger.println("INF: Rebooting");
     systemInstrumentation.restart();
     return 0;
 }
 
-int bootRadio(int argc, const char **argv) { 
+int bootRadio(int argc, char **argv) { 
     logger.println("INF: Rebooting radio");
     systemInstrumentation.restartRadio();
     return 0;
 }
 
-int info(int argc, const char **argv) { 
+int info(int argc, char **argv) { 
     logger.print(F("{ \"node\": "));
     logger.print(systemConfig.getAddr());
     logger.print(F(", \"version\": "));
@@ -163,7 +163,7 @@ int info(int argc, const char **argv) {
 }
 
 // Used for testing the watch dog 
-int sleep(int argc, const char **argv) { 
+int sleep(int argc, char **argv) { 
 
   if (argc != 2) {
     logger.println(msg_arg_error);
@@ -177,7 +177,7 @@ int sleep(int argc, const char **argv) {
   return 0;
 }
 
-int setAddr(int argc, const char **argv) { 
+int setAddr(int argc, char **argv) { 
 
     if (argc != 2) {
         logger.println(msg_arg_error);
@@ -188,7 +188,7 @@ int setAddr(int argc, const char **argv) {
     return 0;
 }
 
-int setCall(int argc, const char **argv) { 
+int setCall(int argc, char **argv) { 
 
     if (argc != 2) {
         logger.println(msg_arg_error);
@@ -199,7 +199,7 @@ int setCall(int argc, const char **argv) {
     return 0;
 }
 
-int setBatteryLimit(int argc, const char **argv) { 
+int setBatteryLimit(int argc, char **argv) { 
 
     if (argc != 2) {
         logger.println(msg_arg_error);
@@ -210,7 +210,7 @@ int setBatteryLimit(int argc, const char **argv) {
     return 0;
 }
 
-int doPrint(int argc, const char **argv) { 
+int doPrint(int argc, char **argv) { 
 
     if (argc != 2) {
         logger.println(msg_arg_error);
@@ -226,7 +226,7 @@ int doPrint(int argc, const char **argv) {
 /**
  * Used to put a comment into the console log
  */
-int doRem(int argc, const char **argv) { 
+int doRem(int argc, char **argv) { 
     if (argc != 2) {
         logger.println(msg_arg_error);
         return -1;
@@ -243,7 +243,7 @@ int doRem(int argc, const char **argv) {
  *  1: The destination node number
  *  2: The text of the message, limited to 80 characters.
  */
-int sendText(int argc, const char **argv) { 
+int sendText(int argc, char **argv) { 
  
     if (argc != 3) {
         logger.println(msg_arg_error);
@@ -293,7 +293,7 @@ int sendText(int argc, const char **argv) {
     return 0;
 }
 
-int setRoute(int argc, const char **argv) { 
+int setRoute(int argc, char **argv) { 
 
     if (argc != 3) {
         logger.println(msg_arg_error);
@@ -315,12 +315,12 @@ int setRoute(int argc, const char **argv) {
     return 0;
 }
 
-int clearRoutes(int argc, const char **argv) { 
+int clearRoutes(int argc, char **argv) { 
     systemRoutingTable.clearRoutes();
     return 0;
 }
 
-int sendSetRoute(int argc, const char **argv) { 
+int sendSetRoute(int argc, char **argv) { 
  
     if (argc != 4) {
         logger.println(msg_arg_error);
@@ -374,7 +374,7 @@ int sendSetRoute(int argc, const char **argv) {
     return 0;
 }
 
-int sendGetRoute(int argc, const char **argv) { 
+int sendGetRoute(int argc, char **argv) { 
  
     if (argc != 3) {
         logger.println(msg_arg_error);
@@ -424,9 +424,8 @@ int sendGetRoute(int argc, const char **argv) {
     return 0;
 }
 
-int doResetCounters(int argc, const char **argv) { 
+int doResetCounters(int argc, char **argv) { 
     systemInstrumentation.resetCounters();
     systemMessageProcessor.resetCounters();
     return 0;
 }
-

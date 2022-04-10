@@ -146,7 +146,7 @@ static MessageProcessor systemMessageProcessor(systemClock,
   systemConfig, 10 * 1000, 2 * 1000);
 
 // Exposed base interfaces to the rest of the program
-Configuration& config = testConfig;
+Configuration& config = systemConfig;
 RoutingTable& routingTable = systemRoutingTable;
 MessageProcessor& messageProcessor = systemMessageProcessor;
 
@@ -212,14 +212,14 @@ void event_RxDone() {
 
   // Put the RSSI (OOB) and the entire packet (not just the header)
   // into the circular queue
-  rx_buffer.push((const uint8_t*)&lastRssi, rx_buf, len);
+  rxBuffer.push((const uint8_t*)&lastRssi, rx_buf, len);
 }
 
 static void event_tick_LISTENING() {
 
   // Check for pending transmissions.  If nothing is pending then 
   // return without any state change.
-  if (tx_buffer.isEmpty()) {
+  if (txBuffer.isEmpty()) {
     return;
   }
     
@@ -230,7 +230,7 @@ static void event_tick_LISTENING() {
   // Pop the data off the TX queue into the transmit buffer.  
   unsigned int tx_buf_len = 256;
   uint8_t tx_buf[tx_buf_len];
-  tx_buffer.pop(0, tx_buf, &tx_buf_len);
+  txBuffer.pop(0, tx_buf, &tx_buf_len);
 
   // Move the data into the radio FIFO
   write_message(tx_buf, tx_buf_len);
@@ -325,7 +325,7 @@ int reset_radio() {
       return -1;
     }
 
-    logger.printf(F("INF: Radio initialized"));
+    logger.println(F("INF: Radio initialized"));
 
     // Flash the LED as a diagnostic indicator 
     digitalWrite(LED_PIN, HIGH);
@@ -674,8 +674,6 @@ void setup() {
   esp_task_wdt_reset();
 }
 
-static void process_rx_msg(const uint8_t* buf, const unsigned int len);
-static void check_for_rx_msg();
 static void check_for_interrupts();
 
 void loop() {
@@ -692,8 +690,8 @@ void loop() {
   // Check for radio activity
   event_tick();
 
-  // Look for any received data that should be processed by the application
-  check_for_rx_msg();
+  // Perform any message processing that is pending
+  systemMessageProcessor.pump();
 
   // Keep the watchdog alive
   esp_task_wdt_reset();
