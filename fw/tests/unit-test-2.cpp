@@ -62,8 +62,6 @@ public:
     uint16_t getPanelVoltage() const { return 4000; }
     int16_t getTemperature() const { return 23; }
     int16_t getHumidity() const { return  87; }
-    uint16_t getBootCount() const { return 1; }
-    uint16_t getSleepCount() const { return 1; }
     void restart() { cout << "RESTART" << endl; }
     void restartRadio() { cout << "RESTART" << endl; }
     void sleep(uint32_t ms) { cout << "SLEEP " << ms << endl; }
@@ -74,7 +72,9 @@ public:
 
     TestConfiguration(nodeaddr_t myAddr, const char* myCall) 
     : _myAddr(myAddr), 
-      _myCall(myCall) {
+      _myCall(myCall),
+      _bootCount(6),
+      _sleepCount(1) {
     }
 
     nodeaddr_t getAddr() const {
@@ -89,10 +89,27 @@ public:
         return 3400;
     }
 
+    uint16_t getBootCount() const {
+        return _bootCount;
+    }
+
+    void setBootCount(uint16_t l) {
+        _bootCount = l;
+    }
+
+    uint16_t getSleepCount() const {
+        return _sleepCount;
+    };
+
+    void setSleepCount(uint16_t l) {
+        _sleepCount = l;
+    }
+
 private:
 
     nodeaddr_t _myAddr;
     const CallSign _myCall;
+    uint16_t _bootCount, _sleepCount;
 };
 
 void movePacket(CircularBuffer& from, CircularBuffer& to) {
@@ -132,6 +149,9 @@ void test_CommandProcessor() {
     
     systemRoutingTable.setRoute(3, 3);
     systemRoutingTable.setRoute(7, 3);
+
+    // Increment boot count
+    systemConfig.setBootCount(systemConfig.getBootCount() + 1);
 
     // PING
     {

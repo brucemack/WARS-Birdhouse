@@ -37,8 +37,6 @@ public:
     virtual uint16_t getPanelVoltage() const = 0;
     virtual int16_t getTemperature() const = 0;
     virtual int16_t getHumidity() const = 0;
-    virtual uint16_t getBootCount() const = 0;
-    virtual uint16_t getSleepCount() const = 0;
     
     virtual void sleep(uint32_t ms) = 0;
     virtual void restart() = 0;

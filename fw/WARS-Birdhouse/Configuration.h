@@ -33,6 +33,12 @@ public:
 
     virtual uint16_t getBatteryLimit() const = 0;
     virtual void setBatteryLimit(uint16_t l) {};
+
+    virtual uint16_t getBootCount() const = 0;
+    virtual void setBootCount(uint16_t l) {};
+
+    virtual uint16_t getSleepCount() const = 0;
+    virtual void setSleepCount(uint16_t l) {};
 };
 
 #endif

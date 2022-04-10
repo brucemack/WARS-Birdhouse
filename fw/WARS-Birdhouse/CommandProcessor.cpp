@@ -138,9 +138,9 @@ int info(int argc, const char **argv) {
     logger.print(F(", \"panelMv\": "));
     logger.print(systemInstrumentation.getPanelVoltage());
     logger.print(F(", \"bootCount\": "));
-    logger.print(systemInstrumentation.getBootCount());
+    logger.print(systemConfig.getBootCount());
     logger.print(F(", \"sleepCount\": "));
-    logger.print(systemInstrumentation.getSleepCount());
+    logger.print(systemConfig.getSleepCount());
     logger.print(F(", \"routes\": ["));
 
     // Display the routing table
@@ -179,12 +179,13 @@ int sleep(int argc, const char **argv) {
 
 int setAddr(int argc, char **argv) { 
 
-  if (argc != 2) {
-    logger.println(msg_arg_error);
-    return -1;
-  }
+    if (argc != 2) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
 
-  systemConfig.setAddr(atoi(argv[1]));
+    systemConfig.setAddr(atoi(argv[1]));
+    return 0;
 }
 
 int setBatteryLimit(int argc, const char **argv) { 
@@ -195,6 +196,7 @@ int setBatteryLimit(int argc, const char **argv) {
     }
 
     systemConfig.setBatteryLimit(atoi(argv[1]));
+    return 0;
 }
 
 int doPrint(int argc, const char **argv) { 
@@ -207,6 +209,7 @@ int doPrint(int argc, const char **argv) {
     logger.print("[");
     logger.print(argv[1]);
     logger.println("]");
+    return 0;
 }
 
 /**
@@ -217,6 +220,7 @@ int doRem(int argc, char **argv) {
         logger.println(msg_arg_error);
         return -1;
     }
+    return 0;
 }
 
 /** This function handles a request to send a text message to another node
@@ -297,10 +301,12 @@ int setRoute(int argc, const char **argv) {
     }
 
     systemRoutingTable.setRoute(t, r);
+    return 0;
 }
 
 int clearRoutes(int argc, const char **argv) { 
     systemRoutingTable.clearRoutes();
+    return 0;
 }
 
 int sendSetRoute(int argc, const char **argv) { 
@@ -410,4 +416,5 @@ int sendGetRoute(int argc, char **argv) {
 int doResetCounters(int argc, const char **argv) { 
     systemInstrumentation.resetCounters();
     systemMessageProcessor.resetCounters();
+    return 0;
 }

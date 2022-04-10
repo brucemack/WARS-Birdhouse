@@ -37,6 +37,12 @@ public:
     uint16_t getBatteryLimit() const;
     void setBatteryLimit(uint16_t l);
 
+    uint16_t getBootCount() const;
+    void setBootCount(uint16_t l);
+
+    uint16_t getSleepCount() const;
+    void setSleepCount(uint16_t l);
+
 private:
 
     void _load();

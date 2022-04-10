@@ -206,8 +206,8 @@ void MessageProcessor::_process(int16_t rssi,
       respPayload.panelMv = _instrumentation.getPanelVoltage();
       respPayload.uptimeSeconds = (_clock.time() - _startTime) / 1000;
       respPayload.time = _clock.time();
-      respPayload.bootCount = _instrumentation.getBootCount();
-      respPayload.sleepCount = _instrumentation.getSleepCount();
+      respPayload.bootCount = _config.getBootCount();
+      respPayload.sleepCount = _config.getSleepCount();
       // #### TODO
       respPayload.rxPacketCount = 0;
       // #### TODO

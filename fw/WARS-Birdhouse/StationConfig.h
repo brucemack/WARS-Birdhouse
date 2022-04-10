@@ -10,6 +10,8 @@ struct StationConfig {
     uint16_t batteryLimitMv;
     uint8_t debugMode;
     uint32_t securityToken;
+    uint16_t bootCount;
+    uint16_t sleepCount;
 };
 
 #endif

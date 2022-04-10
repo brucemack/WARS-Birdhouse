@@ -54,6 +54,24 @@ void ConfigurationImpl::setBatteryLimit(uint16_t l) {
     _save();
 }
 
+uint16_t ConfigurationImpl::getBootCount() const {
+    return _configCache.bootCount;
+}
+
+void ConfigurationImpl::setBootCount(uint16_t l) {
+    _configCache.bootCount = l;
+    _save();
+}
+
+uint16_t ConfigurationImpl::getSleepCount() const {
+    return _configCache.sleepCount;
+}
+
+void ConfigurationImpl::setSleepCount(uint16_t l) {
+    _configCache.sleepCount = l;
+    _save();
+}
+
 void ConfigurationImpl::_save() {
     const uint8_t* v = (const uint8_t*)&_configCache;
     for (unsigned int i = 0; i < sizeof(StationConfig); i++)
