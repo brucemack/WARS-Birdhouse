@@ -13,3 +13,6 @@ void EEPROMClass::write(unsigned int addr, uint8_t data) {
 
 EEPROMClass EEPROM;
 
+uint32_t millis() {
+    return 1000;
+}

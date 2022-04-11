@@ -3,13 +3,13 @@
 #include "../WARS-Birdhouse/CircularBuffer.h"
 #include "../WARS-Birdhouse/packets.h"
 #include "../WARS-Birdhouse/OutboundPacketManager.h"
-#include "../WARS-Birdhouse/Clock.h"
 #include "../WARS-Birdhouse/Instrumentation.h"
 #include "../WARS-Birdhouse/RoutingTable.h"
 #include "../WARS-Birdhouse/RoutingTableImpl.h"
 #include "../WARS-Birdhouse/MessageProcessor.h"
 #include "../WARS-Birdhouse/CommandProcessor.h"
 #include "../WARS-Birdhouse/Configuration.h"
+#include "TestClockImpl.h"
 
 #include <iostream>
 #include <assert.h>
@@ -27,30 +27,6 @@ public:
     void print(uint16_t m) { cout << m; }
     void println() { cout << endl; }
     void println(const char* m) { cout << m << endl; }
-};
-
-class TestClock : public Clock {
-public:
-
-    TestClock() {
-        _time = 10 * 1000;
-    }
-
-    uint32_t time() const {
-        return _time;
-    };
-
-    void setTime(uint32_t t) {
-        _time = t;
-    }
-
-    void advanceSeconds(uint32_t seconds) {
-        _time += (seconds * 1000);
-    }
-
-private:
-
-    uint32_t _time;
 };
 
 class TestInstrumentation : public Instrumentation {

@@ -41,7 +41,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include <arduino-timer.h>
 
 #include "CircularBuffer.h"
-#include "Clock.h"
+#include "ClockImpl.h"
 #include "ConfigurationImpl.h"
 #include "packets.h"
 #include "OutboundPacketManager.h"
@@ -78,21 +78,9 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 
 static const float STATION_FREQUENCY = 906.5;
 
-static int32_t get_time_seconds() {
-  return esp_timer_get_time() / 1000000L;
-}
-
 int reset_radio();
 
 // ===== Interface Classes ===========================================
-
-class ClockImpl : public Clock {
-public:
-
-    uint32_t time() const {
-        return millis();
-    };
-};
 
 class InstrumentationImpl : public Instrumentation {
 public:
@@ -135,15 +123,25 @@ public:
 // Connect the logger stream to the SimpleSerialShell
 Stream& logger = shell;
 
-ClockImpl systemClock;
-ConfigurationImpl systemConfig;
-InstrumentationImpl systemInstrumentation;
-RoutingTableImpl systemRoutingTable;
+static ClockImpl clock;
+Clock& systemClock = clock;
+
+static ConfigurationImpl config;
+Configuration& systemConfig = config;
+
+static InstrumentationImpl instrumentation;
+Instrumentation& systemInstrumentation = instrumentation;
+
+static RoutingTableImpl routingTable;
+RoutingTable& systemRoutingTable = routingTable;
+
 CircularBufferImpl<4096> txBuffer(0);
 CircularBufferImpl<4096> rxBuffer(2);
-MessageProcessor systemMessageProcessor(systemClock, 
-  rxBuffer, txBuffer, systemRoutingTable, systemInstrumentation, 
-  systemConfig, 10 * 1000, 2 * 1000);
+
+static MessageProcessor messageProcessor(clock, 
+  rxBuffer, txBuffer, routingTable, instrumentation, 
+  config, 10 * 1000, 2 * 1000);
+MessageProcessor& systemMessageProcessor = messageProcessor;
 
 // The states of the state machine
 enum State { IDLE, LISTENING, TRANSMITTING };
@@ -162,11 +160,16 @@ void IRAM_ATTR isr() {
   isr_hit = true;
 }
 
+/**
+ * @brief This is called when the radio reports the end of a 
+ * transmission sequence.  The radio is put back into 
+ * continuous receive mode.
+ */
 void event_TxDone() { 
 
-  // Waiting for an message transmit to finish successfull
+  // Sanity check on state transition
   if (state != State::TRANSMITTING) {
-    Serial.println(F("ERR: TxDone received in unexpected state"));
+    logger.println(F("ERR: TxDone received in unexpected state"));
     return;
   }
 
@@ -178,13 +181,16 @@ void event_TxDone() {
   set_mode_RXCONTINUOUS();  
 } 
 
+/**
+ * @brief This is called when a complete message is received.
+ */
 void event_RxDone() {
 
   // How much data is available?
   const uint8_t len = spi_read(0x13);
   // Reset the FIFO read pointer to the beginning of the packet we just got
   spi_write(0x0d, spi_read(0x10));
-  // Stream in from the FIFO. 
+  // Stream received data in from the FIFO. 
   uint8_t rx_buf[256];
   spi_read_multi(0x00, rx_buf, len);
 
@@ -201,12 +207,12 @@ void event_RxDone() {
   // Handle based on state.  If we're not listening for anything then 
   // ignore what was just read.
   if (state != State::LISTENING) {
-    Serial.println(F("ERR: Message received when not listening"));
+    logger.println(F("ERR: Message received when not listening"));
     return;
   }
 
   // Put the RSSI (OOB) and the entire packet (not just the header)
-  // into the circular queue
+  // into the circular queue for later processing.
   rxBuffer.push((const uint8_t*)&lastRssi, rx_buf, len);
 }
 
@@ -218,7 +224,7 @@ static void event_tick_LISTENING() {
     return;
   }
     
-  // At this point we have something pending.
+  // At this point we have something pending to be sent.
   // Go into stand-by so we know that nothing else is coming in
   set_mode_STDBY();
 
@@ -229,6 +235,7 @@ static void event_tick_LISTENING() {
 
   // Move the data into the radio FIFO
   write_message(tx_buf, tx_buf_len);
+  
   // Go into transmit mode
   state = State::TRANSMITTING;
   enable_interrupt_TxDone();
@@ -572,8 +579,6 @@ void setup() {
   // Changed to speed up boot
   delay(100);
   Serial.begin(115200);
-  // Removed this to speed up boot
-  //delay(1000);
   
   Serial.println();
   Serial.println(F("====================="));

@@ -28,8 +28,15 @@
 #include "RoutingTable.h"
 
 /**
- * @brief An instance of this class is responsible for pulling 
- * packets off the node's receive queue and processing them.
+ * @brief An instance of this class is responsible for dealing
+ * with the inbound and outbound message flow.  Key responsibilities:
+ *   - Keeping a queue of messages that are waiting to be 
+ *     transmitted.
+ *   - Keeping a copy of any message that has not been acknowledged
+ *     in case it needs to be re-transmitted.
+ *   - Keeping track of timeout intervals and issuing re-transmitts. 
+ *   - Looking at received messages to find the acknowledgements.  Marking
+ *     outbound messages when they are successfully acknowledged.
  */
 class MessageProcessor {
 public:

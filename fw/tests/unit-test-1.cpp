@@ -3,12 +3,12 @@
 #include "../WARS-Birdhouse/CircularBuffer.h"
 #include "../WARS-Birdhouse/packets.h"
 #include "../WARS-Birdhouse/OutboundPacketManager.h"
-#include "../WARS-Birdhouse/Clock.h"
 #include "../WARS-Birdhouse/Instrumentation.h"
 #include "../WARS-Birdhouse/RoutingTable.h"
 #include "../WARS-Birdhouse/RoutingTableImpl.h"
 #include "../WARS-Birdhouse/MessageProcessor.h"
 #include "../WARS-Birdhouse/Configuration.h"
+#include "TestClockImpl.h"
 
 #include <iostream>
 #include <assert.h>
@@ -30,28 +30,6 @@ public:
 static TestStream testStream;
 Stream& logger = testStream;
 static const uint8_t SW_VERSION = 1;
-
-// Dummy clock for unit test.
-
-class TestClock : public Clock {
-public:
-
-    uint32_t time() const {
-        return _time;
-    };
-
-    void setTime(uint32_t t) {
-        _time = t;
-    }
-
-    void advanceSeconds(uint32_t seconds) {
-        _time += (seconds * 1000);
-    }
-
-private:
-
-    uint32_t _time;
-};
 
 // Dummy Instrumentation
 class TestInstrumentation : public Instrumentation {

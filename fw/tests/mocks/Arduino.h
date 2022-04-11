@@ -22,5 +22,8 @@ public:
     virtual void println() {};
 };
 
+// Returns unsigned long on Arduino
+uint32_t millis();
+
 #endif
 
