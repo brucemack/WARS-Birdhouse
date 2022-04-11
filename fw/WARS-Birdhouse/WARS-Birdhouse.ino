@@ -135,8 +135,8 @@ Instrumentation& systemInstrumentation = instrumentation;
 static RoutingTableImpl routingTable;
 RoutingTable& systemRoutingTable = routingTable;
 
-CircularBufferImpl<4096> txBuffer(0);
-CircularBufferImpl<4096> rxBuffer(2);
+static CircularBufferImpl<4096> txBuffer(0);
+static CircularBufferImpl<4096> rxBuffer(2);
 
 static MessageProcessor messageProcessor(mainClock, 
   rxBuffer, txBuffer, routingTable, instrumentation, config, 10 * 1000, 2 * 1000);
