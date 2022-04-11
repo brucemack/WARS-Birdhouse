@@ -157,10 +157,6 @@ void test_CommandProcessor() {
         const char* a1 = "7";
         const char *a_args[2] = { a0, a1 };
 
-        cout << "1" << endl;
-
-        cout << testClock.time() << endl;
-
         sendPing(2, (char**)a_args);
 
         systemMessageProcessor.pump();
