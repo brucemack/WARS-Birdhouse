@@ -78,6 +78,7 @@ private:
     OutboundPacketManager _opm;
     unsigned int _idCounter;
     uint32_t _startTime;
+    uint16_t _badPacketCounter;
 };
 
 #endif

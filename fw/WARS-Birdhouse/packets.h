@@ -25,7 +25,7 @@
 #include "Utils.h"
 #include "Configuration.h"
 
-static const uint8_t PACKET_VERSION = 2;
+const uint8_t PACKET_VERSION = 2;
 static const nodeaddr_t BROADCAST_ADDR = 0xffff;
 
 // The top bit indicates whether an ACK is needed
@@ -152,6 +152,10 @@ struct Header {
           type == TYPE_GETROUTE_REQ);
     }
 
+    uint8_t getPacketVersion() const {
+        return version;
+    }
+    
     uint8_t getType() const {
         return type;
     }

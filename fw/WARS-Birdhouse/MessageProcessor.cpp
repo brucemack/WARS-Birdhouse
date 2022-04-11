@@ -49,7 +49,8 @@ MessageProcessor::MessageProcessor(
       _config(config),
       _opm(clock, txBuffer, txTimeoutMs, txRetryMs),
       _idCounter(1),
-      _startTime(clock.time()) {
+      _startTime(clock.time()),
+      _badPacketCounter(0) {
 }
 
 void MessageProcessor::pump() {
@@ -80,13 +81,21 @@ bool MessageProcessor::transmitIfPossible(const Packet& packet,
 }
 
 void MessageProcessor::_process(int16_t rssi, 
-  const Packet& packet, unsigned int packetLen) { 
+    const Packet& packet, unsigned int packetLen) { 
 
-  // Error checking on new packet
-  if (packetLen < sizeof(Header)) {
-    logger.println(msg_bad_message);
-    return;
-  }
+    // Error checking on new packet
+    if (packetLen < sizeof(Header)) {
+        _badPacketCounter++;
+        logger.println(msg_bad_message);
+        return;
+    }
+
+    // Ignore messages that are for different versions of the protocol
+    if (packet.header.getPacketVersion() != PACKET_VERSION) {
+        _badPacketCounter++;
+        logger.println(msg_bad_message);
+        return;
+    }
 
   // Ignore messages that aren't targeted at this node.
   // This can happen when nodes are close to each other 
@@ -97,27 +106,27 @@ void MessageProcessor::_process(int16_t rssi,
       return;
   }
 
-  logger.print(F("INF: Got type: "));
-  logger.print(packet.header.type);
-  logger.print(", id: ");
-  logger.print(packet.header.id);
-  logger.print(", from: ");
-  logger.print(packet.header.sourceAddr);
-  logger.print(", to: ");
-  logger.print(packet.header.destAddr);
-  logger.print(", originalSource: ");
-  logger.print(packet.header.originalSourceAddr);
-  logger.print(", finalDest: ");
-  logger.print(packet.header.finalDestAddr);
-  logger.print(", RSSi: ");
-  logger.print(rssi);
-  logger.println();
+    logger.print(F("INF: Got type: "));
+    logger.print(packet.header.type);
+    logger.print(", id: ");
+    logger.print(packet.header.id);
+    logger.print(", from: ");
+    logger.print(packet.header.sourceAddr);
+    logger.print(", to: ");
+    logger.print(packet.header.destAddr);
+    logger.print(", originalSource: ");
+    logger.print(packet.header.originalSourceAddr);
+    logger.print(", finalDest: ");
+    logger.print(packet.header.finalDestAddr);
+    logger.print(", RSSi: ");
+    logger.print(rssi);
+    logger.println();
 
-  // If we got an ACK then process it directly 
-  if (packet.header.isAck()) {
-    _opm.processAck(packet);
-    return;
-  }
+    // If we got an ACK then process it directly 
+    if (packet.header.isAck()) {
+        _opm.processAck(packet);
+        return;
+    }
 
   // If the message we just received requires and ACK then 
   // generate one before proceeding with the local processing.

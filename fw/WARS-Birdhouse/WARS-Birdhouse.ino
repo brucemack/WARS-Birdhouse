@@ -34,12 +34,11 @@ Currently using the ESP32 D1 Mini
 http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 */
 
-#include "WiFi.h"
 #include <esp_task_wdt.h>
 #include <SimpleSerialShell.h>
-#include "spi_utils.h"
 #include <arduino-timer.h>
 
+#include "spi_utils.h"
 #include "CircularBuffer.h"
 #include "ClockImpl.h"
 #include "ConfigurationImpl.h"
@@ -104,6 +103,7 @@ public:
         return level * 1000.0;
     }
 
+    // Option is not implemented yet
     int16_t getTemperature() const { return 0; }
     int16_t getHumidity() const { return  0; }
 
@@ -112,22 +112,23 @@ public:
     }
 
     void restartRadio() {
-      reset_radio();
+        reset_radio();
     }
 
     void sleep(uint32_t ms) {
-      sleep(ms);
+        sleep(ms);
     }
 };
 
-// Connect the logger stream to the SimpleSerialShell
+// Connect the logger stream to the SimpleSerialShell.  The shell
+// global is defined (and externed) in the SimpleSerialShell module.
 Stream& logger = shell;
 
 static ClockImpl mainClock;
 Clock& systemClock = mainClock;
 
-static ConfigurationImpl config;
-Configuration& systemConfig = config;
+static ConfigurationImpl mainConfig;
+Configuration& systemConfig = mainConfig;
 
 static InstrumentationImpl instrumentation;
 Instrumentation& systemInstrumentation = instrumentation;
@@ -135,11 +136,14 @@ Instrumentation& systemInstrumentation = instrumentation;
 static RoutingTableImpl routingTable;
 RoutingTable& systemRoutingTable = routingTable;
 
-static CircularBufferImpl<4096> txBuffer(0);
-static CircularBufferImpl<4096> rxBuffer(2);
+// We keep a pretty small TX buffer because the main area where we keep 
+// outbound packets is in the MessageProcessor.
+static CircularBufferImpl<256> txBuffer(0);
+// There is a two-byte OOB allocation here for the RSSI data on receive
+static CircularBufferImpl<2048> rxBuffer(2);
 
 static MessageProcessor messageProcessor(mainClock, 
-  rxBuffer, txBuffer, routingTable, instrumentation, config, 10 * 1000, 2 * 1000);
+  rxBuffer, txBuffer, routingTable, instrumentation, mainConfig, 10 * 1000, 2 * 1000);
 MessageProcessor& systemMessageProcessor = messageProcessor;
 
 // The states of the state machine
@@ -147,15 +151,16 @@ enum State { IDLE, LISTENING, TRANSMITTING };
 
 // The overall state
 static State state = State::IDLE;
-
-// ----- Interrupt Service -------
-
+// This is volatile because it is set inside of the ISR context
 static volatile bool isr_hit = false;
 
+/**
+ * @brief This is the actual ISR that is called by the Arduino run-time.
+ */
 void IRAM_ATTR isr() {
   // NOTE: We've had so many problems with interrupt enable/disable on the ESP32
   // so now we're just going to set a flag and let everything happen in the loop()
-  // context.
+  // context. This eliminates a lot of risk around race-conditions, etc.
   isr_hit = true;
 }
 
@@ -163,27 +168,31 @@ void IRAM_ATTR isr() {
  * @brief This is called when the radio reports the end of a 
  * transmission sequence.  The radio is put back into 
  * continuous receive mode.
+ * 
+ * This gets called from the main processing loop.
  */
-void event_TxDone() { 
+static void event_TxDone() { 
 
-  // Sanity check on state transition
-  if (state != State::TRANSMITTING) {
-    logger.println(F("ERR: TxDone received in unexpected state"));
-    return;
-  }
-
-  // Revert back to whatever we were listening for. 
-  state = State::LISTENING;
-  // Ask for interrupt when receiving
-  enable_interrupt_RxDone();
-  // Go into RXCONTINUOUS so we can hear the response
-  set_mode_RXCONTINUOUS();  
+    // Sanity check on state transition
+    if (state != State::TRANSMITTING) {
+        logger.println(F("ERR: TxDone received in unexpected state"));
+        return;
+    }
+  
+    // Revert back to whatever we were listening for. 
+    state = State::LISTENING;
+    // Ask for interrupt when receiving
+    enable_interrupt_RxDone();
+    // Go into RXCONTINUOUS so we can hear the response
+    set_mode_RXCONTINUOUS();  
 } 
 
 /**
  * @brief This is called when a complete message is received.
+ * 
+ * This gets called from the main processing loop.
  */
-void event_RxDone() {
+static void event_RxDone() {
 
   // How much data is available?
   const uint8_t len = spi_read(0x13);
@@ -213,6 +222,46 @@ void event_RxDone() {
   // Put the RSSI (OOB) and the entire packet (not just the header)
   // into the circular queue for later processing.
   rxBuffer.push((const uint8_t*)&lastRssi, rx_buf, len);
+}
+
+/**
+ * @brief This function gets called from inside of the main processing loop.  It looks
+ * to see if any interrupt activitry has been detected and, if so, figiured out what 
+ * kind of interrupt was reported and calls the correct handler.
+ */ 
+static void check_for_interrupts(bool force) {
+
+    // Interrupt stuff
+    if (!isr_hit) {
+        return;
+    }
+
+    // *******************************************************************************
+    // Critical Section:
+    // Here we make sure that the cleaing of the isr_hit flag and the unloading 
+    // of the pending interrupts in the radio's IRQ register happen atomically.
+    // We are avoding the case where 
+    noInterrupts();
+
+    isr_hit = false;
+
+    // Read and reset the IRQ register at the same time:
+    uint8_t irq_flags = spi_write(0x12, 0xff);    
+
+    interrupts();
+    // *******************************************************************************
+    
+    // RX timeout - ignored
+    if (irq_flags & 0x80) {
+    } 
+    // RxDone without a CRC error
+    if ((irq_flags & 0x40) && !(irq_flags & 0x20)) {
+      event_RxDone();
+    }
+    // TxDone
+    if (irq_flags & 0x08) {
+      event_TxDone();
+    }
 }
 
 static void event_tick_LISTENING() {
@@ -573,6 +622,11 @@ static bool check_low_battery(void*) {
   return true;
 }
 
+static bool check_stranded_irq(void*) {
+    check_for_interrupts(true);
+    return true;
+}
+
 void setup() {
 
   // Changed to speed up boot
@@ -580,25 +634,22 @@ void setup() {
   Serial.begin(115200);
   
   Serial.println();
-  Serial.println(F("====================="));
-  Serial.println(F("KC1FSZ LoRa Mesh Node"));
-  Serial.println(F("====================="));
+  Serial.println(F("==========================="));
+  Serial.println(F("WARS Birdhouse Mesh Network"));
   Serial.println();
-
-  Serial.print(F("Version: "));
-  Serial.println(SW_VERSION);
-
-  Serial.print(F("Build: "));
+  Serial.print(F("V: "));
+  Serial.print(SW_VERSION);
+  Serial.print(F(" , Built: "));
   Serial.println(__DATE__);
 
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
   switch (wakeup_reason){
-    case ESP_SLEEP_WAKEUP_EXT0: Serial.println("Wakeup caused by external signal using RTC_IO"); break;
-    case ESP_SLEEP_WAKEUP_EXT1: Serial.println("Wakeup caused by external signal using RTC_CNTL"); break;
-    case ESP_SLEEP_WAKEUP_TIMER: Serial.println("Wakeup caused by timer"); break;
-    case ESP_SLEEP_WAKEUP_TOUCHPAD: Serial.println("Wakeup caused by touchpad"); break;
-    case ESP_SLEEP_WAKEUP_ULP: Serial.println("Wakeup caused by ULP program"); break;
-    default: Serial.printf("Wakeup was not caused by deep sleep: %d\n",wakeup_reason); break;
+    case ESP_SLEEP_WAKEUP_EXT0: Serial.println("Wakeup EXT0"); break;
+    case ESP_SLEEP_WAKEUP_EXT1: Serial.println("Wakeup EXT1"); break;
+    case ESP_SLEEP_WAKEUP_TIMER: Serial.println("Wakeup Timer"); break;
+    case ESP_SLEEP_WAKEUP_TOUCHPAD: Serial.println("Wakeup Touch"); break;
+    case ESP_SLEEP_WAKEUP_ULP: Serial.println("Wakeup ULP"); break;
+    default: Serial.printf("Wakeup %d\n",wakeup_reason); break;
   }
 
   // Radio interrupt pin
@@ -666,24 +717,25 @@ void setup() {
   
   // Enable the battery check timer
   timer.every(BATTERY_CHECK_INTERVAL_SECONDS * 1000, check_low_battery);
-
+  // Enable a periodic interrupt check (to make sure that we don't 
+  // accidentally leave an interrupt stranded in the IRQ
+  timer.every(1000, check_stranded_irq);
+ 
   // Enable the watchdog timer
   esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
   esp_task_wdt_add(NULL); //add current thread to WDT watch
   esp_task_wdt_reset();
 }
 
-static void check_for_interrupts();
-
 void loop() {
 
-  // Interrupt stuff
-  check_for_interrupts();
+  // Interrupt stuff, no forcing
+  check_for_interrupts(false);
  
-  // Service the shell
+  // Check for shell activity
   shell.executeIfInput();
   
-  // Service the timer
+  // Service the timers
   timer.tick();
 
   // Check for radio activity
@@ -694,27 +746,4 @@ void loop() {
 
   // Keep the watchdog alive
   esp_task_wdt_reset();
-}
-
-static void check_for_interrupts() {
-  // Interrupt stuff
-  if (isr_hit) {
-
-    isr_hit = false;
-
-    // Read and reset the IRQ register at the same time:
-    uint8_t irq_flags = spi_write(0x12, 0xff);    
-    
-    // RX timeout - ignored
-    if (irq_flags & 0x80) {
-    } 
-    // RxDone without a CRC error
-    if ((irq_flags & 0x40) && !(irq_flags & 0x20)) {
-      event_RxDone();
-    }
-    // TxDone
-    if (irq_flags & 0x08) {
-      event_TxDone();
-    }
-  }
 }
