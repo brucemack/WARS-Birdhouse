@@ -54,7 +54,7 @@ int sendPing(int argc, char** argv) {
         logger.println(F("ERR: No route"));
         return -1;
     }
-
+    
     // Make a ping request
     Packet packet;
     packet.header.setType(TYPE_PING_REQ);
@@ -71,9 +71,8 @@ int sendPing(int argc, char** argv) {
     if (!good) {
       logger.println("ERR: TX full");
       return -1;
-    } else {
-      return 0;
-    }
+    } 
+    return 0;
 }
 
 int sendReset(int argc, char **argv) { 

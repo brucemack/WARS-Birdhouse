@@ -124,25 +124,23 @@ void movePacket(CircularBuffer& from, CircularBuffer& to) {
 
 // ===== TEST CASES ================================================
 
-static TestStream testStream;
-
-TestClock systemClock;
+static TestStream testLogger;
+Stream& logger = testLogger;
+static TestClock testClock;
+Clock& systemClock = testClock;
 
 // Node #1
-TestConfiguration testConfig(1, "KC1FSZ");
-TestInstrumentation testInstrumentation;
+static TestConfiguration testConfig(1, "KC1FSZ");
+Configuration& systemConfig = testConfig;
+static TestInstrumentation testInstrumentation;
+Instrumentation& systemInstrumentation = testInstrumentation;
 static RoutingTableImpl testRoutingTable;
-CircularBufferImpl<4096> testTxBuffer(0);
-CircularBufferImpl<4096> testRxBuffer(2);
-static MessageProcessor testMessageProcessor(systemClock, testRxBuffer, testTxBuffer,
+RoutingTable& systemRoutingTable = testRoutingTable;
+CircularBufferImpl<4096> txBuffer(0);
+CircularBufferImpl<4096> rxBuffer(2);
+MessageProcessor testMessageProcessor(testClock, rxBuffer, txBuffer,
     testRoutingTable, testInstrumentation, testConfig,
     10 * 1000, 2 * 1000);
-
-// Exposed base interfaces to the rest of the program
-Stream& logger = testStream;
-Configuration& systemConfig = testConfig;
-Instrumentation& systemInstrumentation = testInstrumentation;
-RoutingTable& systemRoutingTable = testRoutingTable;
 MessageProcessor& systemMessageProcessor = testMessageProcessor;
 
 void test_CommandProcessor() {
@@ -159,13 +157,17 @@ void test_CommandProcessor() {
         const char* a1 = "7";
         const char *a_args[2] = { a0, a1 };
 
-        sendPing(2, a_args);
+        cout << "1" << endl;
+
+        cout << testClock.time() << endl;
+
+        sendPing(2, (char**)a_args);
 
         systemMessageProcessor.pump();
 
         // Make sure we see the outbound message
-        assert(!testTxBuffer.isEmpty());
-        testTxBuffer.popAndDiscard();
+        assert(!txBuffer.isEmpty());
+        txBuffer.popAndDiscard();
     }
 
     // INFO
@@ -173,12 +175,12 @@ void test_CommandProcessor() {
         const char* a0 = "info";
         const char *a_args[2] = { a0 };
 
-        info(1, a_args);
+        info(1, (char**)a_args);
 
         systemMessageProcessor.pump();
 
         // Make sure we dont see outbound message
-        assert(testTxBuffer.isEmpty());
+        assert(txBuffer.isEmpty());
     }
 
     // SET ROUTE
@@ -188,12 +190,12 @@ void test_CommandProcessor() {
         const char* a2 = "3";
         const char *a_args[3] = { a0, a1, a2 };
 
-        setRoute(3, a_args);
+        setRoute(3, (char**)a_args);
 
         systemMessageProcessor.pump();
 
         // Make sure we dont see the outbound message
-        assert(testTxBuffer.isEmpty());
+        assert(txBuffer.isEmpty());
 
         // Check the routing table
         assert(systemRoutingTable.nextHop(8) == 3);
@@ -207,17 +209,17 @@ void test_CommandProcessor() {
         const char* a3 = "4";
         const char *a_args[4] = { a0, a1, a2, a3 };
 
-        sendSetRoute(4, a_args);
+        sendSetRoute(4, (char**)a_args);
 
         systemMessageProcessor.pump();
 
         // Make sure we see the outbound message
-        assert(!testTxBuffer.isEmpty());
+        assert(!txBuffer.isEmpty());
 
         // Pull off the message and examine it
         Packet packet;
         unsigned int packetLen = sizeof(packet);
-        testTxBuffer.pop(0, (void*)&packet, &packetLen);
+        txBuffer.pop(0, (void*)&packet, &packetLen);
         assert(packet.header.getType() == TYPE_SETROUTE);
         assert(packet.header.destAddr == 3);
         assert(packet.header.sourceAddr == 1);
@@ -237,17 +239,17 @@ void test_CommandProcessor() {
         const char* a2 = "Hello World!";
         const char *a_args[3] = { a0, a1, a2 };
 
-        sendText(3, a_args);
+        sendText(3, (char**)a_args);
 
         systemMessageProcessor.pump();
 
         // Make sure we see the outbound message
-        assert(!testTxBuffer.isEmpty());
+        assert(!txBuffer.isEmpty());
 
         // Pull off the message and examine it
         Packet packet;
         unsigned int packetLen = sizeof(packet);
-        testTxBuffer.pop(0, (void*)&packet, &packetLen);
+        txBuffer.pop(0, (void*)&packet, &packetLen);
 
         assert(packet.header.getType() == TYPE_TEXT);
         assert(packet.header.destAddr == 3);

@@ -141,14 +141,9 @@ InstrumentationImpl systemInstrumentation;
 RoutingTableImpl systemRoutingTable;
 CircularBufferImpl<4096> txBuffer(0);
 CircularBufferImpl<4096> rxBuffer(2);
-static MessageProcessor systemMessageProcessor(systemClock, 
+MessageProcessor systemMessageProcessor(systemClock, 
   rxBuffer, txBuffer, systemRoutingTable, systemInstrumentation, 
   systemConfig, 10 * 1000, 2 * 1000);
-
-// Exposed base interfaces to the rest of the program
-Configuration& config = systemConfig;
-RoutingTable& routingTable = systemRoutingTable;
-MessageProcessor& messageProcessor = systemMessageProcessor;
 
 // The states of the state machine
 enum State { IDLE, LISTENING, TRANSMITTING };
