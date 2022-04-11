@@ -123,8 +123,8 @@ public:
 // Connect the logger stream to the SimpleSerialShell
 Stream& logger = shell;
 
-static ClockImpl clock;
-Clock& systemClock = clock;
+static ClockImpl mainClock;
+Clock& systemClock = mainClock;
 
 static ConfigurationImpl config;
 Configuration& systemConfig = config;
@@ -138,9 +138,8 @@ RoutingTable& systemRoutingTable = routingTable;
 CircularBufferImpl<4096> txBuffer(0);
 CircularBufferImpl<4096> rxBuffer(2);
 
-static MessageProcessor messageProcessor(clock, 
-  rxBuffer, txBuffer, routingTable, instrumentation, 
-  config, 10 * 1000, 2 * 1000);
+static MessageProcessor messageProcessor(mainClock, 
+  rxBuffer, txBuffer, routingTable, instrumentation, config, 10 * 1000, 2 * 1000);
 MessageProcessor& systemMessageProcessor = messageProcessor;
 
 // The states of the state machine
