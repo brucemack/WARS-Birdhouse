@@ -289,6 +289,7 @@ are using much more sophisticated hardware.  The WARS Birdhouse project uses a d
 wireless technology and is not interoperable with the ARDEN system.  See https://www.arednmesh.org. 
 * LoRaHAM (https://github.com/travisgoodspeed/loraham): A great open-source project that explored some similar territory.  The project appears to be inactive at this time.
 * LoRaWAN: A cool system that uses LoRa stations organized in a star topology.  The hub of each star is a gateway to the public internet.  This technology uses encryption and is not legal for amateur projects. 
+* DASH7 wireless network (https://en.wikipedia.org/wiki/DASH7).  Uses encryption, so not good for Part 97, but interesting nonetheless.  
 
 Reference Material
 ==================
