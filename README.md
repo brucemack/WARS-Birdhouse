@@ -381,13 +381,14 @@ Make sure these settings are chosen under the Tools menu:
 
 Now you should be able to compile.
 
-Relevant FCC Regulations
-========================
+Relevant FCC Regulations/Notes
+==============================
 
 * Part 97.311 Defines spread-spectrum (SS) rules.
 * Part 97.303 (N) Defines rules for the 33cm band.  Basically, hams must share the band with other services.  There are also geographical restrictions in Texas, New Mexico, Colorado, and Wyoming.
 * Part 97.309 (B) Talks about unspecified data emission codes.  Basically, all formats need to be clearly documented. See above. 
 * Are any part 15 regulations relevant here?
+* This firm does certification and [provides a detailed guide on the certification process](https://www.sunfiretesting.com/LoRa-FCC-Certification-Guide/).  
 
 Copyright Information 
 =====================
