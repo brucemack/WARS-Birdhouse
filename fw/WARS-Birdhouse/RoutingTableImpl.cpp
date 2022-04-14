@@ -18,10 +18,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include <stdint.h>
-#include <EEPROM.h>
 #include "RoutingTableImpl.h"
 
-RoutingTableImpl::RoutingTableImpl() {
+RoutingTableImpl::RoutingTableImpl(Preferences& pref) 
+:   _pref(pref) {
+}
+
+void RoutingTableImpl::begin() {
     _load();
 }
 
@@ -51,11 +54,9 @@ void RoutingTableImpl::clearRoutes() {
 }
 
 void RoutingTableImpl::_load() {
-    for (unsigned int i = 0; i < _tableSize; i++) 
-        _table[i] = EEPROM.read(32 + i);
+    _pref.getBytes("routing", (void*)_table, _tableSize);
 }
 
 void RoutingTableImpl::_save() {
-    for (unsigned int i = 0; i < _tableSize; i++)
-        EEPROM.write(32 + i, (uint8_t)_table[i]);
+    _pref.putBytes("routing", (const void*)_table, _tableSize);
 }

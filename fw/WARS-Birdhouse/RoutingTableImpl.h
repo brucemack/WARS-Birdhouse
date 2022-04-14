@@ -20,12 +20,19 @@
 #ifndef _RoutingTableImpl_h
 #define _RoutingTableImpl_h
 
+#include <Preferences.h>
 #include "RoutingTable.h"
 
 class RoutingTableImpl : public RoutingTable {
 public:
     
-    RoutingTableImpl();
+    RoutingTableImpl(Preferences& pref);
+
+    /**
+     * @brief Called once a startup
+     */
+    void begin();
+    
     nodeaddr_t nextHop(nodeaddr_t finalDestAddr);
     void setRoute(nodeaddr_t target, nodeaddr_t nextHop);
     void clearRoutes();
@@ -39,6 +46,7 @@ private:
     void _load();
     void _save();
 
+    Preferences& _pref;
     static const unsigned int _tableSize = 64;
     nodeaddr_t _table[64];
 };

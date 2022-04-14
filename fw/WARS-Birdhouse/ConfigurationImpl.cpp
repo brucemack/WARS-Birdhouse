@@ -19,11 +19,14 @@
  */
 #include "ConfigurationImpl.h"
 
-#include <EEPROM.h>
+ConfigurationImpl::ConfigurationImpl(Preferences& pref)
+:   _pref(pref) {
+}
 
-ConfigurationImpl::ConfigurationImpl() {
+void ConfigurationImpl::begin() {
     _load();
 }
+
 
 CallSign ConfigurationImpl::getCall() const {
     CallSign cs;
@@ -74,14 +77,10 @@ void ConfigurationImpl::setSleepCount(uint16_t l) {
 
 void ConfigurationImpl::_save() {
     const uint8_t* v = (const uint8_t*)&_configCache;
-    for (unsigned int i = 0; i < sizeof(StationConfig); i++)
-        EEPROM.write(i, v[i]);
+    _pref.putBytes("config", v, sizeof(StationConfig));
 }
 
 void ConfigurationImpl::_load() {
     uint8_t* v = (uint8_t*)&_configCache;
-    for (unsigned int i = 0; i < sizeof(StationConfig); i++)
-        v[i] = EEPROM.read(i);
+    _pref.getBytes("config", v, sizeof(StationConfig));
 }
-
-

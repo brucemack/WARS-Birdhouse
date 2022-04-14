@@ -133,7 +133,7 @@ int info(int argc, char **argv) {
     cs.printTo(logger);
     logger.print(F("\", \"version\": "));
     logger.print(systemInstrumentation.getSoftwareVersion());
-    logger.print(F("\", \"blimit\": "));
+    logger.print(F(", \"blimit\": "));
     logger.print(systemConfig.getBatteryLimit());
     logger.print(F(", \"batteryMv\": "));
     logger.print(systemInstrumentation.getBatteryVoltage());

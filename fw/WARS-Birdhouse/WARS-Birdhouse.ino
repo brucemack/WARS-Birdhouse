@@ -37,6 +37,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include <esp_task_wdt.h>
 #include <SimpleSerialShell.h>
 #include <arduino-timer.h>
+#include <Preferences.h>
 
 #include "spi_utils.h"
 #include "CircularBuffer.h"
@@ -120,6 +121,9 @@ public:
     }
 };
 
+// Used for persistent storage
+static Preferences nvram;
+
 // Connect the logger stream to the SimpleSerialShell.  The shell
 // global is defined (and externed) in the SimpleSerialShell module.
 Stream& logger = shell;
@@ -127,13 +131,13 @@ Stream& logger = shell;
 static ClockImpl mainClock;
 Clock& systemClock = mainClock;
 
-static ConfigurationImpl mainConfig;
+static ConfigurationImpl mainConfig(nvram);
 Configuration& systemConfig = mainConfig;
 
 static InstrumentationImpl instrumentation;
 Instrumentation& systemInstrumentation = instrumentation;
 
-static RoutingTableImpl routingTable;
+static RoutingTableImpl routingTable(nvram);
 RoutingTable& systemRoutingTable = routingTable;
 
 // We keep a pretty small TX buffer because the main area where we keep 
@@ -629,28 +633,34 @@ static bool check_stranded_irq(void*) {
 
 void setup() {
 
-  // Changed to speed up boot
-  delay(100);
-  Serial.begin(115200);
+    // Changed to speed up boot
+    delay(100);
   
-  Serial.println();
-  Serial.println(F("==========================="));
-  Serial.println(F("WARS Birdhouse Mesh Network"));
-  Serial.println();
-  Serial.print(F("V: "));
-  Serial.print(SW_VERSION);
-  Serial.print(F(" , Built: "));
-  Serial.println(__DATE__);
-
-  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-  switch (wakeup_reason){
-    case ESP_SLEEP_WAKEUP_EXT0: Serial.println("Wakeup EXT0"); break;
-    case ESP_SLEEP_WAKEUP_EXT1: Serial.println("Wakeup EXT1"); break;
-    case ESP_SLEEP_WAKEUP_TIMER: Serial.println("Wakeup Timer"); break;
-    case ESP_SLEEP_WAKEUP_TOUCHPAD: Serial.println("Wakeup Touch"); break;
-    case ESP_SLEEP_WAKEUP_ULP: Serial.println("Wakeup ULP"); break;
-    default: Serial.printf("Wakeup %d\n",wakeup_reason); break;
-  }
+    Serial.begin(115200);
+    Serial.println();
+    Serial.println(F("WARS Birdhouse Mesh Network (c) 2022 Bruce MacKinnon KC1FSZ"));
+    Serial.println();
+    Serial.print(F("V: "));
+    Serial.print(SW_VERSION);
+    Serial.print(" ");
+    Serial.println(__DATE__);
+  
+    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+    switch (wakeup_reason){
+        case 0:
+            break;
+        case ESP_SLEEP_WAKEUP_EXT0: Serial.println("Wakeup EXT0"); break;
+        case ESP_SLEEP_WAKEUP_EXT1: Serial.println("Wakeup EXT1"); break;
+        case ESP_SLEEP_WAKEUP_TIMER: Serial.println("Wakeup Timer"); break;
+        case ESP_SLEEP_WAKEUP_TOUCHPAD: Serial.println("Wakeup Touch"); break;
+        case ESP_SLEEP_WAKEUP_ULP: Serial.println("Wakeup ULP"); break;
+        default: Serial.printf("Wakeup %d\n",wakeup_reason); break;
+    }
+  
+    // Do all of the one-time initialization
+    nvram.begin("my-app", false);
+    mainConfig.begin();
+    routingTable.begin();
 
   // Radio interrupt pin
   pinMode(DIO0_PIN, INPUT);

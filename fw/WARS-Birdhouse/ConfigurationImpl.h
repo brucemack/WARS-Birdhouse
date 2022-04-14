@@ -20,13 +20,17 @@
 #ifndef _ConfigurationImpl_h
 #define _ConfigurationImpl_h
 
+#include <Preferences.h>
 #include "StationConfig.h"
 #include "Configuration.h"
+
 
 class ConfigurationImpl : public Configuration {
 public:
 
-    ConfigurationImpl();
+    ConfigurationImpl(Preferences& pref);
+
+    void begin();
 
     CallSign getCall() const;
     void setCall(const CallSign& call);
@@ -48,6 +52,8 @@ private:
     void _load();
     void _save();
 
+    // Handle to the ESP32 NVRAM
+    Preferences& _pref;
     // A RAM-cached version of the configuration
     StationConfig _configCache;
 };
