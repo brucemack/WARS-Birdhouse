@@ -284,14 +284,17 @@ void MessageProcessor::_process(int16_t rssi,
     
     // Text (for display)
     else if (packet.header.getType() == TYPE_TEXT) {
+      
+      // There is no null-termination, so we must use the message length here
+      unsigned int textLen = packetLen - sizeof(Header);
+      char scratch[128];
+      memcpy(scratch, packet.payload, textLen);
+      scratch[textLen] = 0;
+      
       logger.print("MSG: [");
       packet.header.getOriginalSourceCall().printTo(logger);
       logger.print("] ");
-      // There is no null-termination, so we must use the message length here
-      for (int i = 0; i < packetLen - sizeof(Header); i++) {
-        logger.print(packet.payload[i + sizeof(Header)]);
-      }
-      logger.println();
+      logger.println(scratch);
     }
 
     // Set route
