@@ -284,7 +284,9 @@ void MessageProcessor::_process(int16_t rssi,
     
     // Text (for display)
     else if (packet.header.getType() == TYPE_TEXT) {
-      logger.print("MSG: ");
+      logger.print("MSG: [");
+      packet.header.getOriginalSourceCall().printTo(logger);
+      logger.print("] ");
       // There is no null-termination, so we must use the message length here
       for (int i = 0; i < packetLen - sizeof(Header); i++) {
         logger.print(packet.payload[i + sizeof(Header)]);

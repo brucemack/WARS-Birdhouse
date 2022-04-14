@@ -208,7 +208,7 @@ struct Header {
         call.writeTo(sourceCall);
     }
 
-    CallSign getSourceCall() {
+    CallSign getSourceCall() const {
         CallSign result;
         result.readFrom(sourceCall);
         return result;
@@ -218,7 +218,7 @@ struct Header {
         call.writeTo(originalSourceCall);
     }
 
-    CallSign getOriginalSourceCall() {
+    CallSign getOriginalSourceCall() const {
         CallSign result;
         result.readFrom(originalSourceCall);
         return result;

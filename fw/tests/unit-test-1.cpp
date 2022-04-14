@@ -99,9 +99,10 @@ void test_MessageProcessor() {
     TestClock clock;
 
     // Node #1
+    Preferences nvram1;
     TestConfiguration config1(1, "KC1FSZ");
     TestInstrumentation instrumentation1;
-    RoutingTableImpl routingTable1;
+    RoutingTableImpl routingTable1(nvram1);
     routingTable1.setRoute(3, 3);
     routingTable1.setRoute(7, 3);
     CircularBufferImpl<4096> txBuffer1(0);
@@ -111,9 +112,10 @@ void test_MessageProcessor() {
         10 * 1000, 2 * 1000);
 
     // Node #3 (intermediate)
+    Preferences nvram3;
     TestConfiguration config3(3, "W1TKZ");
     TestInstrumentation instrumentation3;
-    RoutingTableImpl routingTable3;
+    RoutingTableImpl routingTable3(nvram3);
     routingTable3.setRoute(1, 1);
     routingTable3.setRoute(7, 7);
     CircularBufferImpl<4096> txBuffer3(0);
@@ -123,10 +125,11 @@ void test_MessageProcessor() {
         10 * 1000, 2 * 1000);
 
     // Node #7 (desktop)
+    Preferences nvram7;
     TestConfiguration config7(7, "WA3ITR");
     TestInstrumentation instrumentation7;
     //TestRoutingTable routingTable7;
-    RoutingTableImpl routingTable7;
+    RoutingTableImpl routingTable7(nvram7);
     routingTable7.setRoute(1, 3);
     routingTable7.setRoute(3, 3);
     CircularBufferImpl<4096> txBuffer7(0);
@@ -216,10 +219,11 @@ void test_MessageProcessor() {
 
 void test_OutboundPacket() {
     
+    Preferences nvram1;
     TestConfiguration config3(3, "W1TKZ");
     TestClock clock;
     TestInstrumentation instrumentation;
-    RoutingTableImpl routingTable1;
+    RoutingTableImpl routingTable1(nvram1);
     CircularBufferImpl<4096> txBuffer(0);
     OutboundPacketManager opm(clock, txBuffer, 10 * 1000, 2 * 1000);
     assert(opm.getFreeCount() == 8);

@@ -47,7 +47,8 @@ void test_3() {
 
     TestStream stream;
 
-    ConfigurationImpl config;
+    Preferences nvram;
+    ConfigurationImpl config(nvram);
     config.setCall(CallSign("KC1FSZ"));
     config.setAddr(7);
     config.setBatteryLimit(3800);

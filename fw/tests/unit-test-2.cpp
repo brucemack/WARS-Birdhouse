@@ -106,11 +106,12 @@ static TestClock testClock;
 Clock& systemClock = testClock;
 
 // Node #1
+Preferences nvram1;
 static TestConfiguration testConfig(1, "KC1FSZ");
 Configuration& systemConfig = testConfig;
 static TestInstrumentation testInstrumentation;
 Instrumentation& systemInstrumentation = testInstrumentation;
-static RoutingTableImpl testRoutingTable;
+static RoutingTableImpl testRoutingTable(nvram1);
 RoutingTable& systemRoutingTable = testRoutingTable;
 CircularBufferImpl<4096> txBuffer(0);
 CircularBufferImpl<4096> rxBuffer(2);
