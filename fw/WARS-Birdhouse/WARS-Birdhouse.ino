@@ -673,6 +673,7 @@ void setup() {
   shell.attach(Serial); 
   shell.setTokenizer(tokenizer);
   shell.addCommand(F("ping <addr>"), sendPing);
+  shell.addCommand(F("sed <addr>"), sendGetSed);
   shell.addCommand(F("reset <addr>"), sendReset);
   shell.addCommand(F("text <addr> <text>"), sendText);
   shell.addCommand(F("boot"), boot);

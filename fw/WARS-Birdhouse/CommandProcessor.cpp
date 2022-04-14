@@ -51,7 +51,7 @@ int sendPing(int argc, char** argv) {
     nodeaddr_t finalDestAddr = parseAddr(argv[1]);
     nodeaddr_t nextHop = systemRoutingTable.nextHop(finalDestAddr);
     if (nextHop == RoutingTable::NO_ROUTE) {
-        logger.println(F("ERR: No route"));
+        logger.println(msg_no_route);
         return -1;
     }
     
@@ -69,7 +69,40 @@ int sendPing(int argc, char** argv) {
     // Send it
     bool good = systemMessageProcessor.transmitIfPossible(packet, packetLen);
     if (!good) {
-      logger.println("ERR: TX full");
+      logger.println(msg_tx_busy);
+      return -1;
+    } 
+    return 0;
+}
+
+int sendGetSed(int argc, char** argv) { 
+ 
+    if (argc != 2) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
+
+    nodeaddr_t finalDestAddr = parseAddr(argv[1]);
+    nodeaddr_t nextHop = systemRoutingTable.nextHop(finalDestAddr);
+    if (nextHop == RoutingTable::NO_ROUTE) {
+        logger.println( msg_no_route);
+        return -1;
+    }
+    
+    Packet packet;
+    packet.header.setType(TYPE_GETSED_REQ);
+    packet.header.setId(systemMessageProcessor.getUniqueId());
+    packet.header.setSourceAddr(systemConfig.getAddr());
+    packet.header.setDestAddr(nextHop);
+    packet.header.setOriginalSourceAddr(systemConfig.getAddr());
+    packet.header.setFinalDestAddr(finalDestAddr);
+    packet.header.setSourceCall(systemConfig.getCall());
+    packet.header.setOriginalSourceCall(systemConfig.getCall());
+    unsigned int packetLen = sizeof(Header);
+    // Send it
+    bool good = systemMessageProcessor.transmitIfPossible(packet, packetLen);
+    if (!good) {
+      logger.println(msg_tx_busy);
       return -1;
     } 
     return 0;
