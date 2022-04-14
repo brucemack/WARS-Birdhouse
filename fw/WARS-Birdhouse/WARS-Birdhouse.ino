@@ -68,6 +68,10 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 // we are changing the CPU clock frequency)
 #define WDT_TIMEOUT 5
 
+// The time we will wait for a TxDone interrupt before giving up and resetting
+// the transmit process.
+#define TX_TIMEOUT_MS 10 * 1000
+
 #define S_TO_US_FACTOR 1000000UL
 
 // Deep sleep duration when low battery is detected
@@ -157,6 +161,10 @@ enum State { IDLE, LISTENING, TRANSMITTING };
 static State state = State::IDLE;
 // This is volatile because it is set inside of the ISR context
 static volatile bool isr_hit = false;
+// The time when we started the last transmission.  This is needed 
+// to create a timeout on transmissions so we don't accidentally get 
+// stuck in a transmission.
+static uint32_t startTxTime = 0;
 
 /**
  * @brief This is the actual ISR that is called by the Arduino run-time.
@@ -198,34 +206,34 @@ static void event_TxDone() {
  */
 static void event_RxDone() {
 
-  // How much data is available?
-  const uint8_t len = spi_read(0x13);
-  // Reset the FIFO read pointer to the beginning of the packet we just got
-  spi_write(0x0d, spi_read(0x10));
-  // Stream received data in from the FIFO. 
-  uint8_t rx_buf[256];
-  spi_read_multi(0x00, rx_buf, len);
+    // How much data is available?
+    const uint8_t len = spi_read(0x13);
+    // Reset the FIFO read pointer to the beginning of the packet we just got
+    spi_write(0x0d, spi_read(0x10));
+    // Stream received data in from the FIFO. 
+    uint8_t rx_buf[256];
+    spi_read_multi(0x00, rx_buf, len);
+    
+    // Grab the RSSI value from the radio
+    int8_t lastSnr = (int8_t)spi_read(0x19) / 4;
+    int16_t lastRssi = spi_read(0x1a);
+    if (lastSnr < 0)
+        lastRssi = lastRssi + lastSnr;
+    else
+        lastRssi = (int)lastRssi * 16 / 15;
+    // We are using the high frequency port
+    lastRssi -= 157;
 
-  // Grab the RSSI value from the radio
-  int8_t lastSnr = (int8_t)spi_read(0x19) / 4;
-  int16_t lastRssi = spi_read(0x1a);
-  if (lastSnr < 0)
-    lastRssi = lastRssi + lastSnr;
-  else
-    lastRssi = (int)lastRssi * 16 / 15;
-  // We are using the high frequency port
-  lastRssi -= 157;
+    // Handle based on state.  If we're not listening for anything then 
+    // ignore what was just read.
+    if (state != State::LISTENING) {
+        logger.println(F("ERR: Message received when not listening"));
+        return;
+    }
 
-  // Handle based on state.  If we're not listening for anything then 
-  // ignore what was just read.
-  if (state != State::LISTENING) {
-    logger.println(F("ERR: Message received when not listening"));
-    return;
-  }
-
-  // Put the RSSI (OOB) and the entire packet (not just the header)
-  // into the circular queue for later processing.
-  rxBuffer.push((const uint8_t*)&lastRssi, rx_buf, len);
+    // Put the RSSI (OOB) and the entire packet (not just the header)
+    // into the circular queue for later processing.
+    rxBuffer.push((const uint8_t*)&lastRssi, rx_buf, len);
 }
 
 /**
@@ -290,16 +298,30 @@ static void event_tick_LISTENING() {
   
   // Go into transmit mode
   state = State::TRANSMITTING;
+  startTxTime = mainClock.time();
   enable_interrupt_TxDone();
   set_mode_TX();
+}
+
+static void event_tick_TRANSMITTING() {
+    // Check for the case where a transmission times out
+    if (mainClock.time() - startTxTime > TX_TIMEOUT_MS) {
+          logger.println("ERR: TX timed out");
+          // Reset the TX FIFO
+          spi_write(0x0e, 0);
+          // Force a TX done
+          event_TxDone();
+    }
 }
 
 // Call periodically to look for timeouts or other pending activity.  This will happen
 // on the regular application thread, so we disable interrupts to avoid conflicts.
 void event_tick() {
-  if (state == State::LISTENING) {
-    event_tick_LISTENING();
-  }
+    if (state == State::LISTENING) {
+        event_tick_LISTENING();
+    } else if (state == State::TRANSMITTING) {
+        event_tick_TRANSMITTING();
+    }
 }
 
 // --------------------------------------------------------------------------
