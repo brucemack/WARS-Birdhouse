@@ -128,7 +128,10 @@ int bootRadio(int argc, char **argv) {
 int info(int argc, char **argv) { 
     logger.print(F("{ \"node\": "));
     logger.print(systemConfig.getAddr());
-    logger.print(F(", \"version\": "));
+    logger.print(F(", \"call\": \""));
+    CallSign cs = systemConfig.getCall();
+    cs.printTo(logger);
+    logger.print(F("\", \"version\": "));
     logger.print(systemInstrumentation.getSoftwareVersion());
     logger.print(F("\", \"blimit\": "));
     logger.print(systemConfig.getBatteryLimit());
@@ -304,11 +307,8 @@ int setRoute(int argc, char **argv) {
         logger.println(msg_bad_address);
         return -1;
     }
+    // A zero address is allowed here so that we can clear the route
     nodeaddr_t r = parseAddr(argv[2]);
-    if (r == 0) {
-        logger.println(msg_bad_address);
-        return -1;
-    }
 
     systemRoutingTable.setRoute(t, r);
     return 0;
