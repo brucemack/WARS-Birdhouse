@@ -80,6 +80,28 @@ bool MessageProcessor::transmitIfPossible(const Packet& packet,
   return _opm.scheduleTransmitIfPossible(packet, packetLen);
 }
 
+static void log_packet(Stream& l, const Packet& packet, int16_t rssi) {
+    l.print(F("INF: Got type: "));
+    l.print(packet.header.type);
+    l.print(", id: ");
+    l.print(packet.header.id);
+    l.print(", from: ");
+    l.print(packet.header.sourceAddr);
+    l.print(", fromCall: ");
+    packet.header.getSourceCall().printTo(l);
+    l.print(", to: ");
+    l.print(packet.header.destAddr);
+    l.print(", originalSource: ");
+    l.print(packet.header.originalSourceAddr);
+    l.print(", originalSourceCall: ");
+    packet.header.getOriginalSourceCall().printTo(l);
+    l.print(", finalDest: ");
+    l.print(packet.header.finalDestAddr);
+    l.print(", RSSI: ");
+    l.print(rssi);
+    l.println();  
+}
+
 void MessageProcessor::_process(int16_t rssi, 
     const Packet& packet, unsigned int packetLen) { 
 
@@ -97,31 +119,18 @@ void MessageProcessor::_process(int16_t rssi,
         return;
     }
 
-  // Ignore messages that aren't targeted at this node.
-  // This can happen when nodes are close to each other 
-  // and they are able to hear traffic targed at other
-  // nodes.
-  if (packet.header.getDestAddr() != BROADCAST_ADDR &&
-      packet.header.getDestAddr() != _config.getAddr()) {
-      return;
-  }
+    // Ignore messages that aren't targeted at this node.
+    // This can happen when nodes are close to each other 
+    // and they are able to hear traffic targed at other
+    // nodes.
+    if (packet.header.getDestAddr() != BROADCAST_ADDR &&
+        packet.header.getDestAddr() != _config.getAddr()) {
+        return;
+    }
 
-    logger.print(F("INF: Got type: "));
-    logger.print(packet.header.type);
-    logger.print(", id: ");
-    logger.print(packet.header.id);
-    logger.print(", from: ");
-    logger.print(packet.header.sourceAddr);
-    logger.print(", to: ");
-    logger.print(packet.header.destAddr);
-    logger.print(", originalSource: ");
-    logger.print(packet.header.originalSourceAddr);
-    logger.print(", finalDest: ");
-    logger.print(packet.header.finalDestAddr);
-    logger.print(", RSSi: ");
-    logger.print(rssi);
-    logger.println();
-
+    // TODO: LOG LEVEL SETTING
+    //log_packet(logger, packet, rssi);
+    
     // If we got an ACK then process it directly 
     if (packet.header.isAck()) {
         _opm.processAck(packet);
