@@ -327,8 +327,11 @@ void MessageProcessor::_process(int16_t rssi,
 
     else if (packet.header.getType() == TYPE_PING_RESP) {
         // Display
-        logger.print("INF: Good response from ");
+        logger.print("INF: Ping response [");
+        packet.header.getOriginalSourceCall().printTo(logger);
+        logger.print(',');
         logger.print(packet.header.getOriginalSourceAddr());
+        logger.print(']');
         logger.println();
     }
     
