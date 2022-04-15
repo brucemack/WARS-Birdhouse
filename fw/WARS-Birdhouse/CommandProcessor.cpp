@@ -121,10 +121,7 @@ static int sendReset(int argc, char **argv, uint8_t resetType) {
         logger.println(msg_no_route);
         return -1;
     }
-
-    ResetReqPayload resetReqPayload;
-    resetReqPayload.passcode = atol(argv[2]);
-
+    
     Packet packet;
     packet.header.setType(resetType);
     packet.header.setId(systemMessageProcessor.getUniqueId());
@@ -134,6 +131,10 @@ static int sendReset(int argc, char **argv, uint8_t resetType) {
     packet.header.setFinalDestAddr(finalDestAddr);
     packet.header.setSourceCall(systemConfig.getCall());
     packet.header.setOriginalSourceCall(systemConfig.getCall());
+    // Fill in payload secion of the packet
+    ResetReqPayload resetReqPayload;
+    resetReqPayload.passcode = atol(argv[2]);
+    memcpy(packet.payload, (const void*)&resetReqPayload, sizeof(resetReqPayload));
     unsigned int packetLen = sizeof(Header) + sizeof(ResetReqPayload);
     
     // Send it
@@ -348,6 +349,8 @@ int info(int argc, char **argv) {
     logger.print(systemConfig.getBootCount());
     logger.print(F(", \"sleepCount\": "));
     logger.print(systemConfig.getSleepCount());
+    logger.print(F(", \"logLevel\": "));
+    logger.print(systemConfig.getLogLevel());
     logger.print(F(", \"routes\": ["));
 
     // Display the routing table
@@ -426,6 +429,15 @@ int setBatteryLimit(int argc, char **argv) {
 
     systemConfig.setBatteryLimit(atoi(argv[1]));
     return 0;
+}
+
+int setLog(int argc, char **argv) {
+    if (argc != 2) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
+    systemConfig.setLogLevel(atoi(argv[1]));
+    return 0;  
 }
 
 int print(int argc, char **argv) { 

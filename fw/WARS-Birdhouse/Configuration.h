@@ -43,6 +43,9 @@ public:
     virtual uint16_t getSleepCount() const = 0;
     virtual void setSleepCount(uint16_t l) {};
 
+    virtual uint8_t getLogLevel() const { return 0; }
+    virtual void setLogLevel(uint8_t l) {};
+
     virtual void factoryReset() = 0;
 };
 

@@ -50,7 +50,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include "MessageProcessor.h"
 #include "CommandProcessor.h"
 
-#define SW_VERSION 36
+#define SW_VERSION 37
 
 // This is the pin that is available on the D1 Mini module:
 #define RST_PIN   26
@@ -63,7 +63,8 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #define BATTERY_LEVEL_PIN 33
 // Analog input pin for measuring panel, connected via 1:6 voltage divider
 #define PANEL_LEVEL_PIN 34
-//#define PANEL_LEVEL_PIN 35 // NODE 5 ONLY!
+// NODE 5 ONLY!!!
+//#define PANEL_LEVEL_PIN 35
 
 // Watchdog timeout in seconds (NOTE: I think this time might be off because
 // we are changing the CPU clock frequency)
@@ -84,8 +85,8 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 // How frequently to check for idle potential
 #define IDLE_CHECK_INTERVAL_SECONDS 15
 
-#define IDLE_INTERVAL_SECONDS 30
-
+// The definition of "idle" 
+#define IDLE_INTERVAL_SECONDS 60
 
 static const float STATION_FREQUENCY = 906.5;
 
@@ -680,9 +681,9 @@ static bool check_stranded_irq(void*) {
  * @return false 
  */
 static bool check_idle(void*) {
-
+  
     if (state == State::LISTENING &&
-        systemMessageProcessor.getPendingCount() == 0 |
+        systemMessageProcessor.getPendingCount() == 0 &&
         systemMessageProcessor.getSecondsSinceLastRx() > IDLE_INTERVAL_SECONDS) {
         logger.println("INF: Sleeping due to inactivity");
         // Put the ESP32 into a deep sleep that will be awakened using 
@@ -693,8 +694,6 @@ static bool check_idle(void*) {
         //
         esp_sleep_enable_ext0_wakeup(GPIO_NUM_4, 1);
         esp_deep_sleep_start();        
-    } else {
-      logger.println("INF: Not idle");
     }
 
     return true;
@@ -759,6 +758,7 @@ void setup() {
     shell.addCommand(F("clearroutes"), clearRoutes);
     shell.addCommand(F("setblimit <limit_mv>"), setBatteryLimit);
     shell.addCommand(F("setpasscode <passcode>"), setPasscode);
+    shell.addCommand(F("setlog <level>"), setLog);
 
     shell.addCommand(F("boot"), boot);
     shell.addCommand(F("bootradio"), bootRadio);
@@ -813,8 +813,9 @@ void setup() {
         
     // Enable the battery check timer
     timer.every(BATTERY_CHECK_INTERVAL_SECONDS * 1000, check_low_battery);
-    // Enable the battery idle check
-    timer.every(IDLE_CHECK_INTERVAL_SECONDS * 1000, check_idle);
+    // Enable the idle check
+    // TODO: NOT WORKING YET - NOT SURE WHY
+    //timer.every(IDLE_CHECK_INTERVAL_SECONDS * 1000, check_idle);
 
     // Enable a periodic interrupt check (to make sure that we don't 
     // accidentally leave an interrupt stranded in the IRQ

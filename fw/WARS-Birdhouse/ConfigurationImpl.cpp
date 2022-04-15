@@ -85,6 +85,15 @@ void ConfigurationImpl::setSleepCount(uint16_t l) {
     _save();
 }
 
+uint8_t ConfigurationImpl::getLogLevel() const {
+    return _configCache.logLevel;
+}
+
+void ConfigurationImpl::setLogLevel(uint8_t l) {
+    _configCache.logLevel = l;
+    _save();
+}
+
 void ConfigurationImpl::_save() {
     const uint8_t* v = (const uint8_t*)&_configCache;
     _pref.putBytes("config", v, sizeof(StationConfig));

@@ -31,7 +31,7 @@ struct StationConfig {
     uint32_t securityToken;
     uint16_t bootCount;
     uint16_t sleepCount;
+    uint8_t logLevel;
 };
 
 #endif
-

@@ -55,7 +55,7 @@ MessageProcessor::MessageProcessor(
       _badRxPacketCounter(0),
       _wrongNodeRxPacketCounter(0),
       _badRouteCounter(0),
-      _lastRxTime(0) {
+      _lastRxTime(clock.time()) {
 }
 
 void MessageProcessor::pump() {
@@ -150,8 +150,8 @@ void MessageProcessor::_process(int16_t rssi,
     _rxPacketCounter++;
     _lastRxTime = _clock.time();
 
-    // TODO: LOG LEVEL SETTING
-    //log_packet(logger, packet, rssi);
+    if (_config.getLogLevel() > 0) 
+      log_packet(logger, packet, rssi);
     
     // If we got an ACK then process it directly 
     if (packet.header.isAck()) {
@@ -190,9 +190,11 @@ void MessageProcessor::_process(int16_t rssi,
       if (!good) {
         logger.println("ERR: Full, no forward");
       } else {
-        logger.print("INF: Forward to ");
-        logger.print(nextHop);
-        logger.println();
+        if (_config.getLogLevel() > 0) {
+          logger.print("INF: Forward to ");
+          logger.print(nextHop);
+          logger.println();
+        }
       }
     }
     else {
@@ -329,7 +331,7 @@ void MessageProcessor::_process(int16_t rssi,
 
     else if (packet.header.getType() == TYPE_PING_RESP) {
         // Display
-        logger.print("INF: Ping response [");
+        logger.print("PING_RESP: Ping response [");
         packet.header.getOriginalSourceCall().printTo(logger);
         logger.print(',');
         logger.print(packet.header.getOriginalSourceAddr());
@@ -471,6 +473,5 @@ void MessageProcessor::resetCounters() {
 }
 
 uint32_t MessageProcessor::getSecondsSinceLastRx() const {
-  return (_clock.time() - _lastRxTime) / 1000; 
+  return (_clock.time() - _lastRxTime) / 1000L; 
 }
-

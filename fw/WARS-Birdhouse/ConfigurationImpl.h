@@ -49,6 +49,9 @@ public:
     uint16_t getSleepCount() const;
     void setSleepCount(uint16_t l);
 
+    uint8_t getLogLevel() const;
+    void setLogLevel(uint8_t l);
+    
     void factoryReset();
 
 private:
