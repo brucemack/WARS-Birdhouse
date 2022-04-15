@@ -118,7 +118,7 @@ static int sendReset(int argc, char **argv, uint8_t resetType) {
     nodeaddr_t finalDestAddr = parseAddr(argv[1]);
     nodeaddr_t nextHop = systemRoutingTable.nextHop(finalDestAddr);
     if (nextHop == RoutingTable::NO_ROUTE) {
-        logger.println(F("ERR: No route"));
+        logger.println(msg_no_route);
         return -1;
     }
 
@@ -139,7 +139,7 @@ static int sendReset(int argc, char **argv, uint8_t resetType) {
     // Send it
     bool good = systemMessageProcessor.transmitIfPossible(packet, packetLen);
     if (!good) {
-        logger.println("ERR: TX full");
+        logger.println(msg_tx_busy);
         return -1;
     } else {
         return 0;
@@ -331,7 +331,7 @@ int bootRadio(int argc, char **argv) {
 }
 
 int info(int argc, char **argv) { 
-    logger.print(F("{ \"node\": "));
+    logger.print(F("INFO: { \"node\": "));
     logger.print(systemConfig.getAddr());
     logger.print(F(", \"call\": \""));
     CallSign cs = systemConfig.getCall();
@@ -435,9 +435,9 @@ int print(int argc, char **argv) {
         return -1;
     }
 
-    logger.print("[");
+    logger.print("PRINT: ");
     logger.print(argv[1]);
-    logger.println("]");
+    logger.println();
     return 0;
 }
 
