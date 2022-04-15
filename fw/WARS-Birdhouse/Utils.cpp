@@ -21,6 +21,12 @@ CallSign::CallSign(const CallSign& other) {
     readFrom(other._call);
 }
 
+bool CallSign::isValid() const {
+    // For now we just make sure it is set to something
+    // TODO: MAKE THIS BETTER
+    return _call[0] != 0;
+}
+
 void CallSign::_clear() {
     for (unsigned int i = 0; i < 8; i++)
         _call[i] = 0;

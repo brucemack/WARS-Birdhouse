@@ -50,7 +50,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include "MessageProcessor.h"
 #include "CommandProcessor.h"
 
-#define SW_VERSION 30
+#define SW_VERSION 31
 
 // This is the pin that is available on the D1 Mini module:
 #define RST_PIN   26
@@ -63,6 +63,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #define BATTERY_LEVEL_PIN 33
 // Analog input pin for measuring pannel, connected via 1:6 voltage divider
 #define PANEL_LEVEL_PIN 34
+//#define PANEL_LEVEL_PIN 35 // NODE 5 ONLY!
 
 // Watchdog timeout in seconds (NOTE: I think this time might be off because
 // we are changing the CPU clock frequency)
@@ -83,6 +84,13 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 static const float STATION_FREQUENCY = 906.5;
 
 int reset_radio();
+
+// Used for scheduling events
+auto timer = timer_create_default();
+
+// Connect the logger stream to the SimpleSerialShell.  The shell
+// global is defined (and externed) in the SimpleSerialShell module.
+Stream& logger = shell;
 
 // ===== Interface Classes ===========================================
 
@@ -113,7 +121,10 @@ public:
     int16_t getHumidity() const { return  0; }
 
     void restart() { 
-        ESP.restart();
+        // This is scheduled in the background to make sure that any final communication
+        // has time to happen.
+        timer.in(2 * 1000, _backgroundRestart);
+        logger.println("INF: Restart scheduled");
     }
 
     void restartRadio() {
@@ -123,14 +134,17 @@ public:
     void sleep(uint32_t ms) {
         sleep(ms);
     }
+
+private:
+
+    static bool _backgroundRestart(void*) {
+        ESP.restart();
+        return false;
+    }    
 };
 
 // Used for persistent storage
 static Preferences nvram;
-
-// Connect the logger stream to the SimpleSerialShell.  The shell
-// global is defined (and externed) in the SimpleSerialShell module.
-Stream& logger = shell;
 
 static ClockImpl mainClock;
 Clock& systemClock = mainClock;
@@ -548,7 +562,6 @@ int init_radio() {
 
 // ===== Application 
 
-auto timer = timer_create_default();
 
 static bool isDelim(char d, const char* delims) {
   const char* ptr = delims;
@@ -664,7 +677,7 @@ void setup() {
     Serial.println();
     Serial.print(F("V: "));
     Serial.print(SW_VERSION);
-    Serial.print(" ");
+    Serial.print(", ");
     Serial.println(__DATE__);
   
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
@@ -684,80 +697,87 @@ void setup() {
     mainConfig.begin();
     routingTable.begin();
 
-  // Radio interrupt pin
-  pinMode(DIO0_PIN, INPUT);
-
-  // LED pin
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, LOW);
-
-  // Shell setup
-  shell.attach(Serial); 
-  shell.setTokenizer(tokenizer);
-  shell.addCommand(F("ping <addr>"), sendPing);
-  shell.addCommand(F("sed <addr>"), sendGetSed);
-  shell.addCommand(F("reset <addr>"), sendReset);
-  shell.addCommand(F("text <addr> <text>"), sendText);
-  shell.addCommand(F("boot"), boot);
-  shell.addCommand(F("bootradio"), bootRadio);
-  shell.addCommand(F("info"), info);
-  shell.addCommand(F("sleep <seconds>"), sleep);
-  shell.addCommand(F("setaddr <addr>"), setAddr);
-  shell.addCommand(F("setcall <call_sign>"), setCall);
-  shell.addCommand(F("setroute <target addr> <next hop addr>"), setRoute);
-  shell.addCommand(F("clearroutes"), clearRoutes);
-  shell.addCommand(F("setblimit <limit_mv>"), setBatteryLimit);
-  shell.addCommand(F("print <text>"), doPrint);
-  shell.addCommand(F("rem <text>"), doRem);
-  shell.addCommand(F("setrouteremote <addr> <target addr> <next hop addr>"), sendSetRoute);
-  shell.addCommand(F("getrouteremote <addr> <target addr>"), sendGetRoute);
-  shell.addCommand(F("resetcounters"), doResetCounters);
-
-  // Increment the boot count
-  systemConfig.setBootCount(systemConfig.getBootCount() + 1);
-
-  // Interrupt setup from radio
-  // Allocating an external interrupt will always allocate it on the core that does the allocation.
-  attachInterrupt(DIO0_PIN, isr, RISING);
-
-  // Initialize SPI and configure
-  delay(100);
-  spi_setup();
-
-  // Starting here, the process depends on why we are rebooting.
-  // Check to see if we are rebooting because of a radio interrupt.
-  // There is an assumption that we were in the State::LISTENING 
-  // state when the processor was put to sleep.
-  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
-    
-    // One LED flash
-    digitalWrite(LED_PIN, HIGH);
-    delay(200);
-    digitalWrite(LED_PIN, LOW);
-
-    // Given that we just came up from an interrupt trigger, setup 
-    // the state as if we were waiting for a message, and then 
-    // set the flag that will cause the ISR code to run.
-    state = State::LISTENING;
-    enable_interrupt_RxDone();
-    isr_hit = true;
-  }
-  // Any other reason for a reboot causes full radio reset/initialization
-  else {
-    // Reset the radio 
-    reset_radio();
-  }
+    // Radio interrupt pin
+    pinMode(DIO0_PIN, INPUT);
   
-  // Enable the battery check timer
-  timer.every(BATTERY_CHECK_INTERVAL_SECONDS * 1000, check_low_battery);
-  // Enable a periodic interrupt check (to make sure that we don't 
-  // accidentally leave an interrupt stranded in the IRQ
-  timer.every(1000, check_stranded_irq);
- 
-  // Enable the watchdog timer
-  esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
-  esp_task_wdt_add(NULL); //add current thread to WDT watch
-  esp_task_wdt_reset();
+    // LED pin
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, LOW);
+  
+    // Shell setup
+    shell.attach(Serial); 
+    shell.setTokenizer(tokenizer);
+    shell.addCommand(F("ping <addr>"), sendPing);
+    shell.addCommand(F("sed <addr>"), sendGetSed);
+    shell.addCommand(F("reset <addr> <passcode>"), sendReset);
+    shell.addCommand(F("text <addr> <text>"), sendText);
+    shell.addCommand(F("boot"), boot);
+    shell.addCommand(F("bootradio"), bootRadio);
+    shell.addCommand(F("info"), info);
+    shell.addCommand(F("sleep <seconds>"), sleep);
+    shell.addCommand(F("setaddr <addr>"), setAddr);
+    shell.addCommand(F("setcall <call_sign>"), setCall);
+    shell.addCommand(F("setroute <target addr> <next hop addr> <passcode>"), setRoute);
+    shell.addCommand(F("clearroutes"), clearRoutes);
+    shell.addCommand(F("setblimit <limit_mv>"), setBatteryLimit);
+    shell.addCommand(F("print <text>"), doPrint);
+    shell.addCommand(F("rem <text>"), doRem);
+    shell.addCommand(F("setrouteremote <addr> <target addr> <next hop addr>"), sendSetRoute);
+    shell.addCommand(F("getrouteremote <addr> <target addr>"), sendGetRoute);
+    shell.addCommand(F("resetcounters"), doResetCounters);
+
+    // Increment the boot count
+    systemConfig.setBootCount(systemConfig.getBootCount() + 1);
+  
+    // Interrupt setup from radio
+    // Allocating an external interrupt will always allocate it on the core that does the allocation.
+    attachInterrupt(DIO0_PIN, isr, RISING);
+  
+    // Initialize SPI and configure
+    delay(100);
+    spi_setup();
+
+    // Make sure the address and callsign are valid before allowing the radio to turn on
+    if (!systemConfig.getCall().isValid() || 
+        systemConfig.getAddr() == 0) {
+        logger.println("ERR: Station not configured.");      
+    }
+    else {  
+        // Starting here, the process depends on why we are rebooting.
+        // Check to see if we are rebooting because of a radio interrupt.
+        // There is an assumption that we were in the State::LISTENING 
+        // state when the processor was put to sleep.
+        if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
+          
+          // One LED flash
+          digitalWrite(LED_PIN, HIGH);
+          delay(200);
+          digitalWrite(LED_PIN, LOW);
+      
+          // Given that we just came up from an interrupt trigger, setup 
+          // the state as if we were waiting for a message, and then 
+          // set the flag that will cause the ISR code to run.
+          state = State::LISTENING;
+          enable_interrupt_RxDone();
+          isr_hit = true;
+        }
+        // Any other reason for a reboot causes full radio reset/initialization
+        else {
+            // Reset the radio 
+            reset_radio();
+        }
+    }
+        
+    // Enable the battery check timer
+    timer.every(BATTERY_CHECK_INTERVAL_SECONDS * 1000, check_low_battery);
+    // Enable a periodic interrupt check (to make sure that we don't 
+    // accidentally leave an interrupt stranded in the IRQ
+    timer.every(1000, check_stranded_irq);
+   
+    // Enable the watchdog timer
+    esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
+    esp_task_wdt_add(NULL); //add current thread to WDT watch
+    esp_task_wdt_reset();
 }
 
 void loop() {

@@ -42,6 +42,8 @@ public:
     
     CallSign(const CallSign& other);
 
+    bool isValid() const;
+
     /**
      * @brief Writes the call sign into an 8 byte buffer,
      * padding with spaces if necessary to full.  There
