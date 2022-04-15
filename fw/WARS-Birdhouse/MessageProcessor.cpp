@@ -357,21 +357,27 @@ void MessageProcessor::_process(int16_t rssi,
 
     // Set route
     else if (packet.header.getType() == TYPE_SETROUTE) {
-      if (packetLen < sizeof(Header) + sizeof(SetRouteReqPayload)) {
-        logger.println(msg_bad_message);
-        return;
-      }
-      // Unpack the request
-      SetRouteReqPayload payload;
-      memcpy((void*)&payload, packet.payload, sizeof(SetRouteReqPayload));
+        if (packetLen < sizeof(Header) + sizeof(SetRouteReqPayload)) {
+          logger.println(msg_bad_message);
+          return;
+        }
+        // Unpack the request
+        SetRouteReqPayload payload;
+        memcpy((void*)&payload, packet.payload, sizeof(SetRouteReqPayload));
 
-      _routingTable.setRoute(payload.targetAddr, payload.nextHopAddr);
+        // Authorization check
+        if (!_config.checkPasscode(payload.passcode)) {
+            logger.println(msg_no_auth);
+            return;
+        }
 
-      logger.print("INF: Set route ");
-      logger.print(payload.targetAddr);
-      logger.print("->");
-      logger.print(payload.nextHopAddr);
-      logger.println();
+        _routingTable.setRoute(payload.targetAddr, payload.nextHopAddr);
+  
+        logger.print("INF: Set route ");
+        logger.print(payload.targetAddr);
+        logger.print("->");
+        logger.print(payload.nextHopAddr);
+        logger.println();
     }
 
     // Get route

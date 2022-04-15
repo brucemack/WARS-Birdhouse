@@ -708,6 +708,8 @@ void setup() {
     shell.setTokenizer(tokenizer);
 
     shell.addCommand(F("sendping <addr>"), sendPing);
+    // A short-hand
+    shell.addCommand(F("p <addr>"), sendPing);
     shell.addCommand(F("sendedr <addr>"), sendGetSed);
     shell.addCommand(F("sendreset <addr> <passcode>"), sendReset);
     shell.addCommand(F("sendresetcounters <addr> <passcode>"), sendResetCounters);

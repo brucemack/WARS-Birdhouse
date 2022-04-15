@@ -55,6 +55,7 @@ bool ConfigurationImpl::checkPasscode(uint32_t p) const {
 
 void ConfigurationImpl::setPasscode(uint32_t p) {
     _configCache.securityToken = p;
+    _save();
 }
 
 uint16_t ConfigurationImpl::getBatteryLimit() const {

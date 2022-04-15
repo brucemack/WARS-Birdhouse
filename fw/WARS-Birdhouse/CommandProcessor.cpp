@@ -413,7 +413,7 @@ int setPasscode(int argc, char **argv) {
         return -1;
     }
 
-    systemConfig.setPasscode(atoi(argv[1]));
+    systemConfig.setPasscode(atol(argv[1]));
     return 0;
 }
 
