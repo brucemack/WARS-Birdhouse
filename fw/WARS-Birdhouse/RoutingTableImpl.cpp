@@ -53,6 +53,11 @@ void RoutingTableImpl::clearRoutes() {
     _save();
 }
 
+void RoutingTableImpl::factoryReset() {
+    clearRoutes();
+    _pref.remove("routing");
+}
+
 void RoutingTableImpl::_load() {
     _pref.getBytes("routing", (void*)_table, _tableSize);
 }

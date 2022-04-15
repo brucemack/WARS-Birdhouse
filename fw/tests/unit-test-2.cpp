@@ -61,6 +61,13 @@ public:
         return _myCall;
     }
 
+    bool checkPasscode(uint32_t) const {
+        return true;
+    }
+    
+    void setPasscode(uint32_t) {
+    }
+
     uint16_t getBatteryLimit() const {
         return 3400;
     }
@@ -80,6 +87,8 @@ public:
     void setSleepCount(uint16_t l) {
         _sleepCount = l;
     }
+
+    void factoryReset() { }
 
 private:
 
@@ -180,9 +189,10 @@ void test_CommandProcessor() {
         const char* a1 = "7";
         const char* a2 = "1";
         const char* a3 = "4";
-        const char *a_args[4] = { a0, a1, a2, a3 };
+        const char* a4 = "1234";
+        const char *a_args[5] = { a0, a1, a2, a3, a4 };
 
-        sendSetRoute(4, (char**)a_args);
+        sendSetRoute(5, (char**)a_args);
 
         systemMessageProcessor.pump();
 

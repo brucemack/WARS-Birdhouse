@@ -35,6 +35,8 @@ public:
      * @brief Removes all routes from the table.
      */
     virtual void clearRoutes() = 0;
+
+    virtual void factoryReset() = 0;
 };
 
 #endif

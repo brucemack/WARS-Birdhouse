@@ -24,7 +24,6 @@
 #include "StationConfig.h"
 #include "Configuration.h"
 
-
 class ConfigurationImpl : public Configuration {
 public:
 
@@ -38,6 +37,9 @@ public:
     nodeaddr_t getAddr() const;
     void setAddr(nodeaddr_t a);
 
+    bool checkPasscode(uint32_t) const;
+    void setPasscode(uint32_t);
+
     uint16_t getBatteryLimit() const;
     void setBatteryLimit(uint16_t l);
 
@@ -46,6 +48,8 @@ public:
 
     uint16_t getSleepCount() const;
     void setSleepCount(uint16_t l);
+
+    void factoryReset();
 
 private:
 

@@ -31,6 +31,7 @@ extern Stream& logger;
 
 static const char* msg_bad_message = "ERR: Bad message";
 static const char* msg_no_route = "ERR: No route";
+static const char* msg_no_auth = "ERR: Unauthorized";
 
 MessageProcessor::MessageProcessor(
     Clock& clock, 
@@ -267,9 +268,26 @@ void MessageProcessor::_process(int16_t rssi,
     }
 
     // Reboot
-    else if (packet.header.getType() == TYPE_RESET) {
-      logger.println("INF: Reset");
-      _instrumentation.restart();
+    else if (packet.header.getType() == TYPE_RESET || 
+             packet.header.getType() == TYPE_RESET_COUNTERS) {
+        if (packetLen < sizeof(Header) + sizeof(ResetReqPayload)) {
+            logger.println(msg_bad_message);
+            return;
+        }
+        ResetReqPayload payload;
+        memcpy((void*)&payload, packet.payload, sizeof(ResetReqPayload));
+        // Authorization check
+        if (!_config.checkPasscode(payload.passcode)) {
+            logger.println(msg_no_auth);
+            return;
+        }
+
+        if (packet.header.getType() == TYPE_RESET) {
+            _instrumentation.restart();
+        } else if (packet.header.getType() == TYPE_RESET_COUNTERS) {
+            logger.println("INF: Reset counters");
+            resetCounters();
+        }
     }    
 
     // Get Engineering Data Response (for display)
@@ -308,10 +326,10 @@ void MessageProcessor::_process(int16_t rssi,
     }
 
     else if (packet.header.getType() == TYPE_PING_RESP) {
-      // Display
-      logger.print("INF: Good response from ");
-      logger.print(packet.header.getOriginalSourceAddr());
-      logger.println();
+        // Display
+        logger.print("INF: Good response from ");
+        logger.print(packet.header.getOriginalSourceAddr());
+        logger.println();
     }
     
     // Reset

@@ -706,24 +706,30 @@ void setup() {
     // Shell setup
     shell.attach(Serial); 
     shell.setTokenizer(tokenizer);
-    shell.addCommand(F("ping <addr>"), sendPing);
-    shell.addCommand(F("sed <addr>"), sendGetSed);
-    shell.addCommand(F("reset <addr> <passcode>"), sendReset);
-    shell.addCommand(F("text <addr> <text>"), sendText);
-    shell.addCommand(F("boot"), boot);
-    shell.addCommand(F("bootradio"), bootRadio);
-    shell.addCommand(F("info"), info);
-    shell.addCommand(F("sleep <seconds>"), sleep);
+
+    shell.addCommand(F("sendping <addr>"), sendPing);
+    shell.addCommand(F("sendedr <addr>"), sendGetSed);
+    shell.addCommand(F("sendreset <addr> <passcode>"), sendReset);
+    shell.addCommand(F("sendresetcounters <addr> <passcode>"), sendResetCounters);
+    shell.addCommand(F("send <addr> <text>"), sendText);
+    shell.addCommand(F("sendsetroute <addr> <target addr> <next hop addr> <passcode>"), sendSetRoute);
+    shell.addCommand(F("sendgetroute <addr> <target addr>"), sendGetRoute);
+
     shell.addCommand(F("setaddr <addr>"), setAddr);
     shell.addCommand(F("setcall <call_sign>"), setCall);
     shell.addCommand(F("setroute <target addr> <next hop addr> <passcode>"), setRoute);
     shell.addCommand(F("clearroutes"), clearRoutes);
     shell.addCommand(F("setblimit <limit_mv>"), setBatteryLimit);
+    shell.addCommand(F("setpasscode <passcode>"), setPasscode);
+
+    shell.addCommand(F("boot"), boot);
+    shell.addCommand(F("bootradio"), bootRadio);
+    shell.addCommand(F("info"), info);
+    shell.addCommand(F("sleep <seconds>"), sleep);
     shell.addCommand(F("print <text>"), doPrint);
     shell.addCommand(F("rem <text>"), doRem);
-    shell.addCommand(F("setrouteremote <addr> <target addr> <next hop addr>"), sendSetRoute);
-    shell.addCommand(F("getrouteremote <addr> <target addr>"), sendGetRoute);
     shell.addCommand(F("resetcounters"), doResetCounters);
+    shell.addCommand(F("clear"), doClear);
 
     // Increment the boot count
     systemConfig.setBootCount(systemConfig.getBootCount() + 1);

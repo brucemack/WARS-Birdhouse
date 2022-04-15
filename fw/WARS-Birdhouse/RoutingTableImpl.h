@@ -37,6 +37,8 @@ public:
     void setRoute(nodeaddr_t target, nodeaddr_t nextHop);
     void clearRoutes();
 
+    void factoryReset();
+
 private:
 
     /**

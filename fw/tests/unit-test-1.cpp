@@ -61,6 +61,13 @@ public:
 
     CallSign getCall() const {
         return _myCall;
+    }    
+    
+    bool checkPasscode(uint32_t) const {
+        return true;
+    }
+    
+    void setPasscode(uint32_t) {
     }
 
     uint16_t getBatteryLimit() const {
@@ -75,6 +82,8 @@ public:
     uint16_t getSleepCount() const {
         return 1;
     }
+
+   void factoryReset() { }
 
 private:
 

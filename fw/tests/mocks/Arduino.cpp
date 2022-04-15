@@ -23,6 +23,9 @@ uint32_t millis() {
 void Preferences::begin(const char*) {
 }
 
+void Preferences::remove(const char*) {
+}
+
 void Preferences::getBytes(const char*, void*, unsigned int len) {
 }
 

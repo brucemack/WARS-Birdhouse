@@ -31,6 +31,9 @@ public:
     virtual nodeaddr_t getAddr() const = 0;
     virtual void setAddr(nodeaddr_t a) {};
 
+    virtual bool checkPasscode(uint32_t) const = 0;
+    virtual void setPasscode(uint32_t) = 0;
+
     virtual uint16_t getBatteryLimit() const = 0;
     virtual void setBatteryLimit(uint16_t l) {};
 
@@ -39,6 +42,8 @@ public:
 
     virtual uint16_t getSleepCount() const = 0;
     virtual void setSleepCount(uint16_t l) {};
+
+    virtual void factoryReset() = 0;
 };
 
 #endif

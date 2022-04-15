@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+#include <string.h>
 #include "ConfigurationImpl.h"
 
 ConfigurationImpl::ConfigurationImpl(Preferences& pref)
@@ -46,6 +47,14 @@ nodeaddr_t ConfigurationImpl::getAddr() const {
 void ConfigurationImpl::setAddr(nodeaddr_t a) {
     _configCache.myAddr = a;
     _save();
+}
+
+bool ConfigurationImpl::checkPasscode(uint32_t p) const {
+    return _configCache.securityToken == p;
+}
+
+void ConfigurationImpl::setPasscode(uint32_t p) {
+    _configCache.securityToken = p;
 }
 
 uint16_t ConfigurationImpl::getBatteryLimit() const {
@@ -83,4 +92,9 @@ void ConfigurationImpl::_save() {
 void ConfigurationImpl::_load() {
     uint8_t* v = (uint8_t*)&_configCache;
     _pref.getBytes("config", v, sizeof(StationConfig));
+}
+
+void ConfigurationImpl::factoryReset() {
+    memset((uint8_t*)&_configCache, 0, sizeof(StationConfig));
+    _pref.remove("config");
 }

@@ -108,7 +108,7 @@ int sendGetSed(int argc, char** argv) {
     return 0;
 }
 
-int sendReset(int argc, char **argv) { 
+static int sendReset(int argc, char **argv, uint8_t resetType) { 
 
     if (argc != 3) {
       logger.println(msg_arg_error);
@@ -123,10 +123,10 @@ int sendReset(int argc, char **argv) {
     }
 
     ResetReqPayload resetReqPayload;
-    resetReqPayload.passcode = atoi(argv[2]);
+    resetReqPayload.passcode = atol(argv[2]);
 
     Packet packet;
-    packet.header.setType(TYPE_RESET);
+    packet.header.setType(resetType);
     packet.header.setId(systemMessageProcessor.getUniqueId());
     packet.header.setSourceAddr(systemConfig.getAddr());
     packet.header.setDestAddr(nextHop);
@@ -139,134 +139,19 @@ int sendReset(int argc, char **argv) {
     // Send it
     bool good = systemMessageProcessor.transmitIfPossible(packet, packetLen);
     if (!good) {
-      logger.println("ERR: TX full");
-      return -1;
+        logger.println("ERR: TX full");
+        return -1;
     } else {
-      return 0;
+        return 0;
     }
 }
 
-int boot(int argc, char **argv) { 
-    logger.println("INF: Rebooting");
-    systemInstrumentation.restart();
-    return 0;
+int sendReset(int argc, char **argv) { 
+    return sendReset(argc, argv, TYPE_RESET);
 }
 
-int bootRadio(int argc, char **argv) { 
-    logger.println("INF: Rebooting radio");
-    systemInstrumentation.restartRadio();
-    return 0;
-}
-
-int info(int argc, char **argv) { 
-    logger.print(F("{ \"node\": "));
-    logger.print(systemConfig.getAddr());
-    logger.print(F(", \"call\": \""));
-    CallSign cs = systemConfig.getCall();
-    cs.printTo(logger);
-    logger.print(F("\", \"version\": "));
-    logger.print(systemInstrumentation.getSoftwareVersion());
-    logger.print(F(", \"blimit\": "));
-    logger.print(systemConfig.getBatteryLimit());
-    logger.print(F(", \"batteryMv\": "));
-    logger.print(systemInstrumentation.getBatteryVoltage());
-    logger.print(F(", \"panelMv\": "));
-    logger.print(systemInstrumentation.getPanelVoltage());
-    logger.print(F(", \"bootCount\": "));
-    logger.print(systemConfig.getBootCount());
-    logger.print(F(", \"sleepCount\": "));
-    logger.print(systemConfig.getSleepCount());
-    logger.print(F(", \"routes\": ["));
-
-    // Display the routing table
-    bool first = true;
-    for (unsigned int i = 0; i < 256; i++) {
-      if (systemRoutingTable.nextHop(i) != RoutingTable::NO_ROUTE) {
-        if (!first) 
-          logger.print(", ");
-        first = false;
-        logger.print("[");
-        logger.print(i);
-        logger.print(", ");
-        logger.print(systemRoutingTable.nextHop(i));
-        logger.print("]");
-      }
-    }
-    logger.print("]");
-    logger.println(F("}"));
-    return 0;
-}
-
-// Used for testing the watch dog 
-int sleep(int argc, char **argv) { 
-
-  if (argc != 2) {
-    logger.println(msg_arg_error);
-    return -1;
-  }
-
-  uint16_t seconds = atoi(argv[1]);
-  logger.println("INF: Sleeping ...");
-  systemInstrumentation.sleep(seconds * 1000);
-  logger.println("INF: Done");
-  return 0;
-}
-
-int setAddr(int argc, char **argv) { 
-
-    if (argc != 2) {
-        logger.println(msg_arg_error);
-        return -1;
-    }
-
-    systemConfig.setAddr(atoi(argv[1]));
-    return 0;
-}
-
-int setCall(int argc, char **argv) { 
-
-    if (argc != 2) {
-        logger.println(msg_arg_error);
-        return -1;
-    }
-
-    systemConfig.setCall(CallSign(argv[1]));
-    return 0;
-}
-
-int setBatteryLimit(int argc, char **argv) { 
-
-    if (argc != 2) {
-        logger.println(msg_arg_error);
-        return -1;
-    }
-
-    systemConfig.setBatteryLimit(atoi(argv[1]));
-    return 0;
-}
-
-int doPrint(int argc, char **argv) { 
-
-    if (argc != 2) {
-        logger.println(msg_arg_error);
-        return -1;
-    }
-
-    logger.print("[");
-    logger.print(argv[1]);
-    logger.println("]");
-    return 0;
-}
-
-/**
- * Used to put a comment into the console log
- */
-int doRem(int argc, char **argv) { 
-    if (argc != 2) {
-        logger.println(msg_arg_error);
-        return -1;
-    }
-    return 0;
+int sendResetCounters(int argc, char **argv) { 
+    return sendReset(argc, argv, TYPE_RESET_COUNTERS);
 }
 
 /** This function handles a request to send a text message to another node
@@ -328,33 +213,9 @@ int sendText(int argc, char **argv) {
     return 0;
 }
 
-int setRoute(int argc, char **argv) { 
-
-    if (argc != 3) {
-        logger.println(msg_arg_error);
-        return -1;
-    }
-
-    nodeaddr_t t = parseAddr(argv[1]);
-    if (t == 0) {
-        logger.println(msg_bad_address);
-        return -1;
-    }
-    // A zero address is allowed here so that we can clear the route
-    nodeaddr_t r = parseAddr(argv[2]);
-
-    systemRoutingTable.setRoute(t, r);
-    return 0;
-}
-
-int clearRoutes(int argc, char **argv) { 
-    systemRoutingTable.clearRoutes();
-    return 0;
-}
-
 int sendSetRoute(int argc, char **argv) { 
  
-    if (argc != 4) {
+    if (argc != 5) {
         logger.println(msg_arg_error);
         return -1;
     }
@@ -390,8 +251,7 @@ int sendSetRoute(int argc, char **argv) {
     packet.header.setOriginalSourceCall(systemConfig.getCall());
     // Fill in the payload
     SetRouteReqPayload payload;
-    // #### TODO
-    payload.passcode = 0;
+    payload.passcode = atol(argv[4]);
     payload.targetAddr = a1;
     payload.nextHopAddr = a2; 
     // Put the text into the payload secion of the packet
@@ -456,8 +316,173 @@ int sendGetRoute(int argc, char **argv) {
     return 0;
 }
 
-int doResetCounters(int argc, char **argv) { 
+// ===== LOCAL COMMANDS ==============================================
+
+int boot(int argc, char **argv) { 
+    logger.println("INF: Rebooting");
+    systemInstrumentation.restart();
+    return 0;
+}
+
+int bootRadio(int argc, char **argv) { 
+    logger.println("INF: Rebooting radio");
+    systemInstrumentation.restartRadio();
+    return 0;
+}
+
+int info(int argc, char **argv) { 
+    logger.print(F("{ \"node\": "));
+    logger.print(systemConfig.getAddr());
+    logger.print(F(", \"call\": \""));
+    CallSign cs = systemConfig.getCall();
+    cs.printTo(logger);
+    logger.print(F("\", \"version\": "));
+    logger.print(systemInstrumentation.getSoftwareVersion());
+    logger.print(F(", \"blimit\": "));
+    logger.print(systemConfig.getBatteryLimit());
+    logger.print(F(", \"batteryMv\": "));
+    logger.print(systemInstrumentation.getBatteryVoltage());
+    logger.print(F(", \"panelMv\": "));
+    logger.print(systemInstrumentation.getPanelVoltage());
+    logger.print(F(", \"bootCount\": "));
+    logger.print(systemConfig.getBootCount());
+    logger.print(F(", \"sleepCount\": "));
+    logger.print(systemConfig.getSleepCount());
+    logger.print(F(", \"routes\": ["));
+
+    // Display the routing table
+    bool first = true;
+    for (unsigned int i = 0; i < 256; i++) {
+      if (systemRoutingTable.nextHop(i) != RoutingTable::NO_ROUTE) {
+        if (!first) 
+          logger.print(", ");
+        first = false;
+        logger.print("[");
+        logger.print(i);
+        logger.print(", ");
+        logger.print(systemRoutingTable.nextHop(i));
+        logger.print("]");
+      }
+    }
+    logger.print("]");
+    logger.println(F("}"));
+    return 0;
+}
+
+// Used for testing the watch dog 
+int sleep(int argc, char **argv) { 
+
+    if (argc != 2) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
+
+    uint16_t seconds = atoi(argv[1]);
+    logger.println("INF: Sleeping ...");
+    systemInstrumentation.sleep(seconds * 1000);
+    logger.println("INF: Done");
+    return 0;
+}
+
+int setAddr(int argc, char **argv) { 
+
+    if (argc != 2) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
+
+    systemConfig.setAddr(atoi(argv[1]));
+    return 0;
+}
+
+int setCall(int argc, char **argv) { 
+
+    if (argc != 2) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
+
+    systemConfig.setCall(CallSign(argv[1]));
+    return 0;
+}
+
+int setPasscode(int argc, char **argv) { 
+
+    if (argc != 2) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
+
+    systemConfig.setPasscode(atoi(argv[1]));
+    return 0;
+}
+
+int setBatteryLimit(int argc, char **argv) { 
+
+    if (argc != 2) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
+
+    systemConfig.setBatteryLimit(atoi(argv[1]));
+    return 0;
+}
+
+int print(int argc, char **argv) { 
+
+    if (argc != 2) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
+
+    logger.print("[");
+    logger.print(argv[1]);
+    logger.println("]");
+    return 0;
+}
+
+/**
+ * Used to put a comment into the console log
+ */
+int rem(int argc, char **argv) { 
+    if (argc != 2) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
+    return 0;
+}
+
+int setRoute(int argc, char **argv) { 
+
+    if (argc != 3) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
+
+    nodeaddr_t t = parseAddr(argv[1]);
+    if (t == 0) {
+        logger.println(msg_bad_address);
+        return -1;
+    }
+    // A zero address is allowed here so that we can clear the route
+    nodeaddr_t r = parseAddr(argv[2]);
+
+    systemRoutingTable.setRoute(t, r);
+    return 0;
+}
+
+int clearRoutes(int argc, char **argv) { 
+    systemRoutingTable.clearRoutes();
+    return 0;
+}
+
+int resetCounters(int argc, char **argv) { 
     systemInstrumentation.resetCounters();
     systemMessageProcessor.resetCounters();
     return 0;
+}
+
+int factoryreset(int argc, char **argv) {
+    systemConfig.factoryReset();
+    systemRoutingTable.factoryReset();
 }

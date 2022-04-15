@@ -46,6 +46,7 @@ enum MessageType {
     TYPE_GETROUTE_REQ  = 11,
     TYPE_GETROUTE_RESP = 12,
     TYPE_RESET         = 15,
+    TYPE_RESET_COUNTERS = 17,
     // Routine text traffic
     TYPE_TEXT          = 32,
     TYPE_ALERT         = 36
