@@ -50,7 +50,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include "MessageProcessor.h"
 #include "CommandProcessor.h"
 
-#define SW_VERSION 31
+#define SW_VERSION 33
 
 // This is the pin that is available on the D1 Mini module:
 #define RST_PIN   26
@@ -257,8 +257,8 @@ static void event_RxDone() {
  */ 
 static void check_for_interrupts(bool force) {
 
-    // Interrupt stuff
-    if (!isr_hit) {
+    // Look at the flag that gets set by the ISR itself
+    if (!force && !isr_hit) {
         return;
     }
 
@@ -320,7 +320,7 @@ static void event_tick_LISTENING() {
 static void event_tick_TRANSMITTING() {
     // Check for the case where a transmission times out
     if (mainClock.time() - startTxTime > TX_TIMEOUT_MS) {
-          logger.println("ERR: TX timed out");
+          logger.println("ERR: TX radio time out");
           // Reset the TX FIFO
           spi_write(0x0e, 0);
           // Force a TX done
@@ -668,18 +668,17 @@ static bool check_stranded_irq(void*) {
 
 void setup() {
 
-    // Changed to speed up boot
-    delay(100);
-  
     Serial.begin(115200);
+    delay(100);
     Serial.println();
     Serial.println(F("WARS Birdhouse Mesh Network (c) 2022 Bruce MacKinnon KC1FSZ"));
-    Serial.println();
     Serial.print(F("V: "));
     Serial.print(SW_VERSION);
     Serial.print(", ");
     Serial.println(__DATE__);
-  
+    Serial.println();
+
+    // Figure out why we restarted
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
     switch (wakeup_reason){
         case 0:
@@ -770,9 +769,10 @@ void setup() {
         
     // Enable the battery check timer
     timer.every(BATTERY_CHECK_INTERVAL_SECONDS * 1000, check_low_battery);
+
     // Enable a periodic interrupt check (to make sure that we don't 
     // accidentally leave an interrupt stranded in the IRQ
-    timer.every(1000, check_stranded_irq);
+    //timer.every(30 * 1000, check_stranded_irq);
    
     // Enable the watchdog timer
     esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
