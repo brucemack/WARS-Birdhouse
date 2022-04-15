@@ -83,6 +83,8 @@ public:
      */
     void resetCounters();
 
+    uint32_t getSecondsSinceLastRx() const;
+
 private:
 
     void _process(int16_t rssi, const Packet& packet, unsigned int packetLen);
@@ -96,6 +98,7 @@ private:
     OutboundPacketManager _opm;
     unsigned int _idCounter;
     uint32_t _startTime;
+    uint32_t _lastRxTime;
     // Diagnostic counters
     uint16_t _rxPacketCounter;
     uint16_t _badRxPacketCounter;

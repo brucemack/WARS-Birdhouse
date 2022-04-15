@@ -22,7 +22,7 @@
 // 80mA idle, 160mA transmit with normal clock
 // 30mA at 10 MHz clock rate
 
-// Prerequsisites to Install 
+// Prerequisites to Install 
 // * philj404:SimpleSerialShell
 // * contrem:arduino-timer
 
@@ -61,7 +61,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #define LED_PIN   2
 // Analog input pin for measuring battery, connected via 1:2 voltage divider
 #define BATTERY_LEVEL_PIN 33
-// Analog input pin for measuring pannel, connected via 1:6 voltage divider
+// Analog input pin for measuring panel, connected via 1:6 voltage divider
 #define PANEL_LEVEL_PIN 34
 //#define PANEL_LEVEL_PIN 35 // NODE 5 ONLY!
 
@@ -78,8 +78,14 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 // Deep sleep duration when low battery is detected
 #define DEEP_SLEEP_SECONDS (60UL * 60UL)
 
-// How frequently to check the batter condition
+// How frequently to check the battery condition
 #define BATTERY_CHECK_INTERVAL_SECONDS 30
+
+// How frequently to check for idle potential
+#define IDLE_CHECK_INTERVAL_SECONDS 15
+
+#define IDLE_INTERVAL_SECONDS 30
+
 
 static const float STATION_FREQUENCY = 906.5;
 
@@ -252,8 +258,8 @@ static void event_RxDone() {
 
 /**
  * @brief This function gets called from inside of the main processing loop.  It looks
- * to see if any interrupt activitry has been detected and, if so, figiured out what 
- * kind of interrupt was reported and calls the correct handler.
+ * to see if any interrupt activity has been detected and, if so, figure 
+ * out what kind of interrupt was reported and calls the correct handler.
  */ 
 static void check_for_interrupts(bool force) {
 
@@ -264,7 +270,7 @@ static void check_for_interrupts(bool force) {
 
     // *******************************************************************************
     // Critical Section:
-    // Here we make sure that the cleaing of the isr_hit flag and the unloading 
+    // Here we make sure that the clearing of the isr_hit flag and the unloading 
     // of the pending interrupts in the radio's IRQ register happen atomically.
     // We are avoding the case where 
     noInterrupts();
@@ -666,6 +672,34 @@ static bool check_stranded_irq(void*) {
     return true;
 }
 
+/**
+ * @brief (Advanced feature) This is used in a time to see if we 
+ * can put the processor to sleep between messages.  
+ * 
+ * @return true 
+ * @return false 
+ */
+static bool check_idle(void*) {
+
+    if (state == State::LISTENING &&
+        systemMessageProcessor.getPendingCount() == 0 |
+        systemMessageProcessor.getSecondsSinceLastRx() > IDLE_INTERVAL_SECONDS) {
+        logger.println("INF: Sleeping due to inactivity");
+        // Put the ESP32 into a deep sleep that will be awakened using 
+        // an external interrupt.  Wakeup will look like reboot.
+        //
+        // There are a limited number of GPIOs that can be used 
+        // for this purpose.
+        //
+        esp_sleep_enable_ext0_wakeup(GPIO_NUM_4, 1);
+        esp_deep_sleep_start();        
+    } else {
+      logger.println("INF: Not idle");
+    }
+
+    return true;
+}
+
 void setup() {
 
     Serial.begin(115200);
@@ -779,6 +813,8 @@ void setup() {
         
     // Enable the battery check timer
     timer.every(BATTERY_CHECK_INTERVAL_SECONDS * 1000, check_low_battery);
+    // Enable the battery idle check
+    timer.every(IDLE_CHECK_INTERVAL_SECONDS * 1000, check_idle);
 
     // Enable a periodic interrupt check (to make sure that we don't 
     // accidentally leave an interrupt stranded in the IRQ

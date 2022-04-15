@@ -54,7 +54,8 @@ MessageProcessor::MessageProcessor(
       _rxPacketCounter(0),
       _badRxPacketCounter(0),
       _wrongNodeRxPacketCounter(0),
-      _badRouteCounter(0) {
+      _badRouteCounter(0),
+      _lastRxTime(0) {
 }
 
 void MessageProcessor::pump() {
@@ -147,6 +148,7 @@ void MessageProcessor::_process(int16_t rssi,
     }
 
     _rxPacketCounter++;
+    _lastRxTime = _clock.time();
 
     // TODO: LOG LEVEL SETTING
     //log_packet(logger, packet, rssi);
@@ -467,3 +469,8 @@ void MessageProcessor::resetCounters() {
     _wrongNodeRxPacketCounter = 0;
     _badRouteCounter = 0;
 }
+
+uint32_t MessageProcessor::getSecondsSinceLastRx() const {
+  return (_clock.time() - _lastRxTime) / 1000; 
+}
+
