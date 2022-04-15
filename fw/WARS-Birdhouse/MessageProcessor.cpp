@@ -50,7 +50,10 @@ MessageProcessor::MessageProcessor(
       _opm(clock, txBuffer, txTimeoutMs, txRetryMs),
       _idCounter(1),
       _startTime(clock.time()),
-      _badPacketCounter(0) {
+      _rxPacketCounter(0),
+      _badRxPacketCounter(0),
+      _wrongNodeRxPacketCounter(0),
+      _badRouteCounter(0) {
 }
 
 void MessageProcessor::pump() {
@@ -77,7 +80,20 @@ unsigned int MessageProcessor::getUniqueId() {
 
 bool MessageProcessor::transmitIfPossible(const Packet& packet, 
     unsigned int packetLen) {
-  return _opm.scheduleTransmitIfPossible(packet, packetLen);
+
+    // We need to use a special case if the message is being 
+    // sent to the local node (i.e. loopback).  In this case
+    // we just put the message on the receive queue immediately.
+    if (packet.header.getDestAddr() == _config.getAddr()) {
+        int16_t fakeRssi = 0;
+        return _rxBuffer.push((const void*)&fakeRssi, 
+            (const void*)&packet, packetLen);
+    }
+    // If the message is targeted at another node then put 
+    // it into the outbound packet manager for later delivery. 
+    else {
+        return _opm.scheduleTransmitIfPossible(packet, packetLen);
+    }
 }
 
 static void log_packet(Stream& l, const Packet& packet, int16_t rssi) {
@@ -107,14 +123,14 @@ void MessageProcessor::_process(int16_t rssi,
 
     // Error checking on new packet
     if (packetLen < sizeof(Header)) {
-        _badPacketCounter++;
+        _badRxPacketCounter++;
         logger.println(msg_bad_message);
         return;
     }
 
     // Ignore messages that are for different versions of the protocol
     if (packet.header.getPacketVersion() != PACKET_VERSION) {
-        _badPacketCounter++;
+        _badRxPacketCounter++;
         logger.println(msg_bad_message);
         return;
     }
@@ -125,8 +141,11 @@ void MessageProcessor::_process(int16_t rssi,
     // nodes.
     if (packet.header.getDestAddr() != BROADCAST_ADDR &&
         packet.header.getDestAddr() != _config.getAddr()) {
+        _wrongNodeRxPacketCounter++;
         return;
     }
+
+    _rxPacketCounter++;
 
     // TODO: LOG LEVEL SETTING
     //log_packet(logger, packet, rssi);
@@ -140,12 +159,12 @@ void MessageProcessor::_process(int16_t rssi,
   // If the message we just received requires and ACK then 
   // generate one before proceeding with the local processing.
   if (packet.header.isAckRequired()) {
-    Packet ack;
-    ack.header.setupAckFor(packet.header, _config);
-    bool good = transmitIfPossible(ack, sizeof(Header));
-    if (!good) {
-      logger.println("ERR: Full, no ACK");
-    }
+      Packet ack;
+      ack.header.setupAckFor(packet.header, _config);
+      bool good = transmitIfPossible(ack, sizeof(Header));
+      if (!good) {
+          logger.println("ERR: Full, no ACK");
+      }
   }
 
   // Look for messages that need to be forwarded on to another node
@@ -174,7 +193,7 @@ void MessageProcessor::_process(int16_t rssi,
       }
     }
     else {
-      // TODO: COUNTERS
+      _badRouteCounter++;
       logger.println(msg_no_route);
     }
   }
@@ -192,6 +211,7 @@ void MessageProcessor::_process(int16_t rssi,
     // routing problem.
     if (packet.header.isResponseRequired() && 
         firstHop == RoutingTable::NO_ROUTE) {
+        _badRouteCounter++;  
         logger.print("ERR: No route to ");
         logger.print(packet.header.getOriginalSourceAddr());
         logger.println();
@@ -226,16 +246,17 @@ void MessageProcessor::_process(int16_t rssi,
       respPayload.time = _clock.time();
       respPayload.bootCount = _config.getBootCount();
       respPayload.sleepCount = _config.getSleepCount();
-      // #### TODO
-      respPayload.rxPacketCount = 0;
-      // #### TODO
-      respPayload.routeErrorCount = 0;
+
       respPayload.temp = _instrumentation.getTemperature();
       respPayload.humidity = _instrumentation.getHumidity();
       respPayload.deviceClass = _instrumentation.getDeviceClass();
       respPayload.deviceRevision = _instrumentation.getDeviceRevision();
-      // #### TODO
-      respPayload.wrongNodeRxCount = 0;
+      
+      // Message diagnostic counter 
+      respPayload.rxPacketCount = _rxPacketCounter;
+      respPayload.badRxPacketCount = _badRxPacketCounter;
+      respPayload.wrongNodeRxPacketCount = _wrongNodeRxPacketCounter;
+      respPayload.badRouteCount = _badRouteCounter;
 
       memcpy(resp.payload,(void*)&respPayload,sizeof(SadRespPayload));
 
@@ -275,6 +296,14 @@ void MessageProcessor::_process(int16_t rssi,
       logger.print(respPayload.bootCount);
       logger.print(", \"sleepCount\": ");
       logger.print(respPayload.sleepCount);
+      logger.print(", \"rxPacketCount\": ");
+      logger.print(respPayload.rxPacketCount);
+      logger.print(", \"badRxPacketCount\": ");
+      logger.print(respPayload.badRxPacketCount);
+      logger.print(", \"wrongNodeRxPacketCount\": ");
+      logger.print(respPayload.wrongNodeRxPacketCount);
+      logger.print(", \"badRouteCount\": ");
+      logger.print(respPayload.badRouteCount);
       logger.println("}");
     }
 
@@ -390,6 +419,22 @@ void MessageProcessor::_process(int16_t rssi,
   }
 }
 
+uint16_t MessageProcessor::getPendingCount() const {
+    return _opm.getPendingCount();
+}
+
+
+uint16_t MessageProcessor::getBadRouteCounter() const {
+    return _badRouteCounter;
+}
+
+uint16_t MessageProcessor::getBadRxPacketCounter() const {
+    return _badRxPacketCounter;
+}
+
 void MessageProcessor::resetCounters() {
-  // #### TODO
+    _rxPacketCounter = 0;
+    _badRxPacketCounter = 0;
+    _wrongNodeRxPacketCounter = 0;
+    _badRouteCounter = 0;
 }

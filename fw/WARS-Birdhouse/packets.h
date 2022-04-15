@@ -248,8 +248,11 @@ struct SadRespPayload {
   uint32_t time;
   uint16_t bootCount;
   uint16_t sleepCount;
+  // Message processing diagnostic counters
   uint16_t rxPacketCount;
-  uint16_t routeErrorCount;
+  uint16_t badRxPacketCount;
+  uint16_t wrongNodeRxPacketCount;
+  uint16_t badRouteCount;
   int16_t temp;
   int16_t humidity;
   uint16_t deviceClass;

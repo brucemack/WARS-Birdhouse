@@ -40,10 +40,14 @@ public:
 
     /**
      * @brief Gets the number of free packets that remain.
-     * 
-     * @return unsigned int 
      */
     unsigned int getFreeCount() const;
+
+    /**
+     * @brief Get the number of packets in flight (i.e. waiting
+     * to be sent or waiting for ACK)
+     */
+    unsigned int getPendingCount() const;
 
 private:
 

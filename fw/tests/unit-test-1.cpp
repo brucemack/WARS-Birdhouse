@@ -94,8 +94,6 @@ void movePacket(CircularBuffer& from, CircularBuffer& to) {
 
 void test_MessageProcessor() {
 
-    cout << "test_MessageProcessor" << endl;
-
     TestClock clock;
 
     // Node #1
@@ -554,9 +552,64 @@ void test_header() {
     assert(call.isEqual("YY1YYY"));
 }
 
+void test_Loopback() {
+
+    TestClock clock;
+
+    // Node #1
+    Preferences nvram1;
+    TestConfiguration config1(1, "KC1FSZ");
+    TestInstrumentation instrumentation1;
+    RoutingTableImpl routingTable1(nvram1);
+    routingTable1.setRoute(3, 3);
+    routingTable1.setRoute(7, 3);
+    CircularBufferImpl<4096> txBuffer1(0);
+    CircularBufferImpl<4096> rxBuffer1(2);
+    MessageProcessor mp1(clock, rxBuffer1, txBuffer1,
+        routingTable1, instrumentation1, config1,
+        10 * 1000, 2 * 1000);
+
+    // Message to myself
+    Packet packet;
+    packet.header.type = 5;
+    packet.header.id = 2;
+    packet.header.setSourceAddr(1);
+    packet.header.setDestAddr(1);
+    packet.header.setOriginalSourceAddr(1);
+    packet.header.setFinalDestAddr(1);
+    packet.header.setSourceCall(config1.getCall());
+    packet.header.setFinalDestCall(config1.getCall());
+    packet.header.setOriginalSourceCall(config1.getCall());
+
+    assert(txBuffer1.isEmpty());
+    assert(mp1.getBadRouteCounter() == 0);
+    assert(mp1.transmitIfPossible(packet, sizeof(packet)));
+    mp1.pump();
+    assert(mp1.getBadRouteCounter() == 1);
+    assert(txBuffer1.isEmpty());
+    assert(rxBuffer1.isEmpty());
+    assert(mp1.getPendingCount() == 0);
+
+    // Fix the route
+    mp1.resetCounters();
+    routingTable1.setRoute(1, 1);
+    assert(mp1.transmitIfPossible(packet, sizeof(packet)));
+    // Nothing will be pending here - local!
+    assert(mp1.getPendingCount() == 0);
+    assert(mp1.getBadRouteCounter() == 0);
+    assert(!rxBuffer1.isEmpty());
+    // This will cause the received packet to be processed
+    mp1.pump();
+
+    // We should see this in the RX queue, not in the TX queue
+    assert(txBuffer1.isEmpty());
+    assert(rxBuffer1.isEmpty());
+}
+
 int main(int argc, const char** argv) {
     test_buffer();
     test_header();
     test_OutboundPacket();
     test_MessageProcessor();
+    test_Loopback();
 }

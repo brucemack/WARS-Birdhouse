@@ -52,6 +52,15 @@ public:
      */
     void pump();
 
+    /**
+     * @brief Queues a message for transmission, assuming there is 
+     * space in the outbound queue.
+     * 
+     * @param packet 
+     * @param packetLen 
+     * @return true 
+     * @return false 
+     */
     bool transmitIfPossible(const Packet& packet, 
         unsigned int packetLen);
 
@@ -59,6 +68,15 @@ public:
      * @brief Generates a unique message ID
      */
     unsigned int getUniqueId();
+
+    /**
+     * @brief Get the number of packets that are in-flight (i.e.
+     * waiting to be sent or waiting to be ACKd.
+     */
+    uint16_t getPendingCount() const;
+
+    uint16_t getBadRxPacketCounter() const;
+    uint16_t getBadRouteCounter() const;
 
     /**
      * @brief Resets all diagnostic counters
@@ -78,7 +96,11 @@ private:
     OutboundPacketManager _opm;
     unsigned int _idCounter;
     uint32_t _startTime;
-    uint16_t _badPacketCounter;
+    // Diagnostic counters
+    uint16_t _rxPacketCounter;
+    uint16_t _badRxPacketCounter;
+    uint16_t _wrongNodeRxPacketCounter;
+    uint16_t _badRouteCounter;
 };
 
 #endif

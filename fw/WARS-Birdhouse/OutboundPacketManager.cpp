@@ -27,6 +27,10 @@ OutboundPacketManager::OutboundPacketManager(const Clock& clock, CircularBuffer&
       _txRetryMs(txRetryMs) {
 }
 
+unsigned int OutboundPacketManager::getPendingCount() const {
+    return _packetCount - getFreeCount();
+}
+
 bool OutboundPacketManager::scheduleTransmitIfPossible(const Packet& packet, unsigned int packetLen) {
     // Look for an unallocated packet a grab it - first come, first served.
     for (unsigned int i = 0; i < _packetCount; i++) {
