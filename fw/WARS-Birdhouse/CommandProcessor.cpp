@@ -482,7 +482,7 @@ int resetCounters(int argc, char **argv) {
     return 0;
 }
 
-int factoryreset(int argc, char **argv) {
+int factoryReset(int argc, char **argv) {
     systemConfig.factoryReset();
     systemRoutingTable.factoryReset();
 }

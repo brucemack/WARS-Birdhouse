@@ -42,6 +42,6 @@ int boot(int argc, char **argv);
 int bootRadio(int argc, char **argv);
 int resetCounters(int argc, char **argv);
 int rem(int argc, char **argv);
-int factoryreset(int argc, char **argv);
+int factoryReset(int argc, char **argv);
 
 #endif

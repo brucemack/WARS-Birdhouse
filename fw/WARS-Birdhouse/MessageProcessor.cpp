@@ -349,6 +349,8 @@ void MessageProcessor::_process(int16_t rssi,
       
       logger.print("MSG: [");
       packet.header.getOriginalSourceCall().printTo(logger);
+      logger.print(",");
+      logger.print(packet.header.getOriginalSourceAddr());
       logger.print("] ");
       logger.println(scratch);
     }
