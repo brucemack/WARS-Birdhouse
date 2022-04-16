@@ -59,6 +59,22 @@ Users access the network using desktop stations that are fitted with a USB seria
 
 Currently users interact with the network using a conventional serial terminal running on a PC (ie. PUTTY or something similar).  No special software is required.  A Python desktop user interface is planned to improve ergonomics.  The serial commands are described in a later section.
 
+The expectation is that users will install a birdhouse station at some 
+advantageous location on their property in order to join the network and
+increase the network coverage area.  This
+means that the required line-of-sight for the desktop station is much less 
+important - it's a "short hop" onto  the network.
+
+The other option is to connect the desktop station to a quality antenna 
+using a longer feed-line and avoid the need for two stations.  Either configuration 
+is fine.
+
+The packaging for the desktop station has not yet been finalized.  At the moment 
+the parts are mounted on a block of wood, as pictured below.  A resonant vertical antenna
+and USB cable are included with the package.
+
+![Desktop Node](images/IMG_0747.jpg)
+
 How Can I Get A Birdhouse?
 ==========================
 
