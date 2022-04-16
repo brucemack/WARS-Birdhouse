@@ -1,7 +1,7 @@
 #ifndef _TestClockImpl_h
 #define _TestClockImpl_h
 
-#include "../WARS-Birdhouse/Clock.h"
+#include "../station/Clock.h"
 
 class TestClock : public Clock {
 public:

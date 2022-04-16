@@ -1,5 +1,5 @@
-#include "../WARS-Birdhouse/Utils.h"
-#include "../WARS-Birdhouse/ConfigurationImpl.h"
+#include "../station/Utils.h"
+#include "../station/ConfigurationImpl.h"
 
 #include <EEPROM.h>
 #include <iostream>

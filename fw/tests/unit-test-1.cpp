@@ -1,13 +1,13 @@
 #include <Arduino.h>
 
-#include "../WARS-Birdhouse/CircularBuffer.h"
-#include "../WARS-Birdhouse/packets.h"
-#include "../WARS-Birdhouse/OutboundPacketManager.h"
-#include "../WARS-Birdhouse/Instrumentation.h"
-#include "../WARS-Birdhouse/RoutingTable.h"
-#include "../WARS-Birdhouse/RoutingTableImpl.h"
-#include "../WARS-Birdhouse/MessageProcessor.h"
-#include "../WARS-Birdhouse/Configuration.h"
+#include "../station/CircularBuffer.h"
+#include "../station/packets.h"
+#include "../station/OutboundPacketManager.h"
+#include "../station/Instrumentation.h"
+#include "../station/RoutingTable.h"
+#include "../station/RoutingTableImpl.h"
+#include "../station/MessageProcessor.h"
+#include "../station/Configuration.h"
 #include "TestClockImpl.h"
 
 #include <iostream>
