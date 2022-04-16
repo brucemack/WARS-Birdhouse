@@ -11,6 +11,8 @@ Please contact Bruce MacKinnon (KC1FSZ) if you have technical questions.  I am
 interested in home-brew radio projects, many of which can be 
 found [on my QRZ page](https://www.qrz.com/db/kc1fsz). 
 
+The [project WIKI is located here](https://github.com/brucemack/WARS-Birdhouse/wiki).
+
 Will this bird fly?  Let's find out!  
 
 ![Birdhouse](images/outside.jpg)
@@ -281,6 +283,11 @@ The serial command processor is implemented using this [very good project](https
 
 A static routing mechanism is being used at the moment.  The routing table for each node can be changed remotely.  Dynamic routing will be developed in a future phase.
 
+Developer Information
+=====================
+
+Please see the [project WIKI](https://github.com/brucemack/WARS-Birdhouse/wiki) for information on development, IDE setup, etc.
+
 Related Technology
 ==================
 
@@ -309,7 +316,6 @@ potential station sites: https://link.ui.com/#.2q
 * An article on correcting non-linearity in the ESP32 AD converter: https://github.com/e-tinkers/esp32-adc-calibrate
 * Datasheet for the W5500 which is used to create the bridge to an IP network: https://cdn.sparkfun.com/datasheets/Dev/Arduino/Shields/W5500_datasheet_v1.0.2_1.pdf
 * A very interesting paper talking about the reverse-engineering of the LoRa physical layer: https://www.epfl.ch/labs/tcl/wp-content/uploads/2020/02/Reverse_Eng_Report.pdf
-
 
 Detailed Parts List
 -------------------
@@ -344,46 +350,6 @@ Software
 end-users to interact with the network.
 * Network security.
 * Over-the-air (OTA) software upgrades.
-
-Development Notes
-=================
-
-One-Time Build Setup (Arduino IDE, Windows)
--------------------------------------------
-
-Make sure you have the latest Arduino IDE installed.  All testing has been
-done using version 1.8.19.  Raising build problems when running older 
-versions of the IDE is strongly discouraged.
-
-Make sure you have the Git client installed on your computer.  This will 
-be needed by anyone who is contributing changes to the code base.  Here is 
-the location of a binary install for Git: https://git-scm.com/download/win.
-
-Make sure you have the latest board support for the ESP32 installed in 
-your Ardunio IDE using the Boards Manager feature. This page has a good overview: https://docs.espressif.com/projects/arduino-esp32/en/latest/installing.html.  The Additional Board Manager URL is: https://dl.espressif.com/dl/package_esp32_index.json.
-
-Install these two Arduino libraries using the Arduino IDE (Manage Libraries):
-
-* SimpleSerialShell
-* arduino-timer
-
-Open a command window and switch into your Arduino sketch directory.  
-Typically something like this:
-
-        cd c:\Users\<USER>\Documents\Arduino
-
-Clone the repo for the main sketch from the GitHub:
-
-        git clone https://github.com/brucemack/WARS-Birdhouse.git
-
-Open the sketch in the Arduino IDE.
-
-Make sure these settings are chosen under the Tools menu:
-* Board: ESP32 Dev Module
-* CPU Frequency: 10MHz, WIFI/Bluetooth disabled
-* Port: (Whatever COM port your development board appears as)
-
-Now you should be able to compile.
 
 Relevant FCC Regulations/Notes
 ==============================
