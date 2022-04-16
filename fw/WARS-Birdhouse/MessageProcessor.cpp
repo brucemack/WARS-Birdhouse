@@ -251,6 +251,7 @@ void MessageProcessor::_process(int16_t rssi,
       respPayload.time = _clock.time();
       respPayload.bootCount = _config.getBootCount();
       respPayload.sleepCount = _config.getSleepCount();
+      //respPayload.lastHopRssi = rssi;
 
       respPayload.temp = _instrumentation.getTemperature();
       respPayload.humidity = _instrumentation.getHumidity();
@@ -306,7 +307,9 @@ void MessageProcessor::_process(int16_t rssi,
       memcpy((void*)&respPayload,packet.payload, sizeof(SadRespPayload));
 
       // Display
-      logger.print("GETSED_RESP: { \"version\": ");
+      logger.print("GETSED_RESP: { \"node\": ");
+      logger.print(packet.header.getSourceAddr());
+      logger.print(", \"version\": ");
       logger.print(respPayload.version);
       logger.print(", \"batteryMv\": ");
       logger.print(respPayload.batteryMv);
@@ -326,6 +329,8 @@ void MessageProcessor::_process(int16_t rssi,
       logger.print(respPayload.wrongNodeRxPacketCount);
       logger.print(", \"badRouteCount\": ");
       logger.print(respPayload.badRouteCount);
+      //logger.print(", \"lastHopRssi\": ");
+      //logger.print(respPayload.lastHopRssi);
       logger.println("}");
     }
 

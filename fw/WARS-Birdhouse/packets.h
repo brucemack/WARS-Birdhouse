@@ -259,6 +259,10 @@ struct SadRespPayload {
   uint16_t deviceClass;
   uint16_t deviceRevision;
   uint16_t wrongNodeRxCount;
+  // RSSI of the last hop (i.e. the link to the target node)
+  //int16_t lastHopRssi;
+  //int16_t UNUSED0;
+  //int16_t UNISED1;
 };
 
 struct SetRouteReqPayload {
