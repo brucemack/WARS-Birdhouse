@@ -358,17 +358,17 @@ void MessageProcessor::_process(int16_t rssi,
 
     else if (packet.header.getType() == TYPE_PING_RESP) {
         // Display
-        logger.print("PING_RESP: Ping response [");
-        packet.header.getOriginalSourceCall().printTo(logger);
-        logger.print(',');
+        logger.print("PING_RESP: { \"node\": ");
         logger.print(packet.header.getOriginalSourceAddr());
-        logger.print(']');
+        logger.print(", \"call\": \"");
+        packet.header.getOriginalSourceCall().printTo(logger);
+        logger.print("\" }");
         logger.println();
     }
     
     // Reset
-    else if (packet.header.getType() == TYPE_PING_RESP) {
-      logger.println(F("INF: Resetting ..."));
+    else if (packet.header.getType() == TYPE_RESET) {
+      logger.println(F("INF: Resetting"));
       _instrumentation.restart();
     }
     
