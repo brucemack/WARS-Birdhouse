@@ -252,7 +252,6 @@ struct SadRespPayload {
   // Message processing diagnostic counters
   uint16_t rxPacketCount;
   uint16_t badRxPacketCount;
-  uint16_t wrongNodeRxPacketCount;
   uint16_t badRouteCount;
   int16_t temp;
   int16_t humidity;
@@ -260,9 +259,11 @@ struct SadRespPayload {
   uint16_t deviceRevision;
   uint16_t wrongNodeRxCount;
   // RSSI of the last hop (i.e. the link to the target node)
-  //int16_t lastHopRssi;
-  //int16_t UNUSED0;
-  //int16_t UNISED1;
+  int16_t lastHopRssi;
+  int16_t UNUSED0;
+  int16_t UNISED1;
+  int16_t UNUSED2;
+  int16_t UNISED3;
 };
 
 struct SetRouteReqPayload {

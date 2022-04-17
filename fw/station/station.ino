@@ -50,7 +50,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include "MessageProcessor.h"
 #include "CommandProcessor.h"
 
-#define SW_VERSION 38
+#define SW_VERSION 39
 
 // This is the pin that is available on the D1 Mini module:
 #define RST_PIN   26
@@ -70,9 +70,11 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 // we are changing the CPU clock frequency)
 #define WDT_TIMEOUT 5
 
-// The time we will wait for a TxDone interrupt before giving up and resetting
-// the transmit process.
-#define TX_TIMEOUT_MS 10 * 1000
+// The time we will wait for a TxDone interrupt before giving up.  This should
+// be an unusual case.
+#define TX_TIMEOUT_MS 30 * 1000
+// The time we will wait for a CadDone interrupt before giving up. 
+#define CAD_TIMEOUT_MS 50
 
 #define S_TO_US_FACTOR 1000000UL
 
@@ -172,29 +174,85 @@ static CircularBufferImpl<256> txBuffer(0);
 static CircularBufferImpl<2048> rxBuffer(2);
 
 static MessageProcessor messageProcessor(mainClock, 
-  rxBuffer, txBuffer, routingTable, instrumentation, mainConfig, 10 * 1000, 2 * 1000);
+  rxBuffer, txBuffer, routingTable, instrumentation, mainConfig, 20 * 1000, 2 * 1000);
 MessageProcessor& systemMessageProcessor = messageProcessor;
 
 // The states of the state machine
-enum State { IDLE, LISTENING, TRANSMITTING };
+enum State { IDLE, RX_STATE, TX_STATE, CAD };
 
 // The overall state
-static State state = State::IDLE;
+static volatile State state = State::IDLE;
 // This is volatile because it is set inside of the ISR context
-static volatile bool isr_hit = false;
+static volatile bool isrHit = false;
 // The time when we started the last transmission.  This is needed 
 // to create a timeout on transmissions so we don't accidentally get 
 // stuck in a transmission.
-static uint32_t startTxTime = 0;
+static volatile uint32_t startTxTime = 0;
+// The time when we should give up on the CAD (channel activity detect).
+static volatile uint32_t endCadTime = 0;
 
 /**
  * @brief This is the actual ISR that is called by the Arduino run-time.
  */
 void IRAM_ATTR isr() {
-  // NOTE: We've had so many problems with interrupt enable/disable on the ESP32
-  // so now we're just going to set a flag and let everything happen in the loop()
-  // context. This eliminates a lot of risk around race-conditions, etc.
-  isr_hit = true;
+    // NOTE: We've had so many problems with interrupt enable/disable on the ESP32
+    // so now we're just going to set a flag and let everything happen in the loop()
+    // context. This eliminates a lot of risk around concurrency, etc.
+    isrHit = true;
+}
+
+static void start_Tx() {
+
+    //logger.println("start_Tx");
+
+    // At this point we have something pending to be sent.
+    // Go into stand-by so we know that nothing else is coming in
+    set_mode_STDBY();
+
+    // Pop the data off the TX queue into the transmit buffer.  
+    unsigned int tx_buf_len = 256;
+    uint8_t tx_buf[tx_buf_len];
+    txBuffer.pop(0, tx_buf, &tx_buf_len);
+
+    // Move the data into the radio FIFO
+    write_message(tx_buf, tx_buf_len);
+    
+    // Go into transmit mode
+    state = State::TX_STATE;
+    startTxTime = mainClock.time();
+    enable_interrupt_TxDone();
+    set_mode_TX();
+}
+
+/**
+ * @brief Put the radio RXCONTINUOUS mode and enable the RxDone interrupt.
+ */
+static void start_Rx() {
+
+    //logger.println("start_Rx");
+
+    // Revert back to listening mode. 
+    state = State::RX_STATE;
+    // Ask for interrupt when receiving
+    enable_interrupt_RxDone();
+    // Go into RXCONTINUOUS so we can hear the response
+    set_mode_RXCONTINUOUS();  
+}
+
+/**
+ * @brief Put the radio into CAD (channel activity detect) mode
+ * and enable the CadDone interrupt.
+ * 
+ * NOTE: It appears that we don't get the CadDone interrupt under
+ * normal (inactive) circumstances.  So a timeout is used to stop
+ * the CAD process later.
+ */
+static void start_Cad() {      
+    state = State::CAD;
+    // We use a random number here to try to limit transmissions stepping on each other
+    endCadTime = mainClock.time() + (CAD_TIMEOUT_MS * random(1, 5));
+    enable_interrupt_CadDone();
+    set_mode_CAD();  
 }
 
 /**
@@ -204,20 +262,20 @@ void IRAM_ATTR isr() {
  * 
  * This gets called from the main processing loop.
  */
-static void event_TxDone() { 
+static void event_TxDone() {   
 
-    // Sanity check on state transition
-    if (state != State::TRANSMITTING) {
-        logger.println(F("ERR: TxDone received in unexpected state"));
-        return;
+    //logger.println("TxDone");
+
+    // Check for pending transmissions.  If nothing is pending then 
+    // put the radio back into receive mode.
+    if (txBuffer.isEmpty()) {
+        start_Rx();
     }
-  
-    // Revert back to whatever we were listening for. 
-    state = State::LISTENING;
-    // Ask for interrupt when receiving
-    enable_interrupt_RxDone();
-    // Go into RXCONTINUOUS so we can hear the response
-    set_mode_RXCONTINUOUS();  
+    // If we have pending data then send it out immediately (the assumption
+    // is that the channel is still open). 
+    else {
+        start_Tx();
+    }
 } 
 
 /**
@@ -227,10 +285,18 @@ static void event_TxDone() {
  */
 static void event_RxDone() {
 
+    //logger.println("RxDone");
+
     // How much data is available?
     const uint8_t len = spi_read(0x13);
     // Reset the FIFO read pointer to the beginning of the packet we just got
     spi_write(0x0d, spi_read(0x10));
+
+    // We do nothing for zero-length messages
+    if (len == 0) {
+        return;
+    }
+
     // Stream received data in from the FIFO. 
     uint8_t rx_buf[256];
     spi_read_multi(0x00, rx_buf, len);
@@ -245,16 +311,38 @@ static void event_RxDone() {
     // We are using the high frequency port
     lastRssi -= 157;
 
-    // Handle based on state.  If we're not listening for anything then 
-    // ignore what was just read.
-    if (state != State::LISTENING) {
-        logger.println(F("ERR: Message received when not listening"));
-        return;
-    }
-
-    // Put the RSSI (OOB) and the entire packet (not just the header)
-    // into the circular queue for later processing.
+    // Put the RSSI (OOB) and the entire packet into the circular queue for 
+    // later processing.
     rxBuffer.push((const uint8_t*)&lastRssi, rx_buf, len);
+}
+
+/**
+ * @brief This function is called when the radio completes a CAD cycle
+ * and it is determined that these is channel activity. 
+ */
+static void event_CadDone_Detection() {
+
+    logger.println("INF: CadDone Detection");
+
+    // Channel is busy so revert back to listening mode so that we're
+    // ready to receive the data. 
+    start_Rx();
+}
+
+static void event_CadDone_NoDetection() {
+
+    //logger.println("CadDone");
+
+    // Check for pending transmissions.  If nothing is pending then 
+    // put the radio back into receive mode.
+    if (txBuffer.isEmpty()) {
+        start_Rx();
+    }
+    // If something is pending then transmit it (since we've been told
+    // that the channel is innactive).
+    else {     
+        start_Tx();
+    }
 }
 
 /**
@@ -262,10 +350,10 @@ static void event_RxDone() {
  * to see if any interrupt activity has been detected and, if so, figure 
  * out what kind of interrupt was reported and calls the correct handler.
  */ 
-static void check_for_interrupts(bool force) {
+static void check_for_interrupts() {
 
     // Look at the flag that gets set by the ISR itself
-    if (!force && !isr_hit) {
+    if (!isrHit) {
         return;
     }
 
@@ -276,10 +364,14 @@ static void check_for_interrupts(bool force) {
     // We are avoding the case where 
     noInterrupts();
 
-    isr_hit = false;
+    isrHit = false;
 
     // Read and reset the IRQ register at the same time:
     uint8_t irq_flags = spi_write(0x12, 0xff);    
+    
+    // We saw a comment in another implementation that said that there are problems
+    // clearing the ISR sometimes.  Notice we do a logical OR so we don't loose anything.
+    irq_flags |= spi_write(0x12, 0xff);    
 
     interrupts();
     // *******************************************************************************
@@ -289,59 +381,62 @@ static void check_for_interrupts(bool force) {
     } 
     // RxDone without a CRC error
     if ((irq_flags & 0x40) && !(irq_flags & 0x20)) {
-      event_RxDone();
+        event_RxDone();
     }
     // TxDone
     if (irq_flags & 0x08) {
-      event_TxDone();
+        event_TxDone();
+    }
+    // CadDone
+    if (irq_flags & 0x04) {
+        if (irq_flags & 0x01) {
+            event_CadDone_Detection();
+        } else {
+            event_CadDone_NoDetection();
+        }
     }
 }
 
-static void event_tick_LISTENING() {
-
-  // Check for pending transmissions.  If nothing is pending then 
-  // return without any state change.
-  if (txBuffer.isEmpty()) {
-    return;
-  }
-    
-  // At this point we have something pending to be sent.
-  // Go into stand-by so we know that nothing else is coming in
-  set_mode_STDBY();
-
-  // Pop the data off the TX queue into the transmit buffer.  
-  unsigned int tx_buf_len = 256;
-  uint8_t tx_buf[tx_buf_len];
-  txBuffer.pop(0, tx_buf, &tx_buf_len);
-
-  // Move the data into the radio FIFO
-  write_message(tx_buf, tx_buf_len);
-  
-  // Go into transmit mode
-  state = State::TRANSMITTING;
-  startTxTime = mainClock.time();
-  enable_interrupt_TxDone();
-  set_mode_TX();
-}
-
-static void event_tick_TRANSMITTING() {
+static void event_tick_Tx() {
     // Check for the case where a transmission times out
     if (mainClock.time() - startTxTime > TX_TIMEOUT_MS) {
-          logger.println("ERR: TX radio time out");
-          // Reset the TX FIFO
-          spi_write(0x0e, 0);
-          // Force a TX done
-          event_TxDone();
+        logger.println("ERR: TX time out");
+        start_Rx();
+    }
+}
+
+static void event_tick_Rx() {
+    // Check for pending transmissions.  If nothing is pending then 
+    // return without any state change.
+    if (txBuffer.isEmpty()) {
+        // No state change needed here
+        return;
+    }
+    else {
+        // At this point we know there is something pending.  We first 
+        // go into CAD mode to make sure the channel is innactive.
+        // A successful CAD check (with no detection) will trigger 
+        // the transmission.
+        start_Cad();
+    }
+}
+
+static void event_tick_Cad() {
+    // Check for the case where a CAD check times out
+    if (mainClock.time() > endCadTime) {
+        event_CadDone_NoDetection();
     }
 }
 
 // Call periodically to look for timeouts or other pending activity.  This will happen
-// on the regular application thread, so we disable interrupts to avoid conflicts.
+// on the regular application thread.
 void event_tick() {
-    if (state == State::LISTENING) {
-        event_tick_LISTENING();
-    } else if (state == State::TRANSMITTING) {
-        event_tick_TRANSMITTING();
+    if (state == State::RX_STATE) {
+        event_tick_Rx();
+    } else if (state == State::TX_STATE) {
+        event_tick_Tx();
+    } else if (state == State::CAD) {
+        event_tick_Cad();
     }
 }
 
@@ -353,30 +448,39 @@ void event_tick() {
 // 
 // The LoRa register map starts on page 103.
 
-void set_mode_SLEEP() {
-  spi_write(0x01, 0x00);  
+static void set_mode_SLEEP() {
+    spi_write(0x01, 0x00);  
 }
 
-void set_mode_STDBY() {
-  spi_write(0x01, 0x01);  
+static void set_mode_STDBY() {
+    spi_write(0x01, 0x01);  
 }
 
-void set_mode_TX() {
-  spi_write(0x01, 0x03);
+static void set_mode_TX() {
+    spi_write(0x01, 0x03);
 }
 
-void set_mode_RXCONTINUOUS() {
-  spi_write(0x01, 0x05);
+static void set_mode_RXCONTINUOUS() {
+    spi_write(0x01, 0x05);
+}
+
+static void set_mode_CAD() {
+    spi_write(0x01, 0x07);
 }
 
 // See table 17 - DIO0 is controlled by bits 7-6
-void enable_interrupt_TxDone() {
-  spi_write(0x40, 0x40);
+static void enable_interrupt_TxDone() {
+    spi_write(0x40, 0x40);
 }
 
 // See table 17 - DIO0 is controlled by bits 7-6
-void enable_interrupt_RxDone() {
-  spi_write(0x40, 0x00);
+static void enable_interrupt_RxDone() {
+    spi_write(0x40, 0x00);
+}
+
+// See table 17 - DIO0 is controlled by bits 7-6
+static void enable_interrupt_CadDone() {
+    spi_write(0x40, 0x80);
 }
 
 /** Sets the radio frequency from a decimal value that is quoted
@@ -384,21 +488,21 @@ void enable_interrupt_RxDone() {
  */
 // See page 103
 void set_frequency(float freq_mhz) {
-  const float CRYSTAL_MHZ = 32000000.0;
-  const float FREQ_STEP = (CRYSTAL_MHZ / 524288);
-  const uint32_t f = (freq_mhz * 1000000.0) / FREQ_STEP;
-  spi_write(0x06, (f >> 16) & 0xff);
-  spi_write(0x07, (f >> 8) & 0xff);
-  spi_write(0x08, f & 0xff);
+    const float CRYSTAL_MHZ = 32000000.0;
+    const float FREQ_STEP = (CRYSTAL_MHZ / 524288);
+    const uint32_t f = (freq_mhz * 1000000.0) / FREQ_STEP;
+    spi_write(0x06, (f >> 16) & 0xff);
+    spi_write(0x07, (f >> 8) & 0xff);
+    spi_write(0x08, f & 0xff);
 }
 
 void write_message(uint8_t* data, uint8_t len) {
-  // Move pointer to the start of the FIFO
-  spi_write(0x0d, 0);
-  // The message
-  spi_write_multi(0x00, data, len);
-  // Update the length register
-  spi_write(0x22, len);
+    // Move pointer to the start of the FIFO
+    spi_write(0x0d, 0);
+    // The message
+    spi_write_multi(0x00, data, len);
+    // Update the length register
+    spi_write(0x22, len);
 }
 
 int reset_radio() {
@@ -418,8 +522,8 @@ int reset_radio() {
 
     // Initialize the radio
     if (init_radio() != 0) {
-      logger.println(F("ERR: Problem with radio initialization"));
-      return -1;
+        logger.println(F("ERR: Problem with radio initialization"));
+        return -1;
     }
 
     logger.println(F("INF: Radio initialized"));
@@ -434,10 +538,7 @@ int reset_radio() {
     digitalWrite(LED_PIN, LOW);
 
     // Start listening for messages
-    state = State::LISTENING;
-    enable_interrupt_RxDone();
-    // Put the radio on the receive mode
-    set_mode_RXCONTINUOUS();  
+    start_Rx();
 
     return 0;  
 }
@@ -449,15 +550,13 @@ int reset_radio() {
  */
 static void set_ocp(uint8_t current_ma) {
 
-  uint8_t trim = 27;
-
-  if (current_ma <= 120) {
-    trim = (current_ma - 45) / 5;
-  } else if (current_ma <= 240) {
-    trim = (current_ma + 30) / 10;
-  }
-
-  spi_write(0x0b, 0x20 | (0x1F & trim));
+    uint8_t trim = 27;
+    if (current_ma <= 120) {
+        trim = (current_ma - 45) / 5;
+    } else if (current_ma <= 240) {
+        trim = (current_ma + 30) / 10;
+    }
+    spi_write(0x0b, 0x20 | (0x1F & trim));
 }
 
 static void setLowDatarate() {
@@ -497,88 +596,85 @@ static void setLowDatarate() {
  */
 int init_radio() {
 
-  // Check the radio version to make sure things are connected
-  uint8_t ver = spi_read(0x42);
-  if (ver != 18) {
-    return -1;
-  }
-  
-  // Switch into Sleep mode, LoRa mode
-  spi_write(0x01, 0x80);
-  // Wait for sleep mode 
-  delay(10); 
+    // Check the radio version to make sure things are connected
+    uint8_t ver = spi_read(0x42);
+    if (ver != 18) {
+        return -1;
+    }
 
-  // Make sure we are actually in sleep mode
-  if (spi_read(0x01) != 0x80) {
-    return -1; 
-  }
+    // Switch into Sleep mode, LoRa mode
+    spi_write(0x01, 0x80);
+    // Wait for sleep mode 
+    delay(10); 
 
-  // Setup the FIFO pointers
-  // TX base:
-  spi_write(0x0e, 0);
-  // RX base:
-  spi_write(0x0f, 0);
+    // Make sure we are actually in sleep mode
+    if (spi_read(0x01) != 0x80) {
+        return -1; 
+    }
 
-  set_frequency(STATION_FREQUENCY);
+    // Setup the FIFO pointers
+    // TX base:
+    spi_write(0x0e, 0);
+    // RX base:
+    spi_write(0x0f, 0);
 
-  // Set LNA boost
-  spi_write(0x0c, spi_read(0x0c) | 0x03);
+    set_frequency(STATION_FREQUENCY);
 
-  // AgcAutoOn=LNA gain set by AGC
-  spi_write(0x26, 0x04);
+    // Set LNA boost
+    spi_write(0x0c, spi_read(0x0c) | 0x03);
 
-  // DAC enable (adds 3dB)
-  spi_write(0x4d, 0x87);
-  
-  // Turn on PA and set power to +20dB
-  // PaSelect=1
-  // OutputPower=17 (20 - 3dB from DAC)
-  spi_write(0x09, 0x80 | ((20 - 3) - 2));
+    // AgcAutoOn=LNA gain set by AGC
+    spi_write(0x26, 0x04);
 
-  // Set OCP to 140 (as per the Sandeep Mistry library)
-  set_ocp(140);
+    // DAC enable (adds 3dB)
+    spi_write(0x4d, 0x87);
 
-  // Go into stand-by
-  set_mode_STDBY();
+    // Turn on PA and set power to +20dB
+    // PaSelect=1
+    // OutputPower=17 (20 - 3dB from DAC)
+    spi_write(0x09, 0x80 | ((20 - 3) - 2));
 
-  // Configure the radio
-  uint8_t reg = 0;
+    // Set OCP to 140 (as per the Sandeep Mistry library)
+    set_ocp(140);
 
-  // 7-4: 0111  (125k BW)
-  // 3-1: 001   (4/5 coding rate)
-  // 0:   0     (Explicit header mode)
-  reg = 0b01110010;
-  spi_write(0x1d, reg);
+    // Go into stand-by
+    set_mode_STDBY();
 
-  // 7-4:   9 (512 chips/symbol, spreading factor 9)
-  // 3:     0 (RX continuous mode normal)
-  // 2:     1 (CRC mode on)
-  // 1-0:   0 (RX timeout MSB) 
-  reg = 0b10010100;
-  spi_write(0x1e, reg);
+    // Configure the radio
+    uint8_t reg = 0;
 
-  // Preable Length=8 (default)
-  // Preamble MSB and LSB
-  //spi_write(0x20, 8 >> 8);
-  //spi_write(0x21, 8 & 0xff);
+    // 7-4: 0111  (125k BW)
+    // 3-1: 001   (4/5 coding rate)
+    // 0:   0     (Explicit header mode)
+    reg = 0b01110010;
+    spi_write(0x1d, reg);
 
-  setLowDatarate();
+    // 7-4:   9 (512 chips/symbol, spreading factor 9)
+    // 3:     0 (RX continuous mode normal)
+    // 2:     1 (CRC mode on)
+    // 1-0:   0 (RX timeout MSB) 
+    reg = 0b10010100;
+    spi_write(0x1e, reg);
 
-  return 0;
+    // Preable Length=8 (default)
+    // Preamble MSB and LSB
+    //spi_write(0x20, 8 >> 8);
+    //spi_write(0x21, 8 & 0xff);
+
+    setLowDatarate();
+
+    return 0;
 }
 
-// ===== Application 
-
-
 static bool isDelim(char d, const char* delims) {
-  const char* ptr = delims;
-  while (*ptr != 0) {
-    if (d == *ptr) {
-      return true;
+    const char* ptr = delims;
+    while (*ptr != 0) {
+        if (d == *ptr) {
+            return true;
+        }
+        ptr++;
     }
-    ptr++;
-  }
-  return false;
+    return false;
 }
 
 char* tokenizer(char* str, const char* delims, char** saveptr) {
@@ -648,28 +744,23 @@ char* tokenizer(char* str, const char* delims, char** saveptr) {
  * and tell the ESP32 to go into deep sleep.
  */
 static bool check_low_battery(void*) {
-  uint16_t lowBatteryLimitMv = systemConfig.getBatteryLimit();
-  // Check the battery
-  uint16_t battery = systemInstrumentation.getBatteryVoltage();
-  // If the battery is low then deep sleep
-  if (lowBatteryLimitMv != 0 && battery < lowBatteryLimitMv) {
-    shell.println(F("INF: Low battery, entering deep sleep"));
-    // Keep track of how many times this has happened
-    systemConfig.setSleepCount(systemConfig.getSleepCount() + 1);
-    // Put the radio into SLEEP mode to minimize power consumpion.  Per the 
-    // datasheet the sleep current is 1uA.
-    set_mode_SLEEP();
-    // Put the ESP32 into a deep sleep that will be awakened using the timer.
-    // Wakeup will look like reboot.
-    esp_sleep_enable_timer_wakeup(DEEP_SLEEP_SECONDS * S_TO_US_FACTOR);
-    esp_deep_sleep_start();
-  }
-  // Keep repeating
-  return true;
-}
-
-static bool check_stranded_irq(void*) {
-    check_for_interrupts(true);
+    uint16_t lowBatteryLimitMv = systemConfig.getBatteryLimit();
+    // Check the battery
+    uint16_t battery = systemInstrumentation.getBatteryVoltage();
+    // If the battery is low then deep sleep
+    if (lowBatteryLimitMv != 0 && battery < lowBatteryLimitMv) {
+        shell.println(F("INF: Low battery, entering deep sleep"));
+        // Keep track of how many times this has happened
+        systemConfig.setSleepCount(systemConfig.getSleepCount() + 1);
+        // Put the radio into SLEEP mode to minimize power consumpion.  Per the 
+        // datasheet the sleep current is 1uA.
+        set_mode_SLEEP();
+        // Put the ESP32 into a deep sleep that will be awakened using the timer.
+        // Wakeup will look like reboot.
+        esp_sleep_enable_timer_wakeup(DEEP_SLEEP_SECONDS * S_TO_US_FACTOR);
+        esp_deep_sleep_start();
+    }
+    // Keep repeating
     return true;
 }
 
@@ -682,7 +773,7 @@ static bool check_stranded_irq(void*) {
  */
 static bool check_idle(void*) {
   
-    if (state == State::LISTENING &&
+    if (state == State::RX_STATE &&
         systemMessageProcessor.getPendingCount() == 0 &&
         systemMessageProcessor.getSecondsSinceLastRx() > IDLE_INTERVAL_SECONDS) {
         logger.println("INF: Sleeping due to inactivity");
@@ -740,14 +831,10 @@ void setup() {
     shell.attach(Serial); 
     shell.setTokenizer(tokenizer);
 
-    shell.addCommand(F("sendping <addr>"), sendPing);
-    // A short-hand
     shell.addCommand(F("p <addr>"), sendPing);
-    shell.addCommand(F("sendedr <addr>"), sendGetSed);
+    shell.addCommand(F("d <addr>"), sendGetSed);
     shell.addCommand(F("sendreset <addr> <passcode>"), sendReset);
     shell.addCommand(F("sendresetcounters <addr> <passcode>"), sendResetCounters);
-    shell.addCommand(F("send <addr> <text>"), sendText);
-    // A short-hand version of this
     shell.addCommand(F("t <addr> <text>"), sendText);
     shell.addCommand(F("sendsetroute <addr> <target addr> <next hop addr> <passcode>"), sendSetRoute);
     shell.addCommand(F("sendgetroute <addr> <target addr>"), sendGetRoute);
@@ -800,9 +887,8 @@ void setup() {
           // Given that we just came up from an interrupt trigger, setup 
           // the state as if we were waiting for a message, and then 
           // set the flag that will cause the ISR code to run.
-          state = State::LISTENING;
-          enable_interrupt_RxDone();
-          isr_hit = true;
+          state = State::RX_STATE;
+          isrHit = true;
         }
         // Any other reason for a reboot causes full radio reset/initialization
         else {
@@ -816,10 +902,6 @@ void setup() {
     // Enable the idle check
     // TODO: NOT WORKING YET - NOT SURE WHY
     //timer.every(IDLE_CHECK_INTERVAL_SECONDS * 1000, check_idle);
-
-    // Enable a periodic interrupt check (to make sure that we don't 
-    // accidentally leave an interrupt stranded in the IRQ
-    //timer.every(30 * 1000, check_stranded_irq);
    
     // Enable the watchdog timer
     esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
@@ -829,8 +911,8 @@ void setup() {
 
 void loop() {
 
-  // Interrupt stuff, no forcing
-  check_for_interrupts(false);
+  // Check to see if any interrupts were fired
+  check_for_interrupts();
  
   // Check for shell activity
   shell.executeIfInput();

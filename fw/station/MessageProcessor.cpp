@@ -53,7 +53,6 @@ MessageProcessor::MessageProcessor(
       _startTime(clock.time()),
       _rxPacketCounter(0),
       _badRxPacketCounter(0),
-      _wrongNodeRxPacketCounter(0),
       _badRouteCounter(0),
       _lastRxTime(clock.time()) {
 }
@@ -143,15 +142,19 @@ void MessageProcessor::_process(int16_t rssi,
     // nodes.
     if (packet.header.getDestAddr() != BROADCAST_ADDR &&
         packet.header.getDestAddr() != _config.getAddr()) {
-        _wrongNodeRxPacketCounter++;
+        if (_config.getLogLevel() > 0) {
+            logger.print("INF: Ignored packet for ");
+            logger.println(packet.header.getDestAddr());
+        }
         return;
     }
 
     _rxPacketCounter++;
     _lastRxTime = _clock.time();
 
-    if (_config.getLogLevel() > 0) 
-      log_packet(logger, packet, rssi);
+    if (_config.getLogLevel() > 0) {
+        log_packet(logger, packet, rssi);
+    }
     
     // If we got an ACK then process it directly 
     if (packet.header.isAck()) {
@@ -159,16 +162,33 @@ void MessageProcessor::_process(int16_t rssi,
         return;
     }
 
-  // If the message we just received requires and ACK then 
-  // generate one before proceeding with the local processing.
-  if (packet.header.isAckRequired()) {
-      Packet ack;
-      ack.header.setupAckFor(packet.header, _config);
-      bool good = transmitIfPossible(ack, sizeof(Header));
-      if (!good) {
-          logger.println("ERR: Full, no ACK");
-      }
-  }
+    // Check to see if this message is a duplicate of one recently received
+    for (unsigned int i = 0; i < _packetReportSlots; i++) {
+        if (_packetReport[i].node == packet.header.originalSourceAddr &&
+            _packetReport[i].id == packet.header.id) {
+            if (_config.getLogLevel() > 0) {
+                logger.print("INF: Ignored duplicate from ");
+                logger.println(packet.header.originalSourceAddr);             
+            }
+            return;
+        }
+    }
+    
+    // Record to avoid duplicates
+    _packetReport[_packetReportPtr].node = packet.header.originalSourceAddr;
+    _packetReport[_packetReportPtr].id = packet.header.id;
+    _packetReportPtr = (_packetReportPtr + 1) % _packetReportSlots;
+
+    // If the message we just received requires and ACK then 
+    // generate one before proceeding with the local processing.
+    if (packet.header.isAckRequired()) {
+        Packet ack;
+        ack.header.setupAckFor(packet.header, _config);
+        bool good = transmitIfPossible(ack, sizeof(Header));
+        if (!good) {
+            logger.println("ERR: Full, no ACK");
+        }
+    }
 
   // Look for messages that need to be forwarded on to another node
   if (packet.header.getFinalDestAddr() != _config.getAddr()) {
@@ -251,7 +271,7 @@ void MessageProcessor::_process(int16_t rssi,
       respPayload.time = _clock.time();
       respPayload.bootCount = _config.getBootCount();
       respPayload.sleepCount = _config.getSleepCount();
-      //respPayload.lastHopRssi = rssi;
+      respPayload.lastHopRssi = rssi;
 
       respPayload.temp = _instrumentation.getTemperature();
       respPayload.humidity = _instrumentation.getHumidity();
@@ -261,10 +281,9 @@ void MessageProcessor::_process(int16_t rssi,
       // Message diagnostic counter 
       respPayload.rxPacketCount = _rxPacketCounter;
       respPayload.badRxPacketCount = _badRxPacketCounter;
-      respPayload.wrongNodeRxPacketCount = _wrongNodeRxPacketCounter;
       respPayload.badRouteCount = _badRouteCounter;
 
-      memcpy(resp.payload,(void*)&respPayload,sizeof(SadRespPayload));
+      memcpy(resp.payload, (const void*)&respPayload, sizeof(SadRespPayload));
 
       bool good = transmitIfPossible(resp, sizeof(Header) + sizeof(SadRespPayload));
       if (!good) {
@@ -308,7 +327,7 @@ void MessageProcessor::_process(int16_t rssi,
 
       // Display
       logger.print("GETSED_RESP: { \"node\": ");
-      logger.print(packet.header.getSourceAddr());
+      logger.print(packet.header.getOriginalSourceAddr());
       logger.print(", \"version\": ");
       logger.print(respPayload.version);
       logger.print(", \"batteryMv\": ");
@@ -325,12 +344,10 @@ void MessageProcessor::_process(int16_t rssi,
       logger.print(respPayload.rxPacketCount);
       logger.print(", \"badRxPacketCount\": ");
       logger.print(respPayload.badRxPacketCount);
-      logger.print(", \"wrongNodeRxPacketCount\": ");
-      logger.print(respPayload.wrongNodeRxPacketCount);
       logger.print(", \"badRouteCount\": ");
       logger.print(respPayload.badRouteCount);
-      //logger.print(", \"lastHopRssi\": ");
-      //logger.print(respPayload.lastHopRssi);
+      logger.print(", \"lastHopRssi\": ");
+      logger.print(respPayload.lastHopRssi);
       logger.println("}");
     }
 
@@ -473,7 +490,6 @@ uint16_t MessageProcessor::getBadRxPacketCounter() const {
 void MessageProcessor::resetCounters() {
     _rxPacketCounter = 0;
     _badRxPacketCounter = 0;
-    _wrongNodeRxPacketCounter = 0;
     _badRouteCounter = 0;
 }
 

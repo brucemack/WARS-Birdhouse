@@ -27,6 +27,12 @@
 #include "Instrumentation.h"
 #include "RoutingTable.h"
 
+struct PacketReport {
+    PacketReport() : node(0), id(0) { }
+    nodeaddr_t node;
+    uint16_t id;
+};
+
 /**
  * @brief An instance of this class is responsible for dealing
  * with the inbound and outbound message flow.  Key responsibilities:
@@ -102,8 +108,13 @@ private:
     // Diagnostic counters
     uint16_t _rxPacketCounter;
     uint16_t _badRxPacketCounter;
-    uint16_t _wrongNodeRxPacketCounter;
     uint16_t _badRouteCounter;
+    
+    // Used for tracking packets to supress duplicates.  The more slots we allocate
+    // the better we will be at eliminating duplicates.
+    const static unsigned int _packetReportSlots = 32;
+    unsigned int _packetReportPtr = 0;
+    PacketReport _packetReport[_packetReportSlots];
 };
 
 #endif

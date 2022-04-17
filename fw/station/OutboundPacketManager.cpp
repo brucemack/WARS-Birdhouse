@@ -44,6 +44,12 @@ bool OutboundPacketManager::scheduleTransmitIfPossible(const Packet& packet, uns
 }
 
 void OutboundPacketManager::pump() {
+    // Make sure the ACKs have priority in the output queue
+    for (unsigned int i = 0; i < _packetCount; i++) {
+        if (_packets[i].isAck())
+            _packets[i].transmitIfReady(_clock, _txBuffer);
+    }
+    // Then do everything else
     for (unsigned int i = 0; i < _packetCount; i++) 
         _packets[i].transmitIfReady(_clock, _txBuffer);
 }

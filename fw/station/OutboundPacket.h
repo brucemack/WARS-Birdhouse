@@ -36,7 +36,8 @@ public:
     OutboundPacket();
 
     bool isAllocated() const;
-
+    bool isAck() const;
+    
     void scheduleTransmit(const Packet& packet, unsigned int packetLen,
         uint32_t giveUpTime);
 

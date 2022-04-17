@@ -83,6 +83,10 @@ void OutboundPacket::processAckIfRelevant(const Packet& ackPacket) {
     }
 }
 
+bool OutboundPacket::isAck() const {
+    return _packet.header.type == TYPE_ACK;
+}
+
 void OutboundPacket::_reset() {
     _isAllocated = false;
     _lastTransmitTime = 0;
