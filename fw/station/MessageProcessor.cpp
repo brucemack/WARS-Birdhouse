@@ -164,8 +164,7 @@ void MessageProcessor::_process(int16_t rssi,
 
     // Check to see if this message is a duplicate of one recently received
     for (unsigned int i = 0; i < _packetReportSlots; i++) {
-        if (_packetReport[i].node == packet.header.originalSourceAddr &&
-            _packetReport[i].id == packet.header.id) {
+        if (_packetReport[i].isDuplicate(packet, _clock)) {
             if (_config.getLogLevel() > 0) {
                 logger.print("INF: Ignored duplicate from ");
                 logger.println(packet.header.originalSourceAddr);             
@@ -177,6 +176,7 @@ void MessageProcessor::_process(int16_t rssi,
     // Record to avoid duplicates
     _packetReport[_packetReportPtr].node = packet.header.originalSourceAddr;
     _packetReport[_packetReportPtr].id = packet.header.id;
+    _packetReport[_packetReportPtr].stamp = _clock.time();
     _packetReportPtr = (_packetReportPtr + 1) % _packetReportSlots;
 
     // If the message we just received requires and ACK then 

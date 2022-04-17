@@ -27,10 +27,28 @@
 #include "Instrumentation.h"
 #include "RoutingTable.h"
 
+#define REPORT_TTL_MS 30 * 1000
+
 struct PacketReport {
-    PacketReport() : node(0), id(0) { }
+
+    PacketReport() : node(0), id(0), stamp(0) { }
+    
     nodeaddr_t node;
     uint16_t id;
+    uint32_t stamp;
+
+    /**
+     * @brief A packet is onto considered a duplicate inside the TTL time interval
+     */
+    bool isDuplicate(const Packet& packet, const Clock& systemClock) const {
+        if (node == packet.header.originalSourceAddr &&
+            id == packet.header.id &&
+            (systemClock.time() - stamp) < REPORT_TTL_MS) {
+            return true;      
+        } else {
+           return false;
+        }
+    }
 };
 
 /**

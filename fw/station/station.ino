@@ -248,6 +248,9 @@ static void start_Rx() {
  * the CAD process later.
  */
 static void start_Cad() {      
+
+    //logger.println("start_Cad");
+
     state = State::CAD;
     // We use a random number here to try to limit transmissions stepping on each other
     endCadTime = mainClock.time() + (CAD_TIMEOUT_MS * random(1, 5));
