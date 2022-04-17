@@ -162,7 +162,23 @@ void MessageProcessor::_process(int16_t rssi,
         return;
     }
 
-    // Check to see if this message is a duplicate of one recently received
+    // If the packet we just received requires and ACK then 
+    // generate one before proceeding with the local processing.  
+    //
+    // NOTE: We do this BEFORE the duplicate checking since the reason we
+    // got a duplicate might be that this ACK wasn't received.
+    //
+    if (packet.header.isAckRequired()) {
+        Packet ack;
+        ack.header.setupAckFor(packet.header, _config);
+        bool good = transmitIfPossible(ack, sizeof(Header));
+        if (!good) {
+            logger.println("ERR: Full, no ACK");
+        }
+    }
+
+    // Check to see if this packet is a duplicate of one recently received 
+    // recently.  If so, we can safely ignore it.
     for (unsigned int i = 0; i < _packetReportSlots; i++) {
         if (_packetReport[i].isDuplicate(packet, _clock)) {
             if (_config.getLogLevel() > 0) {
@@ -173,22 +189,11 @@ void MessageProcessor::_process(int16_t rssi,
         }
     }
     
-    // Record to avoid duplicates
+    // Record the packet we got to avoid duplicates
     _packetReport[_packetReportPtr].node = packet.header.originalSourceAddr;
     _packetReport[_packetReportPtr].id = packet.header.id;
     _packetReport[_packetReportPtr].stamp = _clock.time();
     _packetReportPtr = (_packetReportPtr + 1) % _packetReportSlots;
-
-    // If the message we just received requires and ACK then 
-    // generate one before proceeding with the local processing.
-    if (packet.header.isAckRequired()) {
-        Packet ack;
-        ack.header.setupAckFor(packet.header, _config);
-        bool good = transmitIfPossible(ack, sizeof(Header));
-        if (!good) {
-            logger.println("ERR: Full, no ACK");
-        }
-    }
 
   // Look for messages that need to be forwarded on to another node
   if (packet.header.getFinalDestAddr() != _config.getAddr()) {
