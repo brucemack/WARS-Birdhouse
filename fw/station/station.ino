@@ -50,7 +50,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include "MessageProcessor.h"
 #include "CommandProcessor.h"
 
-#define SW_VERSION 40
+#define SW_VERSION 41
 
 // This is the pin that is available on the D1 Mini module:
 #define RST_PIN   26
@@ -841,6 +841,7 @@ void setup() {
     shell.addCommand(F("t <addr> <text>"), sendText);
     shell.addCommand(F("sendsetroute <addr> <target addr> <next hop addr> <passcode>"), sendSetRoute);
     shell.addCommand(F("sendgetroute <addr> <target addr>"), sendGetRoute);
+    shell.addCommand(F("factoryreset"), factoryReset);
 
     shell.addCommand(F("setaddr <addr>"), setAddr);
     shell.addCommand(F("setcall <call_sign>"), setCall);
@@ -857,7 +858,6 @@ void setup() {
     shell.addCommand(F("print <text>"), print);
     shell.addCommand(F("rem <text>"), rem);
     shell.addCommand(F("resetcounters"), resetCounters);
-    shell.addCommand(F("factoryreset"), factoryReset);
 
     // Increment the boot count
     systemConfig.setBootCount(systemConfig.getBootCount() + 1);

@@ -34,6 +34,7 @@ static auto msg_no_route = F("ERR: No route available");
 static auto msg_bad_address = F("ERR: Bad address");
 static auto msg_bad_message = F("ERR: Bad message");
 static auto msg_tx_busy = F("ERR: TX busy");
+static auto msg_ok = F("INF: OK");
 
 extern Stream& logger;
 extern Configuration& systemConfig;
@@ -383,7 +384,7 @@ int sleep(int argc, char **argv) {
     uint16_t seconds = atoi(argv[1]);
     logger.println("INF: Sleeping ...");
     systemInstrumentation.sleep(seconds * 1000);
-    logger.println("INF: Done");
+    logger.println(msg_ok);
     return 0;
 }
 
@@ -395,6 +396,7 @@ int setAddr(int argc, char **argv) {
     }
 
     systemConfig.setAddr(atoi(argv[1]));
+    logger.println(msg_ok);
     return 0;
 }
 
@@ -406,6 +408,7 @@ int setCall(int argc, char **argv) {
     }
 
     systemConfig.setCall(CallSign(argv[1]));
+    logger.println(msg_ok);
     return 0;
 }
 
@@ -417,6 +420,7 @@ int setPasscode(int argc, char **argv) {
     }
 
     systemConfig.setPasscode(atol(argv[1]));
+    logger.println(msg_ok);
     return 0;
 }
 
@@ -428,6 +432,7 @@ int setBatteryLimit(int argc, char **argv) {
     }
 
     systemConfig.setBatteryLimit(atoi(argv[1]));
+    logger.println(msg_ok);
     return 0;
 }
 
@@ -437,6 +442,7 @@ int setLog(int argc, char **argv) {
         return -1;
     }
     systemConfig.setLogLevel(atoi(argv[1]));
+    logger.println(msg_ok);
     return 0;  
 }
 
@@ -480,21 +486,26 @@ int setRoute(int argc, char **argv) {
     nodeaddr_t r = parseAddr(argv[2]);
 
     systemRoutingTable.setRoute(t, r);
+    logger.println(msg_ok);
     return 0;
 }
 
 int clearRoutes(int argc, char **argv) { 
     systemRoutingTable.clearRoutes();
+    logger.println(msg_ok);
     return 0;
 }
 
 int resetCounters(int argc, char **argv) { 
     systemInstrumentation.resetCounters();
     systemMessageProcessor.resetCounters();
+    logger.println(msg_ok);
     return 0;
 }
 
 int factoryReset(int argc, char **argv) {
     systemConfig.factoryReset();
     systemRoutingTable.factoryReset();
+    logger.println(msg_ok);
+    return 0;
 }
