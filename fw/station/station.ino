@@ -851,8 +851,8 @@ void setup() {
     shell.addCommand(F("setpasscode <passcode>"), setPasscode);
     shell.addCommand(F("setlog <level>"), setLog);
 
-    shell.addCommand(F("boot"), boot);
-    shell.addCommand(F("bootradio"), bootRadio);
+    shell.addCommand(F("reset"), boot);
+    shell.addCommand(F("resetradio"), bootRadio);
     shell.addCommand(F("info"), info);
     shell.addCommand(F("sleep <seconds>"), sleep);
     shell.addCommand(F("print <text>"), print);
