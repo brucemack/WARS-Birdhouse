@@ -140,16 +140,15 @@ struct Header {
     }
 
     void setup(const Configuration& config,
-        uint8_t packetType, uint16_t packetId, 
-        nodeaddr_t destAddr, nodeAddr_t finalDestAddr) {        
+        uint8_t packetType, uint16_t packetId, nodeaddr_t packetDestAddr, nodeaddr_t packetFinalDestAddr) {        
         version = PACKET_VERSION;
         type = packetType;
         id = packetId;
         // Address stuff
         sourceAddr = config.getAddr();
         originalSourceAddr = config.getAddr();
-        destAddr = destAddr;
-        finalDestAddr = finalDestAddr;
+        destAddr = packetDestAddr;
+        finalDestAddr = packetFinalDestAddr;
         // Call stuff
         CallSign myCall = config.getCall();
         myCall.writeTo(sourceCall);

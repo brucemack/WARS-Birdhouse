@@ -498,13 +498,13 @@ void MessageProcessor::sendEngineeringData(nodeaddr_t targetAddr) {
 
     // Get the address
     nodeaddr_t nextHop = _routingTable.nextHop(targetAddr);
-    if (nextHop != RoutingTable::NO_ROUTE) {
+    if (nextHop == RoutingTable::NO_ROUTE) {
         return;
     }
 
     // Setup the packet
     Packet resp;
-    resp.setup(_config, TYPE_GETSED_RESP, _config.getUniqueId(), nextHop, targetAddr);
+    resp.header.setup(_config, TYPE_GETSED_RESP, getUniqueId(), nextHop, targetAddr);
 
     // Populate the payload
     SadRespPayload respPayload;
@@ -525,7 +525,7 @@ void MessageProcessor::_populateSedResponse(SadRespPayload& respPayload) const {
     respPayload.time = _clock.time();
     respPayload.bootCount = _config.getBootCount();
     respPayload.sleepCount = _config.getSleepCount();
-    respPayload.lastHopRssi = rssi;
+    respPayload.lastHopRssi = 0;
 
     respPayload.temp = _instrumentation.getTemperature();
     respPayload.humidity = _instrumentation.getHumidity();

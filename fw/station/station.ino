@@ -50,7 +50,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include "MessageProcessor.h"
 #include "CommandProcessor.h"
 
-#define SW_VERSION 43
+#define SW_VERSION 44
 
 // This is the pin that is available on the D1 Mini module:
 #define RST_PIN   26
@@ -92,7 +92,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 
 #define CONTROL_NODE 1
 // How often the station sends its ID information to the control station
-#define STATION_ID_INTERVAL_SECONDS (60L * 1L)
+#define STATION_ID_INTERVAL_SECONDS (60L * 60L)
 
 static const float STATION_FREQUENCY = 906.5;
 
@@ -797,6 +797,10 @@ static bool check_idle(void*) {
     return true;
 }
 
+/**
+ * @brief This function iis called periodically to send engineering/diagnostic data to the master control node
+ * on the network
+ */
 static bool send_station_id(void*) {
     systemMessageProcessor.sendEngineeringData(CONTROL_NODE);
     return true;
@@ -918,6 +922,8 @@ void setup() {
 
     // Enable the station ID timer
     timer.every(STATION_ID_INTERVAL_SECONDS * 1000, send_station_id);
+    // Force an initial update one minute after startup
+    timer.in(60L * 1000L, send_station_id);
    
     // Enable the watchdog timer
     esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
