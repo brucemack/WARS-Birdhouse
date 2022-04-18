@@ -380,13 +380,23 @@ void MessageProcessor::_process(int16_t rssi,
       char scratch[128];
       memcpy(scratch, packet.payload, textLen);
       scratch[textLen] = 0;
-      
-      logger.print("MSG: [");
-      packet.header.getOriginalSourceCall().printTo(logger);
-      logger.print(",");
-      logger.print(packet.header.getOriginalSourceAddr());
-      logger.print("] ");
-      logger.println(scratch);
+
+      if (_config.getCommandMode() == 1) {
+          logger.print("TEXT: { \"call\": \"");
+          packet.header.getOriginalSourceCall().printTo(logger);
+          logger.print("\", \"node\": ");
+          logger.print(packet.header.getOriginalSourceAddr());
+          logger.print("\", \"text\": \"");
+          logger.print(scratch);
+          logger.println("\" } ");        
+      } else {      
+          logger.print("MSG: [");
+          packet.header.getOriginalSourceCall().printTo(logger);
+          logger.print(",");
+          logger.print(packet.header.getOriginalSourceAddr());
+          logger.print("] ");
+          logger.println(scratch);
+      }
     }
 
     // Set route

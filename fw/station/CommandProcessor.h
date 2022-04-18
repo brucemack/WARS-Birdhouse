@@ -35,6 +35,7 @@ int setBatteryLimit(int argc, char **argv);
 int setRoute(int argc, char **argv);
 int clearRoutes(int argc, char **argv);
 int setLog(int argc, char **argv);
+int setMode(int argc, char **argv);
 
 int info(int argc, char **argv);
 int sleep(int argc, char **argv);

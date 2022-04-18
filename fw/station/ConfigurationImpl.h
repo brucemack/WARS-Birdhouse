@@ -51,7 +51,10 @@ public:
 
     uint8_t getLogLevel() const;
     void setLogLevel(uint8_t l);
-    
+
+    uint8_t getCommandMode() const;
+    void setCommandMode(uint8_t l);
+
     void factoryReset();
 
 private:

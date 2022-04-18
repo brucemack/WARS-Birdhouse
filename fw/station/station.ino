@@ -50,7 +50,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include "MessageProcessor.h"
 #include "CommandProcessor.h"
 
-#define SW_VERSION 42
+#define SW_VERSION 43
 
 // This is the pin that is available on the D1 Mini module:
 #define RST_PIN   26
@@ -850,6 +850,7 @@ void setup() {
     shell.addCommand(F("setblimit <limit_mv>"), setBatteryLimit);
     shell.addCommand(F("setpasscode <passcode>"), setPasscode);
     shell.addCommand(F("setlog <level>"), setLog);
+    shell.addCommand(F("setmode <mode>"), setMode);
 
     shell.addCommand(F("reset"), boot);
     shell.addCommand(F("resetradio"), bootRadio);

@@ -27,7 +27,7 @@ struct StationConfig {
     nodeaddr_t myAddr;
     uint8_t myCall[8];
     uint16_t batteryLimitMv;
-    uint8_t debugMode;
+    uint8_t commandMode;
     uint32_t securityToken;
     uint16_t bootCount;
     uint16_t sleepCount;

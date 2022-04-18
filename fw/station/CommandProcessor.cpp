@@ -352,6 +352,8 @@ int info(int argc, char **argv) {
     logger.print(systemConfig.getSleepCount());
     logger.print(F(", \"logLevel\": "));
     logger.print(systemConfig.getLogLevel());
+    logger.print(F(", \"commandMode\": "));
+    logger.print(systemConfig.getCommandMode());
     logger.print(F(", \"routes\": ["));
 
     // Display the routing table
@@ -442,6 +444,16 @@ int setLog(int argc, char **argv) {
         return -1;
     }
     systemConfig.setLogLevel(atoi(argv[1]));
+    logger.println(msg_ok);
+    return 0;  
+}
+
+int setMode(int argc, char **argv) {
+    if (argc != 2) {
+        logger.println(msg_arg_error);
+        return -1;
+    }
+    systemConfig.setCommandMode(atoi(argv[1]));
     logger.println(msg_ok);
     return 0;  
 }

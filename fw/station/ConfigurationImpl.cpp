@@ -94,6 +94,15 @@ void ConfigurationImpl::setLogLevel(uint8_t l) {
     _save();
 }
 
+uint8_t ConfigurationImpl::getCommandMode() const {
+    return _configCache.commandMode;
+}
+
+void ConfigurationImpl::setCommandMode(uint8_t l) {
+    _configCache.commandMode = l;
+    _save();  
+}
+
 void ConfigurationImpl::_save() {
     const uint8_t* v = (const uint8_t*)&_configCache;
     _pref.putBytes("config", v, sizeof(StationConfig));

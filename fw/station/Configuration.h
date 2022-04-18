@@ -46,6 +46,9 @@ public:
     virtual uint8_t getLogLevel() const { return 0; }
     virtual void setLogLevel(uint8_t l) {};
 
+    virtual uint8_t getCommandMode() const { return 0; }
+    virtual void setCommandMode(uint8_t l) { };
+
     virtual void factoryReset() = 0;
 };
 
