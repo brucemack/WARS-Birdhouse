@@ -109,9 +109,15 @@ public:
 
     uint32_t getSecondsSinceLastRx() const;
 
+    /**
+     * @brief Sends SED packet to the designated node.
+     */
+    void sendEngineeringData(nodeaddr_t targetAddr);
+
 private:
 
     void _process(int16_t rssi, const Packet& packet, unsigned int packetLen);
+    void _populateSedResponse(SadRespPayload& respPayload) const;
 
     Configuration& _config;
     const Clock& _clock;

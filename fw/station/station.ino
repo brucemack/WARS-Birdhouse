@@ -90,6 +90,10 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 // The definition of "idle" 
 #define IDLE_INTERVAL_SECONDS 60
 
+#define CONTROL_NODE 1
+// How often the station sends its ID information to the control station
+#define STATION_ID_INTERVAL_SECONDS (60L * 1L)
+
 static const float STATION_FREQUENCY = 906.5;
 
 int reset_radio();
@@ -793,6 +797,11 @@ static bool check_idle(void*) {
     return true;
 }
 
+static bool send_station_id(void*) {
+    systemMessageProcessor.sendEngineeringData(CONTROL_NODE);
+    return true;
+}
+
 void setup() {
 
     Serial.begin(115200);
@@ -906,6 +915,9 @@ void setup() {
     // Enable the idle check
     // TODO: NOT WORKING YET - NOT SURE WHY
     //timer.every(IDLE_CHECK_INTERVAL_SECONDS * 1000, check_idle);
+
+    // Enable the station ID timer
+    timer.every(STATION_ID_INTERVAL_SECONDS * 1000, send_station_id);
    
     // Enable the watchdog timer
     esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
