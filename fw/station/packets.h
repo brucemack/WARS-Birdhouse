@@ -139,6 +139,23 @@ struct Header {
         memcpy(finalDestCall, reqHeader.originalSourceCall, 8);
     }
 
+    void setup(const Configuration& config,
+        uint8_t packetType, uint16_t packetId, 
+        nodeaddr_t destAddr, nodeAddr_t finalDestAddr) {        
+        version = PACKET_VERSION;
+        type = packetType;
+        id = packetId;
+        // Address stuff
+        sourceAddr = config.getAddr();
+        originalSourceAddr = config.getAddr();
+        destAddr = destAddr;
+        finalDestAddr = finalDestAddr;
+        // Call stuff
+        CallSign myCall = config.getCall();
+        myCall.writeTo(sourceCall);
+        myCall.writeTo(originalSourceCall);
+    }
+
     bool isAck() const {
         return (type == TYPE_ACK);
     }

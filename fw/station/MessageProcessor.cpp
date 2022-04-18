@@ -269,25 +269,7 @@ void MessageProcessor::_process(int16_t rssi,
 
       // Populate the payload
       SadRespPayload respPayload;
-      respPayload.version = _instrumentation.getSoftwareVersion();
-      respPayload.batteryMv = _instrumentation.getBatteryVoltage();
-      respPayload.panelMv = _instrumentation.getPanelVoltage();
-      respPayload.uptimeSeconds = (_clock.time() - _startTime) / 1000;
-      respPayload.time = _clock.time();
-      respPayload.bootCount = _config.getBootCount();
-      respPayload.sleepCount = _config.getSleepCount();
-      respPayload.lastHopRssi = rssi;
-
-      respPayload.temp = _instrumentation.getTemperature();
-      respPayload.humidity = _instrumentation.getHumidity();
-      respPayload.deviceClass = _instrumentation.getDeviceClass();
-      respPayload.deviceRevision = _instrumentation.getDeviceRevision();
-      
-      // Message diagnostic counter 
-      respPayload.rxPacketCount = _rxPacketCounter;
-      respPayload.badRxPacketCount = _badRxPacketCounter;
-      respPayload.badRouteCount = _badRouteCounter;
-
+      _populateSedResponse(respPayload);
       memcpy(resp.payload, (const void*)&respPayload, sizeof(SadRespPayload));
 
       bool good = transmitIfPossible(resp, sizeof(Header) + sizeof(SadRespPayload));
@@ -510,4 +492,48 @@ void MessageProcessor::resetCounters() {
 
 uint32_t MessageProcessor::getSecondsSinceLastRx() const {
   return (_clock.time() - _lastRxTime) / 1000L; 
+}
+
+void MessageProcessor::sendEngineeringData(nodeaddr_t targetAddr) {
+
+    // Get the address
+    nodeaddr_t nextHop = _routingTable.nextHop(targetAddr);
+    if (nextHop != RoutingTable::NO_ROUTE) {
+        return;
+    }
+
+    // Setup the packet
+    Packet resp;
+    resp.setup(_config, TYPE_GETSED_RESP, _config.getUniqueId(), nextHop, targetAddr);
+
+    // Populate the payload
+    SadRespPayload respPayload;
+    _populateSedResponse(respPayload);
+    memcpy(resp.payload, (const void*)&respPayload, sizeof(SadRespPayload));
+
+    bool good = transmitIfPossible(resp, sizeof(Header) + sizeof(SadRespPayload));
+    if (!good) {
+        logger.println("ERR: Full, no resp");
+    }
+}
+
+void MessageProcessor::_populateSedResponse(SadRespPayload& respPayload) const {
+    respPayload.version = _instrumentation.getSoftwareVersion();
+    respPayload.batteryMv = _instrumentation.getBatteryVoltage();
+    respPayload.panelMv = _instrumentation.getPanelVoltage();
+    respPayload.uptimeSeconds = (_clock.time() - _startTime) / 1000;
+    respPayload.time = _clock.time();
+    respPayload.bootCount = _config.getBootCount();
+    respPayload.sleepCount = _config.getSleepCount();
+    respPayload.lastHopRssi = rssi;
+
+    respPayload.temp = _instrumentation.getTemperature();
+    respPayload.humidity = _instrumentation.getHumidity();
+    respPayload.deviceClass = _instrumentation.getDeviceClass();
+    respPayload.deviceRevision = _instrumentation.getDeviceRevision();
+    
+    // Message diagnostic counter 
+    respPayload.rxPacketCount = _rxPacketCounter;
+    respPayload.badRxPacketCount = _badRxPacketCounter;
+    respPayload.badRouteCount = _badRouteCounter;
 }
