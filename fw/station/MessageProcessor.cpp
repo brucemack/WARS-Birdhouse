@@ -269,7 +269,7 @@ void MessageProcessor::_process(int16_t rssi,
 
       // Populate the payload
       SadRespPayload respPayload;
-      _populateSedResponse(respPayload);
+      _populateSedResponse(respPayload, rssi);
       memcpy(resp.payload, (const void*)&respPayload, sizeof(SadRespPayload));
 
       bool good = transmitIfPossible(resp, sizeof(Header) + sizeof(SadRespPayload));
@@ -508,7 +508,7 @@ void MessageProcessor::sendEngineeringData(nodeaddr_t targetAddr) {
 
     // Populate the payload
     SadRespPayload respPayload;
-    _populateSedResponse(respPayload);
+    _populateSedResponse(respPayload, 0);
     memcpy(resp.payload, (const void*)&respPayload, sizeof(SadRespPayload));
 
     bool good = transmitIfPossible(resp, sizeof(Header) + sizeof(SadRespPayload));
@@ -517,7 +517,7 @@ void MessageProcessor::sendEngineeringData(nodeaddr_t targetAddr) {
     }
 }
 
-void MessageProcessor::_populateSedResponse(SadRespPayload& respPayload) const {
+void MessageProcessor::_populateSedResponse(SadRespPayload& respPayload, int16_t rssi) const {
     respPayload.version = _instrumentation.getSoftwareVersion();
     respPayload.batteryMv = _instrumentation.getBatteryVoltage();
     respPayload.panelMv = _instrumentation.getPanelVoltage();
@@ -525,7 +525,7 @@ void MessageProcessor::_populateSedResponse(SadRespPayload& respPayload) const {
     respPayload.time = _clock.time();
     respPayload.bootCount = _config.getBootCount();
     respPayload.sleepCount = _config.getSleepCount();
-    respPayload.lastHopRssi = 0;
+    respPayload.lastHopRssi = rssi;
 
     respPayload.temp = _instrumentation.getTemperature();
     respPayload.humidity = _instrumentation.getHumidity();
