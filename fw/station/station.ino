@@ -29,6 +29,11 @@
 // Build instructions
 // * Set clock frequency to 10MHz to save power (also disables WIFI and BT)
 
+// NSS 5
+// SCK 18
+// MOSI 23
+// MISO 19
+
 /**
 Currently using the ESP32 D1 Mini
 http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
