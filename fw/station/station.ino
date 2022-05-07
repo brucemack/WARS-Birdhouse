@@ -50,7 +50,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include "MessageProcessor.h"
 #include "CommandProcessor.h"
 
-#define SW_VERSION 44
+#define SW_VERSION 46
 
 // This is the pin that is available on the D1 Mini module:
 #define RST_PIN   26
@@ -72,10 +72,9 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 
 // The time we will wait for a TxDone interrupt before giving up.  This should
 // be an unusual case.
-#define TX_TIMEOUT_MS 30 * 1000
+#define TX_TIMEOUT_MS (30UL * 1000UL)
 
-// The time we will wait for a CadDone interrupt before giving up and
-// assuming that the channel is inactive.
+// The time we will wait for a CadDone interrupt before giving up. 
 #define CAD_TIMEOUT_MS 50
 
 // The time we wait for a RxDone interrupt before giving up and going 
@@ -99,7 +98,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 
 #define CONTROL_NODE 1
 // How often the station sends its ID information to the control station
-#define STATION_ID_INTERVAL_SECONDS (60L * 60L)
+#define STATION_ID_INTERVAL_SECONDS (60UL * 60UL)
 
 static const float STATION_FREQUENCY = 906.5;
 
@@ -395,6 +394,10 @@ static void check_for_interrupts() {
     // Look at the flag that gets set by the ISR itself
     if (!isrHit) {
         return;
+    } else {
+        if (systemConfig.getLogLevel() > 0) {
+            logger.println("INF: Int");
+        }
     }
 
     // *******************************************************************************

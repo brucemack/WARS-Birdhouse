@@ -117,7 +117,7 @@ public:
 private:
 
     void _process(int16_t rssi, const Packet& packet, unsigned int packetLen);
-    void _populateSedResponse(SadRespPayload& respPayload) const;
+    void _populateSedResponse(SadRespPayload& respPayload, int16_t rssi) const;
 
     Configuration& _config;
     const Clock& _clock;

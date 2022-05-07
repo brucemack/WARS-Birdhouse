@@ -58,7 +58,7 @@ void OutboundPacket::transmitIfReady(const Clock& clock, CircularBuffer& txBuffe
     if ((clock.time() - _lastTransmitTime) < RETRY_INTERVAL_SECONDS * 1000) {
         return;
     }
-    // If we make it here than we are ready to transmit
+    // If we make it here then we are ready to transmit
     bool good = txBuffer.push(0, &_packet, _packetLen);
     if (good) {
         if (_packet.header.isAckRequired()) {
