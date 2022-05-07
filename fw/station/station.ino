@@ -860,6 +860,16 @@ static bool send_station_id(void*) {
     return true;
 }
 
+
+int showState(int argc, char** argv) {
+    logger.print("INF: state: ");
+    logger.print(state);
+    logger.print(" ");
+    logger.print(spi_read(0x01));  
+    logger.println();
+    return 0;    
+}
+
 void setup() {
 
     Serial.begin(115200);
@@ -926,7 +936,8 @@ void setup() {
     shell.addCommand(F("print <text>"), print);
     shell.addCommand(F("rem <text>"), rem);
     shell.addCommand(F("resetcounters"), resetCounters);
-
+    shell.addCommand(F("state"), showState);
+ 
     // Increment the boot count
     systemConfig.setBootCount(systemConfig.getBootCount() + 1);
   
