@@ -55,7 +55,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include "MessageProcessor.h"
 #include "CommandProcessor.h"
 
-#define SW_VERSION 46
+#define SW_VERSION 48
 
 // This is the pin that is available on the D1 Mini module:
 #define RST_PIN   26
@@ -78,8 +78,14 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 // The time we will wait for a TxDone interrupt before giving up.  This should
 // be an unusual case.
 #define TX_TIMEOUT_MS (30UL * 1000UL)
+
 // The time we will wait for a CadDone interrupt before giving up. 
 #define CAD_TIMEOUT_MS 50
+
+// The time we wait for a RxDone interrupt before giving up and going 
+// into idle mode.  This is done to avoid any bugs that might come
+// up where we get completely stuck in the receive state.
+#define RX_TIMEOUT_MS 60 * 1000
 
 #define S_TO_US_FACTOR 1000000UL
 
@@ -187,18 +193,26 @@ static MessageProcessor messageProcessor(mainClock,
 MessageProcessor& systemMessageProcessor = messageProcessor;
 
 // The states of the state machine
-enum State { IDLE, RX_STATE, TX_STATE, CAD };
+enum State { IDLE_STATE, RX_STATE, TX_STATE, CAD_STATE };
 
 // The overall state
-static volatile State state = State::IDLE;
+static volatile State state = State::IDLE_STATE;
 // This is volatile because it is set inside of the ISR context
 static volatile bool isrHit = false;
+
+// The time when the last receive was started.  Used to manage
+// timeouts.
+static volatile uint32_t startRxTime = 0;
 // The time when we started the last transmission.  This is needed 
 // to create a timeout on transmissions so we don't accidentally get 
 // stuck in a transmission.
 static volatile uint32_t startTxTime = 0;
-// The time when we should give up on the CAD (channel activity detect).
-static volatile uint32_t endCadTime = 0;
+// The time when we started the last channel activity detection.
+// This is needed to manage timeouts.
+static volatile uint32_t startCadTime = 0;
+// The time when the last channel activity was seen.. Used to avoid
+// transmission when there is receive activity going on.
+static volatile uint32_t lastActivityTime = 0;
 
 /**
  * @brief This is the actual ISR that is called by the Arduino run-time.
@@ -215,7 +229,8 @@ static void start_Tx() {
     //logger.println("start_Tx");
 
     // At this point we have something pending to be sent.
-    // Go into stand-by so we know that nothing else is coming in
+    // Go into stand-by so we are allowed to fill the FIFO
+    // (see page 34)
     set_mode_STDBY();
 
     // Pop the data off the TX queue into the transmit buffer.  
@@ -234,18 +249,14 @@ static void start_Tx() {
 }
 
 /**
- * @brief Put the radio RXCONTINUOUS mode and enable the RxDone interrupt.
+ * @brief Put the radio into receive mode and enable the RxDone interrupt.
  */
 static void start_Rx() {
-
-    //logger.println("start_Rx");
-
-    // Revert back to listening mode. 
     state = State::RX_STATE;
+    startRxTime = mainClock.time();
     // Ask for interrupt when receiving
     enable_interrupt_RxDone();
-    // Go into RXCONTINUOUS so we can hear the response
-    set_mode_RXCONTINUOUS();  
+    set_mode_RXCONTINUOUS();
 }
 
 /**
@@ -260,33 +271,39 @@ static void start_Cad() {
 
     //logger.println("start_Cad");
 
-    state = State::CAD;
+    state = State::CAD_STATE;
+    startCadTime = mainClock.time();
     // We use a random number here to try to limit transmissions stepping on each other
-    endCadTime = mainClock.time() + (CAD_TIMEOUT_MS * random(1, 5));
+    //endCadTime = mainClock.time() + (CAD_TIMEOUT_MS * random(1, 5));
     enable_interrupt_CadDone();
     set_mode_CAD();  
 }
 
+static void start_Idle() {
+    state = State::IDLE_STATE;
+    set_mode_STDBY();
+}
+
 /**
  * @brief This is called when the radio reports the end of a 
- * transmission sequence.  The radio is put back into 
- * continuous receive mode.
+ * transmission sequence.
  * 
  * This gets called from the main processing loop.
  */
-static void event_TxDone() {   
+static void event_TxDone(uint8_t irqFlags) {   
 
     //logger.println("TxDone");
 
-    // Check for pending transmissions.  If nothing is pending then 
-    // put the radio back into receive mode.
-    if (txBuffer.isEmpty()) {
-        start_Rx();
+    // If we expected this event
+    if (state == State::TX_STATE) {
+        // After transmit the radio goes back to standby mode
+        // automatically
+        state = State::IDLE_STATE;
     }
-    // If we have pending data then send it out immediately (the assumption
-    // is that the channel is still open). 
+    // Unexpected event
     else {
-        start_Tx();
+        logger.println("WRN: Unexpected TxDone");
+        start_Idle();
     }
 } 
 
@@ -295,65 +312,80 @@ static void event_TxDone() {
  * 
  * This gets called from the main processing loop.
  */
-static void event_RxDone() {
+static void event_RxDone(uint8_t irqFlags) {
 
     //logger.println("RxDone");
 
-    // How much data is available?
-    const uint8_t len = spi_read(0x13);
-    // Reset the FIFO read pointer to the beginning of the packet we just got
-    spi_write(0x0d, spi_read(0x10));
+    // Record that some activity was seen on the channel
+    lastActivityTime = mainClock.time();
 
-    // We do nothing for zero-length messages
-    if (len == 0) {
-        return;
+    // Expected
+    if (state == State::RX_STATE) {
+        // Make sure we don't have any errors
+        if (irqFlags & 0x20) {
+            logger.println("WRN: CRC error");
+            // Message is ignored
+        }
+        else {
+            // How much data is available? RxBytesNb
+            const uint8_t len = spi_read(0x13);
+
+            // We do nothing for zero-length messages
+            if (len == 0) {
+                return;
+            }
+
+            // Set the FIFO read pointer to the beginning of the 
+            // packet we just got. FifoAddrPtr=FifoRxCurrentAddr.  
+            spi_write(0x0d, spi_read(0x10));
+
+            // Stream received data in from the FIFO. 
+            uint8_t rx_buf[256];
+            spi_read_multi(0x00, rx_buf, len);
+            
+            // Grab the RSSI value from the radio
+            int8_t lastSnr = (int8_t)spi_read(0x19) / 4;
+            int16_t lastRssi = spi_read(0x1a);
+            if (lastSnr < 0)
+                lastRssi = lastRssi + lastSnr;
+            else
+                lastRssi = (int)lastRssi * 16 / 15;
+            // We are using the high frequency port
+            lastRssi -= 157;
+
+            // Put the RSSI (OOB) and the entire packet into the circular queue for 
+            // later processing.
+            rxBuffer.push((const uint8_t*)&lastRssi, rx_buf, len);
+        }
+        // NOTE: Stay in RX state
     }
-
-    // Stream received data in from the FIFO. 
-    uint8_t rx_buf[256];
-    spi_read_multi(0x00, rx_buf, len);
-    
-    // Grab the RSSI value from the radio
-    int8_t lastSnr = (int8_t)spi_read(0x19) / 4;
-    int16_t lastRssi = spi_read(0x1a);
-    if (lastSnr < 0)
-        lastRssi = lastRssi + lastSnr;
-    else
-        lastRssi = (int)lastRssi * 16 / 15;
-    // We are using the high frequency port
-    lastRssi -= 157;
-
-    // Put the RSSI (OOB) and the entire packet into the circular queue for 
-    // later processing.
-    rxBuffer.push((const uint8_t*)&lastRssi, rx_buf, len);
+    // Unexpected 
+    else {
+        logger.println("WRN: Unexpected RxDone");
+        start_Idle();
+    }
 }
 
 /**
  * @brief This function is called when the radio completes a CAD cycle
  * and it is determined that these is channel activity. 
  */
-static void event_CadDone_Detection() {
+static void event_CadDone(uint8_t irqFlags) {
 
-    logger.println("INF: CadDone Detection");
-
-    // Channel is busy so revert back to listening mode so that we're
-    // ready to receive the data. 
-    start_Rx();
-}
-
-static void event_CadDone_NoDetection() {
-
-    //logger.println("CadDone");
-
-    // Check for pending transmissions.  If nothing is pending then 
-    // put the radio back into receive mode.
-    if (txBuffer.isEmpty()) {
-        start_Rx();
+    // Expected
+    if (state == State::CAD_STATE) {
+        // This is the case where activity was detected
+        if (irqFlags & 0x01) {
+            logger.println("INF: CadDone Detection");
+            lastActivityTime = mainClock.time();
+            // Radio goes back to standby automatically after CAD
+            state = State::IDLE_STATE;
+        }
     }
-    // If something is pending then transmit it (since we've been told
-    // that the channel is innactive).
-    else {     
-        start_Tx();
+    // Unexpected
+    else {
+        logger.println("WRN: Unexpected CadDone");
+        start_Idle();
     }
 }
 
@@ -392,24 +424,28 @@ static void check_for_interrupts() {
     interrupts();
     // *******************************************************************************
     
-    // RX timeout - ignored
-    if (irq_flags & 0x80) {
-    } 
-    // RxDone without a CRC error
-    if ((irq_flags & 0x40) && !(irq_flags & 0x20)) {
-        event_RxDone();
+    // RxDone 
+    if (irq_flags & 0x40) {
+        event_RxDone(irq_flags);
     }
     // TxDone
     if (irq_flags & 0x08) {
-        event_TxDone();
+        event_TxDone(irq_flags);
     }
     // CadDone
     if (irq_flags & 0x04) {
-        if (irq_flags & 0x01) {
-            event_CadDone_Detection();
-        } else {
-            event_CadDone_NoDetection();
-        }
+        event_CadDone(irq_flags);
+    }
+}
+
+static void event_tick_Idle() {
+    // Check to see if there is data waiting to go out
+    if (!txBuffer.isEmpty()) {
+        // Launch a CAD check to see if the channel is clear
+        start_Cad(); 
+    } 
+    else {
+        start_Rx();
     }
 }
 
@@ -417,43 +453,54 @@ static void event_tick_Tx() {
     // Check for the case where a transmission times out
     if (mainClock.time() - startTxTime > TX_TIMEOUT_MS) {
         logger.println("ERR: TX time out");
-        start_Rx();
+        start_Idle();
     }
 }
 
 static void event_tick_Rx() {
+
     // Check for pending transmissions.  If nothing is pending then 
     // return without any state change.
-    if (txBuffer.isEmpty()) {
-        // No state change needed here
-        return;
-    }
-    else {
+    if (!txBuffer.isEmpty()) {
         // At this point we know there is something pending.  We first 
         // go into CAD mode to make sure the channel is innactive.
         // A successful CAD check (with no detection) will trigger 
         // the transmission.
         start_Cad();
     }
+
+    // Check for the case where a receive times out
+    if (mainClock.time() - startRxTime > RX_TIMEOUT_MS) {
+        start_Idle();
+    }
 }
 
 static void event_tick_Cad() {
     // Check for the case where a CAD check times out
-    if (mainClock.time() > endCadTime) {
-        event_CadDone_NoDetection();
+    if (mainClock.time() - startCadTime > CAD_TIMEOUT_MS) {
+        // If a CAD times out then that means that it is safe 
+        // to transmit. 
+        if (!txBuffer.isEmpty()) {
+            start_Tx();
+        } else {
+            start_Idle();
+        }
     }
 }
 
-// Call periodically to look for timeouts or other pending activity.  This will happen
-// on the regular application thread.
-void event_tick() {
+// Call periodically to look for timeouts or other pending activity.  
+// This will happen on the regular application thread.
+static bool event_tick(void*) {
     if (state == State::RX_STATE) {
         event_tick_Rx();
     } else if (state == State::TX_STATE) {
         event_tick_Tx();
-    } else if (state == State::CAD) {
+    } else if (state == State::CAD_STATE) {
         event_tick_Cad();
-    }
+    } else if (state == State::IDLE_STATE) {
+        event_tick_Idle();
+    } 
+    return true;
 }
 
 // --------------------------------------------------------------------------
@@ -478,6 +525,10 @@ static void set_mode_TX() {
 
 static void set_mode_RXCONTINUOUS() {
     spi_write(0x01, 0x05);
+}
+
+static void set_mode_RXSINGLE() {
+    spi_write(0x01, 0x06);
 }
 
 static void set_mode_CAD() {
@@ -553,8 +604,7 @@ int reset_radio() {
     delay(200);
     digitalWrite(LED_PIN, LOW);
 
-    // Start listening for messages
-    start_Rx();
+    start_Idle();
 
     return 0;  
 }
@@ -666,7 +716,7 @@ int init_radio() {
     spi_write(0x1d, reg);
 
     // 7-4:   9 (512 chips/symbol, spreading factor 9)
-    // 3:     0 (RX continuous mode normal)
+    // 3:     0 (TX continuous mode normal)
     // 2:     1 (CRC mode on)
     // 1-0:   0 (RX timeout MSB) 
     reg = 0b10010100;
@@ -815,6 +865,16 @@ static bool send_station_id(void*) {
     return true;
 }
 
+
+int showState(int argc, char** argv) {
+    logger.print("INF: state: ");
+    logger.print(state);
+    logger.print(" ");
+    logger.print(spi_read(0x01));  
+    logger.println();
+    return 0;    
+}
+
 void setup() {
 
     Serial.begin(115200);
@@ -881,7 +941,8 @@ void setup() {
     shell.addCommand(F("print <text>"), print);
     shell.addCommand(F("rem <text>"), rem);
     shell.addCommand(F("resetcounters"), resetCounters);
-
+    shell.addCommand(F("state"), showState);
+ 
     // Increment the boot count
     systemConfig.setBootCount(systemConfig.getBootCount() + 1);
   
@@ -922,6 +983,9 @@ void setup() {
             reset_radio();
         }
     }
+
+    // Enable the idle check timer to look for timeouts, etc.
+    timer.every(50, event_tick);
         
     // Enable the battery check timer
     timer.every(BATTERY_CHECK_INTERVAL_SECONDS * 1000, check_low_battery);
@@ -950,9 +1014,6 @@ void loop() {
   
   // Service the timers
   timer.tick();
-
-  // Check for radio activity
-  event_tick();
 
   // Perform any message processing that is pending
   systemMessageProcessor.pump();

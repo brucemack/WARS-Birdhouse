@@ -335,7 +335,9 @@ void MessageProcessor::_process(int16_t rssi,
       logger.print(respPayload.badRouteCount);
       logger.print(", \"lastHopRssi\": ");
       logger.print(respPayload.lastHopRssi);
-      logger.println("}");
+      logger.print(", \"rssi\": ");
+      logger.print(rssi);
+      logger.println(" }");
     }
 
     else if (packet.header.getType() == TYPE_PING_RESP) {
@@ -344,7 +346,9 @@ void MessageProcessor::_process(int16_t rssi,
         logger.print(packet.header.getOriginalSourceAddr());
         logger.print(", \"call\": \"");
         packet.header.getOriginalSourceCall().printTo(logger);
-        logger.print("\" }");
+        logger.print("\", \"rssi\": ");
+        logger.print(rssi);
+        logger.print(" }");
         logger.println();
     }
     
