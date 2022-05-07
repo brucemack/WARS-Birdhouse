@@ -50,7 +50,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include "MessageProcessor.h"
 #include "CommandProcessor.h"
 
-#define SW_VERSION 46
+#define SW_VERSION 48
 
 // This is the pin that is available on the D1 Mini module:
 #define RST_PIN   26
@@ -285,7 +285,7 @@ static void start_Idle() {
  * 
  * This gets called from the main processing loop.
  */
-static void event_TxDone(uint8 irqFlags) {   
+static void event_TxDone(uint8_t irqFlags) {   
 
     //logger.println("TxDone");
 
@@ -293,12 +293,12 @@ static void event_TxDone(uint8 irqFlags) {
     if (state == State::TX_STATE) {
         // After transmit the radio goes back to standby mode
         // automatically
-        state = State::IDLE_STATE
+        state = State::IDLE_STATE;
     }
     // Unexpected event
     else {
         logger.println("WRN: Unexpected TxDone");
-        start_idle();
+        start_Idle();
     }
 } 
 
@@ -307,7 +307,7 @@ static void event_TxDone(uint8 irqFlags) {
  * 
  * This gets called from the main processing loop.
  */
-static void event_RxDone(uint8 irqFlags) {
+static void event_RxDone(uint8_t irqFlags) {
 
     //logger.println("RxDone");
 
@@ -357,7 +357,7 @@ static void event_RxDone(uint8 irqFlags) {
     // Unexpected 
     else {
         logger.println("WRN: Unexpected RxDone");
-        start_idle();
+        start_Idle();
     }
 }
 
@@ -365,7 +365,7 @@ static void event_RxDone(uint8 irqFlags) {
  * @brief This function is called when the radio completes a CAD cycle
  * and it is determined that these is channel activity. 
  */
-static void event_CadDone(uint8 irqFlags) {
+static void event_CadDone(uint8_t irqFlags) {
 
     // Expected
     if (state == State::CAD_STATE) {
@@ -380,7 +380,7 @@ static void event_CadDone(uint8 irqFlags) {
     // Unexpected
     else {
         logger.println("WRN: Unexpected CadDone");
-        start_idle();
+        start_Idle();
     }
 }
 
