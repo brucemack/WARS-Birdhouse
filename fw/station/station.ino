@@ -55,7 +55,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include "MessageProcessor.h"
 #include "CommandProcessor.h"
 
-#define SW_VERSION 49
+#define SW_VERSION 50
 
 // This is the pin that is available on the D1 Mini module:
 #define RST_PIN   26
@@ -91,6 +91,9 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 
 // Deep sleep duration when low battery is detected
 #define DEEP_SLEEP_SECONDS (60UL * 60UL)
+
+// Full reboot interval
+#define REBOOT_INTERVAL_SECONDS (60UL * 60UL * 24UL)
 
 // How frequently to check the battery condition
 #define BATTERY_CHECK_INTERVAL_SECONDS 30
@@ -439,6 +442,15 @@ static void check_for_interrupts() {
 }
 
 static void event_tick_Idle() {
+
+    // Make sure the radio is in the state that we expect
+    uint8_t state = spi_read(0x01);  
+    if (state != 0x81) {
+        logger.println("WRN: Radio in unexpected state.");
+        reset_radio();
+        return;
+    }
+      
     // Check to see if there is data waiting to go out
     if (!txBuffer.isEmpty()) {
         // Launch a CAD check to see if the channel is clear
@@ -866,6 +878,10 @@ static bool send_station_id(void*) {
     return true;
 }
 
+static bool do_reboot(void*) {
+    ESP.restart();
+    return true;
+}
 
 int showState(int argc, char** argv) {
     logger.print("INF: state: ");
@@ -998,6 +1014,9 @@ void setup() {
     timer.every(STATION_ID_INTERVAL_SECONDS * 1000, send_station_id);
     // Force an initial update one minute after startup
     timer.in(60L * 1000L, send_station_id);
+
+    // Enable a daily reboot
+    timer.every(REBOOT_INTERVAL_SECONDS * 1000, do_reboot);
    
     // Enable the watchdog timer
     esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
