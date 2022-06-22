@@ -928,6 +928,7 @@ void setup() {
     // LED pin
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);
+    digitalWrite(LED_PIN, HIGH);
   
     // Shell setup
     shell.attach(Serial); 

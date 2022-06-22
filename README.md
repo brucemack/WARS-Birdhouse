@@ -261,13 +261,13 @@ A tree-mounted repeater prototype installed in a tree inside of a cloverleaf on-
 ![house4](images/IMG_0856.jpg)
 
 Cut list:
-* 1"x6" nominal stock (5.5" actual)
-  * Sides: 8 1/2" length with 32 degree mitre
-  * Roof: 7 1/4" length with 32 degree bevel on table saw
 * 1"x5" nominal stock (4.5" actual)
-  * Back: 12" length
+  * Sides: 6 1/2" max length with 32 degree mitre
+* 1"x6" nominal stock (5.5" actual)
+  * Back: 10" length
   * Bottom: 6" length
-  * Front: 5 1/4" with 32 degree bevel on table saw. Hole 1 1/2" diameter.
+  * Roof: 7 1/4" length with 32 degree bevel on table saw
+  * Front: 3 1/4" with 32 degree bevel on table saw. Hole 1 1/2" diameter.
 
 **PLEASE USE CAUTION WHEN WORKING WITH POWER TOOLS!**
 
