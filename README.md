@@ -321,6 +321,32 @@ Detailed Parts List
 -------------------
 (To follow)
 
+Hookup Notes
+------------
+
+Column 1
+
+Row 0 - GND
+Row 1 - Supply GND
+Row 2 - IO33 (Battery Voltage Sense)
+Row 3 - IO34 (Panel Voltage Sense)
+Row 4 - Supply +VCC
+Row 5 - Pannel
+Row 6 - Pannel
+Row 7 - +3.3V
+
+Column 2
+
+Row 0 
+Row 1
+Row 2 - IO19 (SPI MISO)
+Row 3 - IO23 (SPI MOSI)
+Row 4 - IO18 (SPI SCK)
+Row 5 - IO5  (SPI NSS)
+Row 6 - IO26 (Radio RST)
+Row 7 - IO4  (Radio DIO0) 
+
+
 Areas for Further Experimentation
 =================================
 
