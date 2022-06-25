@@ -261,13 +261,13 @@ A tree-mounted repeater prototype installed in a tree inside of a cloverleaf on-
 ![house4](images/IMG_0856.jpg)
 
 Cut list:
-* 1"x6" nominal stock (5.5" actual)
-  * Sides: 8 1/2" length with 32 degree mitre
-  * Roof: 7 1/4" length with 32 degree bevel on table saw
 * 1"x5" nominal stock (4.5" actual)
-  * Back: 12" length
+  * Sides: 6 1/2" max length with 32 degree mitre
+* 1"x6" nominal stock (5.5" actual)
+  * Back: 10" length
   * Bottom: 6" length
-  * Front: 5 1/4" with 32 degree bevel on table saw. Hole 1 1/2" diameter.
+  * Roof: 7 1/4" length with 32 degree bevel on table saw.  (Set fence at 6 1/2")
+  * Front: 3 3/4" max length with 32 degree bevel on table saw. Hole 1 1/2" diameter.  (Measure this peice using side and adjust fence accordindly).
 
 **PLEASE USE CAUTION WHEN WORKING WITH POWER TOOLS!**
 
@@ -321,6 +321,32 @@ potential station sites: https://link.ui.com/#.2q
 Detailed Parts List
 -------------------
 (To follow)
+
+Hookup Notes
+------------
+
+Column 1
+
+Row 0 - GND
+Row 1 - Supply GND
+Row 2 - IO33 (Battery Voltage Sense)
+Row 3 - IO34 (Panel Voltage Sense)
+Row 4 - Supply +VCC
+Row 5 - Pannel
+Row 6 - Pannel
+Row 7 - +3.3V
+
+Column 2
+
+Row 0 
+Row 1
+Row 2 - IO19 (SPI MISO)
+Row 3 - IO23 (SPI MOSI)
+Row 4 - IO18 (SPI SCK)
+Row 5 - IO5  (SPI NSS)
+Row 6 - IO26 (Radio RST)
+Row 7 - IO4  (Radio DIO0) 
+
 
 Areas for Further Experimentation
 =================================

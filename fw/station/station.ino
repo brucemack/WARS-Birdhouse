@@ -55,7 +55,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include "MessageProcessor.h"
 #include "CommandProcessor.h"
 
-#define SW_VERSION 48
+#define SW_VERSION 50
 
 // This is the pin that is available on the D1 Mini module:
 #define RST_PIN   26
@@ -80,7 +80,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #define TX_TIMEOUT_MS (30UL * 1000UL)
 
 // The time we will wait for a CadDone interrupt before giving up. 
-#define CAD_TIMEOUT_MS 50
+#define CAD_TIMEOUT_MS (50UL)
 
 // The time we wait for a RxDone interrupt before giving up and going 
 // into idle mode.  This is done to avoid any bugs that might come
@@ -91,6 +91,9 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 
 // Deep sleep duration when low battery is detected
 #define DEEP_SLEEP_SECONDS (60UL * 60UL)
+
+// Full reboot interval
+#define REBOOT_INTERVAL_SECONDS (60UL * 60UL * 24UL)
 
 // How frequently to check the battery condition
 #define BATTERY_CHECK_INTERVAL_SECONDS 30
@@ -273,8 +276,6 @@ static void start_Cad() {
 
     state = State::CAD_STATE;
     startCadTime = mainClock.time();
-    // We use a random number here to try to limit transmissions stepping on each other
-    //endCadTime = mainClock.time() + (CAD_TIMEOUT_MS * random(1, 5));
     enable_interrupt_CadDone();
     set_mode_CAD();  
 }
@@ -323,7 +324,9 @@ static void event_RxDone(uint8_t irqFlags) {
     if (state == State::RX_STATE) {
         // Make sure we don't have any errors
         if (irqFlags & 0x20) {
-            logger.println("WRN: CRC error");
+            if (systemConfig.getLogLevel() > 0) {
+               logger.println("WRN: CRC error");
+            }
             // Message is ignored
         }
         else {
@@ -439,6 +442,15 @@ static void check_for_interrupts() {
 }
 
 static void event_tick_Idle() {
+
+    // Make sure the radio is in the state that we expect
+    uint8_t state = spi_read(0x01);  
+    if (state != 0x81) {
+        logger.println("WRN: Radio in unexpected state.");
+        reset_radio();
+        return;
+    }
+      
     // Check to see if there is data waiting to go out
     if (!txBuffer.isEmpty()) {
         // Launch a CAD check to see if the channel is clear
@@ -476,8 +488,9 @@ static void event_tick_Rx() {
 }
 
 static void event_tick_Cad() {
-    // Check for the case where a CAD check times out
-    if (mainClock.time() - startCadTime > CAD_TIMEOUT_MS) {
+    // Check for the case where a CAD check times out.  A random timeout is 
+    // used to try to reduce collisions
+    if ((mainClock.time() - startCadTime) > (CAD_TIMEOUT_MS * random(1, 3))) {
         // If a CAD times out then that means that it is safe 
         // to transmit. 
         if (!txBuffer.isEmpty()) {
@@ -865,6 +878,10 @@ static bool send_station_id(void*) {
     return true;
 }
 
+static bool do_reboot(void*) {
+    ESP.restart();
+    return true;
+}
 
 int showState(int argc, char** argv) {
     logger.print("INF: state: ");
@@ -911,6 +928,7 @@ void setup() {
     // LED pin
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);
+    digitalWrite(LED_PIN, HIGH);
   
     // Shell setup
     shell.attach(Serial); 
@@ -997,6 +1015,9 @@ void setup() {
     timer.every(STATION_ID_INTERVAL_SECONDS * 1000, send_station_id);
     // Force an initial update one minute after startup
     timer.in(60L * 1000L, send_station_id);
+
+    // Enable a daily reboot
+    timer.every(REBOOT_INTERVAL_SECONDS * 1000, do_reboot);
    
     // Enable the watchdog timer
     esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
