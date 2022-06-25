@@ -266,8 +266,8 @@ Cut list:
 * 1"x6" nominal stock (5.5" actual)
   * Back: 10" length
   * Bottom: 6" length
-  * Roof: 7 1/4" length with 32 degree bevel on table saw
-  * Front: 3 1/4" with 32 degree bevel on table saw. Hole 1 1/2" diameter.
+  * Roof: 7 1/4" length with 32 degree bevel on table saw.  (Set fence at 6 1/2")
+  * Front: 3 3/4" max length with 32 degree bevel on table saw. Hole 1 1/2" diameter.  (Measure this peice using side and adjust fence accordindly).
 
 **PLEASE USE CAUTION WHEN WORKING WITH POWER TOOLS!**
 
