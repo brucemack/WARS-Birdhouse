@@ -308,6 +308,7 @@ Reference Material
 potential station sites: https://link.ui.com/#.2q
 * LoRa rules, regulations, and terminology: https://lora.readthedocs.io/en/latest/#rules-and-regulations
 * Reference for LoRa radio module (RFM95W): https://www.hoperf.com/modules/lora/RFM95.html
+* LoRa Modulation Information: https://www.frugalprototype.com/wp-content/uploads/2016/08/an1200.22.pdf
 * Reference for 18650 battery: https://cdn.sparkfun.com/datasheets/Prototyping/ICR18650%202600mAH%20datasheet.pdf
 * Reference for LDO Voltage Regulator: https://ww1.microchip.com/downloads/en/DeviceDoc/MCP1700-Low-Quiescent-Current-LDO-20001826E.pdf
 * Reference for STM32L031 microcontroller: https://www.st.com/resource/en/datasheet/stm32l031k6.pdf
