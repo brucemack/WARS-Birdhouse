@@ -43,6 +43,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include <SimpleSerialShell.h>
 #include <arduino-timer.h>
 #include <Preferences.h>
+#include "BluetoothSerial.h"
 
 #include "spi_utils.h"
 #include "CircularBuffer.h"
@@ -55,7 +56,7 @@ http://www.esp32learning.com/wp-content/uploads/2017/12/esp32minikit.jpg
 #include "MessageProcessor.h"
 #include "CommandProcessor.h"
 
-#define SW_VERSION 50
+#define SW_VERSION 51
 
 // This is the pin that is available on the D1 Mini module:
 #define RST_PIN   26
@@ -216,6 +217,9 @@ static volatile uint32_t startCadTime = 0;
 // The time when the last channel activity was seen.. Used to avoid
 // transmission when there is receive activity going on.
 static volatile uint32_t lastActivityTime = 0;
+
+// Alternate Serial Port
+BluetoothSerial SerialBT;
 
 /**
  * @brief This is the actual ISR that is called by the Arduino run-time.
@@ -929,7 +933,13 @@ void setup() {
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);
     digitalWrite(LED_PIN, HIGH);
-  
+
+    // Setup an optional Bluetooth serial access method
+    // Make sure the Bluetooth address is unique
+    String btStation("Birdhouse");
+    btStation.concat((int)mainConfig.getAddr());
+    SerialBT.begin(btStation);
+
     // Shell setup
     shell.attach(Serial); 
     shell.setTokenizer(tokenizer);
@@ -1025,6 +1035,8 @@ void setup() {
     esp_task_wdt_reset();
 }
 
+static bool alternateSerial = false;
+
 void loop() {
 
   // Check to see if any interrupts were fired
@@ -1041,4 +1053,16 @@ void loop() {
 
   // Keep the watchdog alive
   esp_task_wdt_reset();
+
+  // Serial2 checks
+  if (!alternateSerial && SerialBT.available()) {
+    char c = SerialBT.read();
+    // Look for the activation character
+    if (c == '$') {
+      // Switch
+      Serial.println("INF: Switching to Serial2");
+      shell.attach(SerialBT);
+      alternateSerial = true;
+    }
+  }
 }
