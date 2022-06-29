@@ -236,6 +236,10 @@ A tower-mounted birdhouse repeater prototype at the QTH of KC1FSZ:
 
 ![house3](images/IMG_0853.jpg)
 
+A custom PCB (V2) has been developed to improve integration and to make things easier for kit builders without SMD soldering capability.
+
+![house4](images/IMG_0934.jpg)
+
 Hardware Notes
 --------------
 * Voltage readings are taken on solar panels and batteries.
