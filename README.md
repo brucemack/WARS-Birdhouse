@@ -264,7 +264,7 @@ A tree-mounted repeater prototype installed in a tree inside of a cloverleaf on-
 
 ![house4](images/IMG_0856.jpg)
 
-A station mounted on the top of North Hill in Needham, MA.
+A repeater station mounted on the top of North Hill in Needham, MA.
 
 ![house4](images/IMG_1035.jpg)
 
