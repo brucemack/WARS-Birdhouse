@@ -264,7 +264,12 @@ A tree-mounted repeater prototype installed in a tree inside of a cloverleaf on-
 
 ![house4](images/IMG_0856.jpg)
 
-Cut list:
+A station mounted on the top of North Hill in Needham, MA.
+
+![house4](images/IMG_1035.jpg)
+
+Lumber Cut List:
+
 * 1"x5" nominal stock (4.5" actual)
   * Sides: 6 1/2" max length with 32 degree mitre
 * 1"x6" nominal stock (5.5" actual)
