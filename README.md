@@ -40,8 +40,8 @@ Commodity components are being used to keep birdhouse costs to a minimum.  Our g
 The software supports a simple message routing protocol that allows packets to "hop" between houses to reach their final destination.  Other control packets are used to extract engineering data and to control 
 message routing.
 
-The 33cm ham band (902-928 MHz) is used given that this is an experimental technology.  All 
-nodes must be installed/operated by FCC licensed amateur/ham radio operators.  
+The 33cm ham band (902-928 MHz) is used given that this is an experimental technology and **is not FCC Part 15 certified** at the moment.  All 
+nodes must be installed/operated by FCC licensed amateur/ham radio operators under Part 97 rules.
 
 A proof-of-concept network of 5 stations has been constructed in Wellesley, MA.  Messages have been successfully routed back and forth across the entire mesh, including hops between birdhouses that were separated by approximately 1 kilometer.  Antenna height is important, as always.  The houses have been subjected to bad New England weather conditions including snow, ice, extended periods of cloudy weather and sub-zero temperatures.  It is an open question as to how the system will perform when our trees have leaves on them again!
 
@@ -393,13 +393,19 @@ Relevant FCC Regulations/Notes
 * Part 97.311 Defines spread-spectrum (SS) rules.
 * Part 97.303 (N) Defines rules for the 33cm band.  Basically, hams must share the band with other services.  There are also geographical restrictions in Texas, New Mexico, Colorado, and Wyoming.
 * Part 97.309 (B) Talks about unspecified data emission codes.  Basically, all formats need to be clearly documented. See above. 
-* Are any part 15 regulations relevant here?
 * This firm does certification and [provides a detailed guide on the certification process](https://www.sunfiretesting.com/LoRa-FCC-Certification-Guide/).  
+
+Publicity
+=========
+
+* An article about this project (co-authored by Dan Brown W1DAN) appears in the Club Station column of the July 2023 issue of ARRL QST magazine. It was nice of the League to publish this.
+* A nice Hackaday article [can be found here](https://hackaday.com/2022/04/09/lora-powered-birdhouses-enable-wireless-networking-when-the-internets-down/).  I found this article amusing given its implication that our network could be used as a backup when the Internet was down.  I've not tried streaming Netflix over LoRa, but I'm guessing the video quality won't be great. :-)
+* The Zero Retries newsletter covered the project [in June of 2023](https://www.zeroretries.org/p/zero-retries-0102). Steve Stroh N8GNJ does a nice job with this widely-read newsletter and I was honored to be called "woefully misinformed" and "shortsighted" in his article.  As Lindsay Lohan once said, there is no such thing as bad publicity!
 
 Copyright Information 
 =====================
 
-Copyright (C) 2022 - Bruce MacKinnon KC1FSZ
+Copyright (C) 2023 - Bruce MacKinnon KC1FSZ
 
 This work is covered under the terms of the GNU Public License (V3).  Please consult the 
 LICENSE file for more information.  
