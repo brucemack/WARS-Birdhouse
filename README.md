@@ -398,7 +398,7 @@ Relevant FCC Regulations/Notes
 Publicity
 =========
 
-* An article about this project (co-authored by Dan Brown W1DAN) appears in the Club Station column of the July 2023 issue of ARRL QST magazine. It was nice of the League to publish this.
+* An article about this project (co-authored with Dan Brown W1DAN) appears in the Club Station column of the July 2023 issue of [ARRL QST Magazine](https://www.arrl.org/qst). It was nice of the League to publish this.
 * A nice Hackaday article [can be found here](https://hackaday.com/2022/04/09/lora-powered-birdhouses-enable-wireless-networking-when-the-internets-down/).  I found this article amusing given its implication that our network could be used as a backup when the Internet was down.  I've not tried streaming Netflix over LoRa, but I'm guessing the video quality won't be great. :-)
 * The Zero Retries newsletter covered the project [in June of 2023](https://www.zeroretries.org/p/zero-retries-0102). Steve Stroh N8GNJ does a nice job with this widely-read newsletter and I was honored to be called "woefully misinformed" and "shortsighted" in his article.  As Lindsay Lohan once said, there is no such thing as bad publicity!
 
