@@ -17,6 +17,14 @@ Will this bird fly?  Let's find out!
 
 ![Birdhouse](images/outside.jpg)
 
+Publicity
+=========
+
+* This project is mentioned in an excellent new book called [Other Networks: A Radical Technology Sourcebook](https://www.amazon.com/Other-Networks-Radical-Technology-Sourcebook/dp/1944860657) written by Dr. Lori Emerson, Associate Professor of Media Studies, Founding Director of the Media Archaeology Lab, and Director of the Intermedia Art, Writing and Performance Program at the University of Colorado Boulder.
+* An article about this project (co-authored with Dan Brown W1DAN) appears in the Club Station column of the July 2023 issue of [ARRL QST Magazine](https://www.arrl.org/qst). It was nice of the League to publish this.
+* A nice Hackaday article [can be found here](https://hackaday.com/2022/04/09/lora-powered-birdhouses-enable-wireless-networking-when-the-internets-down/).  I found this article amusing given its implication that our network could be used as a backup when the Internet was down.  I've not tried streaming Netflix over LoRa, but I'm guessing the video quality won't be great. :-)
+* The Zero Retries newsletter covered the project [in June of 2023](https://www.zeroretries.org/p/zero-retries-0102). Steve Stroh N8GNJ does a nice job with this widely-read newsletter and I was honored to be called "woefully misinformed" and "shortsighted" in his article.  As Lindsay Lohan once said, there is no such thing as bad publicity!
+
 Design Overview
 ================
 
@@ -395,13 +403,6 @@ Relevant FCC Regulations/Notes
 * Part 97.309 (B) Talks about unspecified data emission codes.  Basically, all formats need to be clearly documented. See above. 
 * This firm does certification and [provides a detailed guide on the certification process](https://www.sunfiretesting.com/LoRa-FCC-Certification-Guide/).  
 
-Publicity
-=========
-
-* This project is mentioned in an excellent new book called [Other Networks: A Radical Technology Sourcebook](https://www.amazon.com/Other-Networks-Radical-Technology-Sourcebook/dp/1944860657) written by Dr. Lori Emerson, Associate Professor of Media Studies, Founding Director of the Media Archaeology Lab, and Director of the Intermedia Art, Writing and Performance Program at the University of Colorado Boulder.
-* An article about this project (co-authored with Dan Brown W1DAN) appears in the Club Station column of the July 2023 issue of [ARRL QST Magazine](https://www.arrl.org/qst). It was nice of the League to publish this.
-* A nice Hackaday article [can be found here](https://hackaday.com/2022/04/09/lora-powered-birdhouses-enable-wireless-networking-when-the-internets-down/).  I found this article amusing given its implication that our network could be used as a backup when the Internet was down.  I've not tried streaming Netflix over LoRa, but I'm guessing the video quality won't be great. :-)
-* The Zero Retries newsletter covered the project [in June of 2023](https://www.zeroretries.org/p/zero-retries-0102). Steve Stroh N8GNJ does a nice job with this widely-read newsletter and I was honored to be called "woefully misinformed" and "shortsighted" in his article.  As Lindsay Lohan once said, there is no such thing as bad publicity!
 
 Copyright Information 
 =====================
